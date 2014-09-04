@@ -1,3 +1,5 @@
-# Byte-compiled python #
+# Compiled files       #
 ########################
 *.pyc
+*.o
+.DS_Store
