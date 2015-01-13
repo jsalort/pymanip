@@ -16,11 +16,18 @@ def StartPostProcessing(acquisitionName, basePath='.'):
 	
 	# Décompte du nombre d'éléments
 	nval = 0
+	variableList = ""
 	with open(datFilePath, 'r') as f:
-		variableList = f.readline().split(' ')
 		for line in f:
-			if line[0] != 'T':
+			if line[0] == 'T':
+				if(line != variableList):
+					variableList = line
+					#print variableList
+			else:
 				nval = nval+1
+
+	variableList = variableList.split(' ')
+
 	dictionnaire = dict()
 	dictionnaire['nval'] = nval
 	if nval > 1:
@@ -33,11 +40,18 @@ def StartPostProcessing(acquisitionName, basePath='.'):
 			contentList = line.split(' ')
 			if contentList[0] != 'Time':
 				if nval == 1:
-					for i in range(len(variableList)):				
+					for i in range(len(variableList)):		
 						dictionnaire[variableList[i].strip()] = eval(contentList[i].strip())
 				else:
 					for i in range(len(variableList)):
-						dictionnaire[variableList[i].strip()][linenum] = eval(contentList[i].strip())
+						if i < len(contentList):
+							dataStr = contentList[i].strip()
+							if dataStr.lower() == "nan":
+								dictionnaire[variableList[i].strip()][linenum] = np.nan
+							else:
+								dictionnaire[variableList[i].strip()][linenum] = eval(contentList[i].strip())
+						else:
+							dictionnaire[variableList[i].strip()][linenum] = np.nan
 					linenum = linenum+1
 	
 	return dictionnaire
