@@ -4,10 +4,7 @@
 import os
 import numpy as np
 
-
-# Reading OctMI files
-
-def StartPostProcessing(acquisitionName, basePath='.'):
+def load_octmi(acquisitionName, basePath='.'):
 	# Vérification de l'existence du fichier
 	datFilePath = os.path.normpath(basePath) + '/' + acquisitionName + '_MI.dat'
 	if not os.path.exists(datFilePath):

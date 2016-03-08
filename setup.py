@@ -17,7 +17,7 @@ setup(name='pymanip',
       license='Apache',
       packages=['pymanip'],
       install_requires=[
-        'h5py',
+        'h5py', 'fluidlab', 'fluiddyn',
       ],
       include_package_data=True,
       zip_safe=False)
