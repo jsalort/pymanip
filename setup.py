@@ -11,4 +11,7 @@ setup(name='pymanip',
       author_email='julien.salort@ens-lyon.fr',
       license='Apache',
       packages=['pymanip'],
+      install_requires=[
+        'h5py',
+      ],
       zip_safe=False)
