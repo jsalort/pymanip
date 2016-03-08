@@ -55,7 +55,7 @@ def print_formatted(string, color="black", typeface="regular"):
   sys.stdout.flush()
   
 class Session:
-  def __init__(self, session_name, variable_list):
+  def __init__(self, session_name, variable_list=[]):
     self.session_name = session_name
     self.storename = session_name + '.hdf5'
     self.datname = session_name + '.dat'
