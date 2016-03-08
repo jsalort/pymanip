@@ -7,6 +7,7 @@ import numpy as np
 import time
 import inspect
 import matplotlib.pyplot as plt
+import warnings
 
 def colorname_to_colorcode(color):
   if color == "red" or color == "Red" or color == "r":
@@ -121,7 +122,9 @@ class Session:
       plt.plot(t, self.log(var), 'o-', label=var)
     plt.legend(loc='upper left')
     plt.draw()
-    plt.pause(0.0001)
+    with warnings.catch_warnings():
+      warnings.simplefilter("ignore")
+      plt.pause(0.0001)
     
   def sleep(self, duration):
     debut = time.time()
@@ -129,15 +132,17 @@ class Session:
       sys.stdout.write("Sleeping for " + str(-int(time.time()-debut-duration)) + " s           \r")
       sys.stdout.flush()
       #time.sleep(1.0)
-      plt.pause(1.0)
+      with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.pause(1.0)
     sys.stdout.write("\n")
 
       
   def Stop(self):
     if self.opened:
       self.store.close()
-      print "Press Enter to continue ..." 
-      raw_input()
+      #print "Press Enter to continue ..." 
+      #raw_input()
       self.opened = False
       
   def __del__(self):
