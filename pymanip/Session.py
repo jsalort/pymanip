@@ -60,15 +60,20 @@ class Session:
     self.session_name = session_name
     self.storename = session_name + '.hdf5'
     self.datname = session_name + '.dat'
+    self.datfile = open(self.datname, 'a')
     try:
       self.store = h5py.File(self.storename, 'r+')
       self.dset_time = self.store["time"]
       self.grp_variables = self.store["variables"]
       original_size = self.dset_time.len()
       arr = np.zeros( (original_size,) )
+      new_headers = False
+      if len(variable_list) != len(self.grp_variables.keys()):
+        new_headers = True
       for var in variable_list:
         if var not in self.grp_variables.keys():
           self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), data=arr)
+          new_headers = True
       print_formatted("Session reloaded from file " + self.storename, color="blue", typeface="bold")
       if original_size > 0:
         last_t = self.dset_time[original_size-1]
@@ -78,8 +83,14 @@ class Session:
       self.store = h5py.File(self.storename, 'w')
       self.dset_time = self.store.create_dataset("time", chunks=True, maxshape=(None,), shape=(0,), dtype=float)
       self.grp_variables = self.store.create_group("variables")
+      new_headers = True
       for var in variable_list:
         self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), shape=(0,), dtype=float)
+    if new_headers:
+      self.datfile.write('Time')
+      for var in variable_list:
+        self.datfile.write(' ' + var)
+      self.datfile.write("\n")
     self.opened = True
     
   def log_addline(self):
@@ -91,15 +102,19 @@ class Session:
     newsize = self.dset_time.len()+1
     self.dset_time.resize( (newsize,) )
     self.dset_time[newsize-1] = time.time()
+    self.datfile.write("%f" % self.dset_time[newsize-1])
     for varname in self.grp_variables.keys():
       d = self.grp_variables[varname]
       d.resize( (newsize,) )
       try:
         d[newsize-1] = dict_caller[varname]
+        self.datfile.write(" %f" % dict_caller[varname])
       except:
         print_formatted('Variable is not defined: ' + varname, color="red", typeface="bold")
         d[newsize-1] = 0.
         pass
+    self.datfile.write("\n")
+    self.datfile.flush()
     self.store.flush()
   
   def log(self, varname):
@@ -141,8 +156,7 @@ class Session:
   def Stop(self):
     if self.opened:
       self.store.close()
-      #print "Press Enter to continue ..." 
-      #raw_input()
+      self.datfile.close()
       self.opened = False
       
   def __del__(self):
