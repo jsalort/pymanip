@@ -5,3 +5,4 @@
 __all__ = ["interfaces"]
 
 from .Session import Session
+from .Miscellaneous import scanGpib
