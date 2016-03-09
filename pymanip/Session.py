@@ -8,6 +8,8 @@ import time
 import inspect
 import matplotlib.pyplot as plt
 import warnings
+import smtplib, base64, quopri
+import tempfile
 
 def colorname_to_colorcode(color):
   if color == "red" or color == "Red" or color == "r":
@@ -60,7 +62,13 @@ class Session:
     self.session_name = session_name
     self.storename = session_name + '.hdf5'
     self.datname = session_name + '.dat'
+    self.logname = session_name + '.log'
     self.datfile = open(self.datname, 'a')
+    self.logfile = open(self.logname, 'a')
+    self.session_opening_time = time.time()
+    date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(self.session_opening_time))
+    self.logfile.write("Session opened on " + date_string)
+    self.logfile.flush()
     try:
       self.store = h5py.File(self.storename, 'r+')
       self.dset_time = self.store["time"]
@@ -92,7 +100,18 @@ class Session:
         self.datfile.write(' ' + var)
       self.datfile.write("\n")
     self.opened = True
+    self.email_started = False
+    self.email_lastSent = 0.0
     
+  def disp(self, texte):
+    print texte
+    if not texte.endswith("\n"):
+      texte = texte + "\n"
+    self.logfile.write(texte)
+    self.logfile.flush()
+    if self.email_started:
+      self.email_body = self.email_body + texte
+      
   def log_addline(self):
     stack = inspect.stack()
     try:
@@ -125,16 +144,22 @@ class Session:
     else:
       print_formatted('Variable is not defined: ' + varname, color="red", typeface="bold")
     
-      
-  def log_plot(self, fignum, varlist):
+  def log_plot(self, fignum, varlist, maxvalues=1000):
     plt.figure(fignum)
     plt.clf()
     plt.ion()
     plt.show()
     t = self.log('t')
     t = (t-t[0])/3600.
+    if len(t) > maxvalues:
+      debut = len(t) - 1000
+      fin = len(t)
+    else:
+      debut = 0
+      fin = len(t)
     for var in varlist:
-      plt.plot(t, self.log(var), 'o-', label=var)
+      plt.plot(t[debut:fin], self.log(var)[debut:fin], 'o-', label=var)
+    plt.xlabel('t [h]')
     plt.legend(loc='upper left')
     plt.draw()
     with warnings.catch_warnings():
@@ -152,11 +177,143 @@ class Session:
         plt.pause(1.0)
     sys.stdout.write("\n")
 
+  def start_email(self, from_addr, to_addrs, host, subject=None, port=25):
+    self.email_host = host
+    self.email_port = port
+    self.email_from_addr = from_addr
+    self.email_to_addrs = to_addrs
+    date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(time.time()))
+    if subject != None:
+      self.email_subject = subject
+    else:
+      self.email_subject = self.session_name
+    self.email_body = "<html><body>\n<strong>**************************************************</strong><br />\n<strong>" + date_string + "</strong><br />\n" + self.session_name + "<br />\n<strong>**************************************************</strong><br /><br />\n\n"
+    self.email_figlist = []
+    self.email_started = True
+    
+  def add_figure_to_email(self, figNum):
+    self.email_figlist.append(figNum)
+    
+  def stop_email(self):
+    success = False
+    smtp = smtplib.SMTP(self.email_host, self.email_port)
+    self.email_body = self.email_body + "</body></html>"
+    
+    useMime = False
+    if len(self.email_figlist) > 0:
+      useMime = True
       
+    mime_boundary = 'pymanip-MIME-delimiter'
+    if useMime:
+      email_header = 'Content-type: multipart/mixed; boundary="' + mime_boundary + '"\n'
+      email_header = email_header + 'MIME-version: 1.0\n'
+    else:
+      email_header = 'Content-Type: text/html\n'
+      email_header = email_header + 'Content-Transfer-Encoding: quoted-printable\n'
+    email_header = email_header + 'User-Agent: pymanip\n'
+    email_header = email_header + 'To: '
+    if len(self.email_to_addrs) == 1:
+      email_header = email_header + self.email_to_addrs[0] + '\n'
+    else:
+      for addr in self.email_to_addrs[:-1]:
+        email_header = email_header + addr + ', '
+      email_header + email_header + to_addrs[-1] + '\n'
+    email_header = email_header + 'Subject: ' + self.email_subject
+    
+    if useMime:
+      body = "This is a multi-part message in MIME format.\n"
+      # Add text/html MIME part
+      body = body + '--' + mime_boundary + '\n'
+      body = body + 'Content-Type: text/html; charset=UTF-8\n'
+      body = body + 'Content-Transfer-Encoding: quoted-printable\n\n'
+      body = body + quopri.encodestring(self.email_body) + '\n'
+      
+      # Add figures
+      for fig in self.email_figlist:
+        plt.figure(fig)
+        (fd, fname) = tempfile.mkstemp(suffix='.png')
+        f_png = os.fdopen(fd, 'wb')
+        plt.savefig(f_png)
+        f_png.close()
+        with open(fname, 'rb') as image_file:
+          encoded_figure = base64.b64encode(image_file.read())
+        os.remove(fname)
+        # Add image/png MIME part
+        body = body + '--' + mime_boundary + '\n'
+        body = body + 'Content-Type: image/png\n'
+        body = body + 'Content-Disposition: inline\n'
+        body = body + 'Content-Transfer-Encoding: base64\n\n'
+        for i in range(0,len(encoded_figure),76):
+          debut = i
+          fin = i + 75
+          if fin >= len(encoded_figure):
+            fin = len(encoded_figure)-1
+          body = body + encoded_figure[debut:(fin+1)] + '\n'
+          
+      # Send email
+      try:
+        error_list = smtp.sendmail(
+          self.email_from_addr, 
+          self.email_to_addrs, 
+          email_header + '\n' + body + '\n' + '--' + mime_boundary + '--\n')
+        if len(error_list) == 0:
+          success = True
+      except smtplib.SMTPHeloError:
+        print 'SMTP Helo Error'
+        pass
+      except smtplib.SMTPRecipientsRefused:
+        print 'Some recipients have been rejected by SMTP server'
+        pass
+      except smtplib.SMTPSenderRefused:
+        print 'SMTP server refused sender ' + self.email_from_addr
+        pass
+      except smtplib.SMTPDataError:
+        print 'SMTP Data Error'
+        pass
+        
+    else:
+      try:
+        error_list = smtp.sendmail(
+          self.email_from_addr, 
+          self.email_to_addrs, 
+          email_header + '\n' + quopri.encodestring(self.email_body))
+        if len(error_list) == 0:
+          success = True
+      except smtplib.SMTPHeloError:
+        print 'SMTP Helo Error'
+        pass
+      except smtplib.SMTPRecipientsRefused:
+        print 'Some recipients have been rejected by SMTP server'
+        pass
+      except smtplib.SMTPSenderRefused:
+        print 'SMTP server refused sender ' + self.email_from_addr
+        pass
+      except smtplib.SMTPDataError:
+        print 'SMTP Data Error'
+        pass
+        
+    smtp.quit()
+    self.email_body = ''
+    self.email_started = False
+    self.email_figlist = []
+    if success:
+      self.email_lastSent = time.time()
+      date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(self.email_lastSent))
+      print date_string + ': Email successfully sent.'
+
+  def time_since_last_email(self):
+    return time.time() - self.email_lastSent
+    
   def Stop(self):
+    if self.email_started:
+      self.stop_email()
     if self.opened:
       self.store.close()
       self.datfile.close()
+      date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(time.time()))
+      self.logfile.write("Session closed on " + date_string)
+      self.logfile.flush()
+      self.logfile.close()
       self.opened = False
       
   def __del__(self):
