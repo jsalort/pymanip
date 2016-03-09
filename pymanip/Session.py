@@ -105,12 +105,12 @@ class Session:
     
   def disp(self, texte):
     print texte
+    if self.email_started:
+      self.email_body = self.email_body + texte + '<br />\n'
     if not texte.endswith("\n"):
       texte = texte + "\n"
     self.logfile.write(texte)
     self.logfile.flush()
-    if self.email_started:
-      self.email_body = self.email_body + texte
       
   def log_addline(self):
     stack = inspect.stack()
@@ -217,7 +217,7 @@ class Session:
     else:
       for addr in self.email_to_addrs[:-1]:
         email_header = email_header + addr + ', '
-      email_header + email_header + to_addrs[-1] + '\n'
+      email_header = email_header + self.email_to_addrs[-1] + '\n'
     email_header = email_header + 'Subject: ' + self.email_subject
     
     if useMime:
