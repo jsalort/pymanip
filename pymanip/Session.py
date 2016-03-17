@@ -10,52 +10,11 @@ import matplotlib.pyplot as plt
 import warnings
 import smtplib, base64, quopri
 import tempfile
-
-def colorname_to_colorcode(color):
-  if color == "red" or color == "Red" or color == "r":
-    colorcode = 31
-  elif color == "green" or color == "Green" or color == "g":
-    colorcode = 32
-  elif color == "yellow" or color == "Yellow" or color == "y":
-    colorcode = 33
-  elif color == "blue" or color == "Blue" or color == "b":
-    colorcode = 34
-  elif color == "purple" or color == "Purple" or color == "p":
-    colorcode = 35
-  elif color == "cyan" or color == "Cyan" or color == "c":
-    colorcode = 36
-  elif color == "black" or color == "Black" or color == "k":
-    colorcode = 30
-  elif color == "white" or color == "White" or color == "w":
-    colorcode = 37
-  else:
-    print 'Warning: unknown color', color
-    colorcode = 30
-  return str(colorcode)
-
-def typefacename_to_typefacecode(typeface):
-  if typeface == "regular" or typeface == "Regular":
-    typefacecode = 0
-  elif typeface == "bold" or typeface == "Bold":
-    typefacecode = 1
-  elif typeface == "underline" or typeface == "Underline" or typeface == "underlined" or typeface == "_":
-    typefacecode = 4
-  else:
-    print 'Warning: unknown typeface', typeface
-    typefacecode = 0
-  return str(typefacecode)
+from platform import platform
+from clint.textui import colored
 
 def boldface(string):
   return "\x1b[1;1m" + string + "\x1b[0;0m"
-
-def print_formatted(string, color="black", typeface="regular"):
-  if color != "black" or typeface != "regular":
-    formatted_string = "\x1b[" + colorname_to_colorcode(color) + ";" + typefacename_to_typefacecode(typeface) + 'm' + string + "\x1b[0;0m\n"
-    #formatted_string = "[" + colorname_to_colorcode(color) + ";" + typefacename_to_typefacecode(typeface) + 'm' + string + "[0;0m\n"
-  else:
-    formatted_string = string + "\n"
-  sys.stdout.write(formatted_string)
-  sys.stdout.flush()
   
 class Session:
   def __init__(self, session_name, variable_list=[]):
@@ -66,7 +25,11 @@ class Session:
     self.datfile = open(self.datname, 'a')
     self.logfile = open(self.logname, 'a')
     self.session_opening_time = time.time()
-    date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(self.session_opening_time))
+    if platform().startswith('Windows'):
+        self.dateformat = '%A %d %B %Y - %X (%z)'
+    else:
+        self.dateformat = '%A %e %B %Y - %H:%M:%S (UTC%z)'
+    date_string = time.strftime(self.dateformat, time.localtime(self.session_opening_time))
     self.logfile.write("Session opened on " + date_string)
     self.logfile.flush()
     try:
@@ -82,10 +45,10 @@ class Session:
         if var not in self.grp_variables.keys():
           self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), data=arr)
           new_headers = True
-      print_formatted("Session reloaded from file " + self.storename, color="blue", typeface="bold")
+      print colored.blue(boldface("Session reloaded from file ") + self.storename)
       if original_size > 0:
         last_t = self.dset_time[original_size-1]
-        date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(last_t))
+        date_string = time.strftime(self.dateformat, time.localtime(last_t))
         print boldface("Last point recorded:") + " " + date_string
     except IOError:
       self.store = h5py.File(self.storename, 'w')
@@ -129,7 +92,7 @@ class Session:
         d[newsize-1] = dict_caller[varname]
         self.datfile.write(" %f" % dict_caller[varname])
       except:
-        print_formatted('Variable is not defined: ' + varname, color="red", typeface="bold")
+        print colored.red('Variable is not defined: ') + varname
         d[newsize-1] = 0.
         pass
     self.datfile.write("\n")
@@ -142,7 +105,7 @@ class Session:
     elif varname in self.grp_variables.keys():
       return self.grp_variables[varname].value
     else:
-      print_formatted('Variable is not defined: ' + varname, color="red", typeface="bold")
+      print colored.red('Variable is not defined: ') + varname
     
   def log_plot(self, fignum, varlist, maxvalues=1000):
     plt.figure(fignum)
@@ -182,7 +145,7 @@ class Session:
     self.email_port = port
     self.email_from_addr = from_addr
     self.email_to_addrs = to_addrs
-    date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(time.time()))
+    date_string = time.strftime(self.dateformat, time.localtime(time.time()))
     if subject != None:
       self.email_subject = subject
     else:
@@ -298,7 +261,7 @@ class Session:
     self.email_figlist = []
     if success:
       self.email_lastSent = time.time()
-      date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(self.email_lastSent))
+      date_string = time.strftime(self.dateformat, time.localtime(self.email_lastSent))
       print date_string + ': Email successfully sent.'
 
   def time_since_last_email(self):
@@ -310,7 +273,7 @@ class Session:
     if self.opened:
       self.store.close()
       self.datfile.close()
-      date_string = time.strftime('%A %e %B %Y - %H:%M:%S (UTC%z)', time.localtime(time.time()))
+      date_string = time.strftime(self.dateformat, time.localtime(time.time()))
       self.logfile.write("Session closed on " + date_string)
       self.logfile.flush()
       self.logfile.close()
