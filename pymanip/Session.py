@@ -120,8 +120,11 @@ class Session:
     else:
       debut = 0
       fin = len(t)
-    for var in varlist:
-      plt.plot(t[debut:fin], self.log(var)[debut:fin], 'o-', label=var)
+    if isinstance(varlist, str):
+      plt.plot(t[debut:fin], self.log(varlist)[debut:fin], 'o-', label=varlist)
+    else:
+      for var in varlist:
+        plt.plot(t[debut:fin], self.log(var)[debut:fin], 'o-', label=var)
     plt.xlabel('t [h]')
     plt.legend(loc='upper left')
     plt.draw()

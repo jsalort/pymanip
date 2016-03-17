@@ -1,8 +1,14 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# Amplifiers
+from fluidlab.instruments.amplifier.stanford_sr830 import StanfordSR830
+
 # Multiplexer
 from fluidlab.instruments.multiplexer.agilent_34970a import Agilent34970a
+
+# Multimeter
+from fluidlab.instruments.multimeter.hp_34401a import HP34401a
 
 # Power supply
 from fluidlab.instruments.powersupply.isotech_ips2303s import IsoTechIPS2303S
