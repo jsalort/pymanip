@@ -16,19 +16,109 @@ from clint.textui import colored
 def boldface(string):
   return "\x1b[1;1m" + string + "\x1b[0;0m"
   
-class Session:
-  def __init__(self, session_name, variable_list=[]):
+class BaseSession(object):
+  def __init__(self, session_name):
     self.session_name = session_name
     self.storename = session_name + '.hdf5'
-    self.datname = session_name + '.dat'
-    self.logname = session_name + '.log'
-    self.datfile = open(self.datname, 'a')
-    self.logfile = open(self.logname, 'a')
-    self.session_opening_time = time.time()
     if platform().startswith('Windows'):
         self.dateformat = '%A %d %B %Y - %X (%z)'
     else:
         self.dateformat = '%A %e %B %Y - %H:%M:%S (UTC%z)'
+    self.session_opening_time = time.time()
+    self.opened = False
+    self.parameters_defined = False
+
+  def parameter(self, name):
+    if parameters_defined:
+      return self.parameters[name].value
+
+  def log(self, varname):
+    if self.opened:
+      if varname == 'time' or varname == 't':
+        return self.dset_time.value
+      elif varname == '?':
+        print 'List of saved variables:'
+        for var in self.grp_variables.keys():
+          print var
+      elif varname in self.grp_variables.keys():
+        return self.grp_variables[varname].value
+      else:
+        print colored.red('Variable is not defined: ') + varname
+    else:
+      print colored.red('Session is not opened')
+
+  def log_plot(self, fignum, varlist, maxvalues=1000):
+    if self.opened:
+      plt.figure(fignum)
+      plt.clf()
+      plt.ion()
+      plt.show()
+      t = self.log('t')
+      t = (t-t[0])/3600.
+      if len(t) > maxvalues:
+        debut = len(t) - 1000
+        fin = len(t)
+      else:
+        debut = 0
+        fin = len(t)
+      if isinstance(varlist, str):
+        plt.plot(t[debut:fin], self.log(varlist)[debut:fin], 'o-', label=varlist)
+      else:
+        for var in varlist:
+          plt.plot(t[debut:fin], self.log(var)[debut:fin], 'o-', label=var)
+      plt.xlabel('t [h]')
+      plt.legend(loc='upper left')
+      plt.draw()
+      with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.pause(0.0001)
+    else:
+      print colored.red('Session is not opened')
+
+  def sleep(self, duration):
+    debut = time.time()
+    while (time.time() - debut) < duration:
+      sys.stdout.write("Sleeping for " + str(-int(time.time()-debut-duration)) + " s           \r")
+      sys.stdout.flush()
+      #time.sleep(1.0)
+      with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.pause(1.0)
+    sys.stdout.write("\n")
+
+class SavedSession(BaseSession):
+  def __init__(self, session_name):
+    super(SavedSession, self).__init__(session_name)
+    self.store = h5py.File(self.storename, 'r')
+    self.dset_time = self.store["time"]
+    self.grp_variables = self.store["variables"]
+    try:
+      self.parameters = self.store.attrs
+      self.parameters_defined = True
+    except:
+      self.parameters_defined = False
+      pass
+    self.opened = True
+    print 'Loading saved session from file', self.storename
+    total_size = self.dset_time.len()
+    if total_size > 0:
+      start_t = self.dset_time[0]
+      end_t = self.dset_time[total_size-1]
+      start_string = time.strftime(self.dateformat, time.localtime(start_t))
+      end_string = time.strftime(self.dateformat, time.localtime(end_t))
+      print colored.blue('*** Start date: ' + start_string)
+      print colored.blue('***   End date: ' + end_string)
+    else:
+      print colored.red('No logged variables')
+
+class Session(BaseSession):
+  def __init__(self, session_name, variable_list=[]):
+    super(Session, self).__init__(session_name)
+    self.datname = session_name + '.dat'
+    self.logname = session_name + '.log'
+    self.datfile = open(self.datname, 'a')
+    self.logfile = open(self.logname, 'a')
+    
     date_string = time.strftime(self.dateformat, time.localtime(self.session_opening_time))
     self.logfile.write("Session opened on " + date_string)
     self.logfile.flush()
@@ -36,6 +126,8 @@ class Session:
       self.store = h5py.File(self.storename, 'r+')
       self.dset_time = self.store["time"]
       self.grp_variables = self.store["variables"]
+      self.parameters = self.store.attrs
+      self.parameters_defined = True
       original_size = self.dset_time.len()
       arr = np.zeros( (original_size,) )
       new_headers = False
@@ -54,6 +146,8 @@ class Session:
       self.store = h5py.File(self.storename, 'w')
       self.dset_time = self.store.create_dataset("time", chunks=True, maxshape=(None,), shape=(0,), dtype=float)
       self.grp_variables = self.store.create_group("variables")
+      self.parameters = self.store.attrs
+      self.parameters_defined = True
       new_headers = True
       for var in variable_list:
         self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), shape=(0,), dtype=float)
@@ -98,50 +192,29 @@ class Session:
     self.datfile.write("\n")
     self.datfile.flush()
     self.store.flush()
-  
-  def log(self, varname):
-    if varname == 'time' or varname == 't':
-      return self.dset_time.value
-    elif varname in self.grp_variables.keys():
-      return self.grp_variables[varname].value
+
+  def save_parameter(self, parameter_name, dict_caller=None):
+    if dict_caller is None:
+      stack = inspect.stack()
+      try:
+        dict_caller = stack[1][0].f_locals
+      finally:
+        del stack
+    if isinstance(parameter_name, str):
+      value = dict_caller[parameter_name]
+      self.parameters[parameter_name] = value
     else:
-      print colored.red('Variable is not defined: ') + varname
+      for var in parameter_name:
+        value = dict_caller[var]
+        self.parameters[var] = value
     
-  def log_plot(self, fignum, varlist, maxvalues=1000):
-    plt.figure(fignum)
-    plt.clf()
-    plt.ion()
-    plt.show()
-    t = self.log('t')
-    t = (t-t[0])/3600.
-    if len(t) > maxvalues:
-      debut = len(t) - 1000
-      fin = len(t)
-    else:
-      debut = 0
-      fin = len(t)
-    if isinstance(varlist, str):
-      plt.plot(t[debut:fin], self.log(varlist)[debut:fin], 'o-', label=varlist)
-    else:
-      for var in varlist:
-        plt.plot(t[debut:fin], self.log(var)[debut:fin], 'o-', label=var)
-    plt.xlabel('t [h]')
-    plt.legend(loc='upper left')
-    plt.draw()
-    with warnings.catch_warnings():
-      warnings.simplefilter("ignore")
-      plt.pause(0.0001)
-    
-  def sleep(self, duration):
-    debut = time.time()
-    while (time.time() - debut) < duration:
-      sys.stdout.write("Sleeping for " + str(-int(time.time()-debut-duration)) + " s           \r")
-      sys.stdout.flush()
-      #time.sleep(1.0)
-      with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        plt.pause(1.0)
-    sys.stdout.write("\n")
+  def save_parameters(self, parameter_list):
+    stack = inspect.stack()
+    try:
+      dict_caller = stack[1][0].f_locals
+    finally:
+      del stack
+    self.save_parameter(parameter_list, dict_caller)
 
   def start_email(self, from_addr, to_addrs, host, subject=None, port=25):
     self.email_host = host
