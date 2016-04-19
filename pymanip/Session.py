@@ -27,10 +27,16 @@ class BaseSession(object):
     self.session_opening_time = time.time()
     self.opened = False
     self.parameters_defined = False
+    self.grp_datasets_defined = False
+    self.allow_override_datasets = False
 
+  def dataset(self, name):
+    if self.grp_datasets_defined:
+      return self.grp_datasets[name].value
+      
   def parameter(self, name):
-    if parameters_defined:
-      return self.parameters[name].value
+    if self.parameters_defined:
+      return self.parameters[name]
 
   def log(self, varname):
     if self.opened:
@@ -98,6 +104,12 @@ class SavedSession(BaseSession):
     except:
       self.parameters_defined = False
       pass
+    try:
+      self.grp_datasets = self.store["datasets"]
+      self.grp_datasets_defined = True
+    except:
+      self.grp_datasets_defined = False
+      pass
     self.opened = True
     print 'Loading saved session from file', self.storename
     total_size = self.dset_time.len()
@@ -108,16 +120,20 @@ class SavedSession(BaseSession):
       end_string = time.strftime(self.dateformat, time.localtime(end_t))
       print colored.blue('*** Start date: ' + start_string)
       print colored.blue('***   End date: ' + end_string)
-    else:
+    elif not self.grp_datasets_defined:
       print colored.red('No logged variables')
+    if self.grp_datasets_defined:
+      timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
+      print colored.blue('*** Acquisition timestamp ' + timestamp_string)
 
 class Session(BaseSession):
-  def __init__(self, session_name, variable_list=[]):
+  def __init__(self, session_name, variable_list=[], allow_override_datasets=False):
     super(Session, self).__init__(session_name)
     self.datname = session_name + '.dat'
     self.logname = session_name + '.log'
     self.datfile = open(self.datname, 'a')
     self.logfile = open(self.logname, 'a')
+    self.allow_override_datasets = allow_override_datasets
     
     date_string = time.strftime(self.dateformat, time.localtime(self.session_opening_time))
     self.logfile.write("Session opened on " + date_string)
@@ -128,6 +144,12 @@ class Session(BaseSession):
       self.grp_variables = self.store["variables"]
       self.parameters = self.store.attrs
       self.parameters_defined = True
+      try:
+        self.grp_datasets = self.store["datasets"]
+        self.grp_datasets_defined = True
+      except:
+        self.grp_datasets_defined = False
+      pass
       original_size = self.dset_time.len()
       arr = np.zeros( (original_size,) )
       new_headers = False
@@ -215,6 +237,28 @@ class Session(BaseSession):
     finally:
       del stack
     self.save_parameter(parameter_list, dict_caller)
+  
+  def save_dataset(self, data_name):
+    stack = inspect.stack()
+    try:
+      dict_caller = stack[1][0].f_locals
+    finally:
+      del stack
+    if not self.grp_datasets_defined:
+      self.grp_datasets = self.store.create_group("datasets")
+      self.grp_datasets_defined = True
+    if data_name not in self.grp_datasets.keys():
+      self.grp_datasets.attrs['timestamp'] = time.time()
+      self.grp_datasets.create_dataset(data_name, chunks=True, maxshape=(None,), data=dict_caller[data_name])
+    elif self.allow_override_datasets:
+      new_length = len(dict_caller[data_name])
+      if len(self.grp_datasets[data_name]) != new_length:
+        self.grp_datasets[data_name].resize( (new_length,) )
+      self.grp_datasets[data_name][:] = dict_caller[data_name]
+      self.grp_datasets.attrs['timestamp'] = time.time()
+      print colored.red('Warning: overriding existing dataset')
+    else:
+      raise NameError('Dataset is already defined. Use allow_override_datasets to allow override of existing saved datasets.')
 
   def start_email(self, from_addr, to_addrs, host, subject=None, port=25):
     self.email_host = host
