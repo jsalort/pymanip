@@ -12,6 +12,36 @@ import smtplib, base64, quopri
 import tempfile
 from platform import platform
 from clint.textui import colored
+from datetime import datetime
+
+acquisition_clock = None
+acquisition_number = 0
+
+def makeAcqName(comment=None):
+  global acquisition_clock
+  global acquisition_number
+
+  if comment == "reset":
+    acquisition_clock = None
+    acquisition_number = 0
+    name = None
+  else:
+    if acquisition_clock is None:
+      acquisition_clock = datetime.now()
+    acquisition_number = acquisition_number+1
+    name = "%d-%02d-%02d_%02d-%02d-%02d" % (acquisition_clock.year,
+                                            acquisition_clock.month,
+                                            acquisition_clock.day,
+                                            acquisition_clock.hour,
+                                            acquisition_clock.minute,
+                                            acquisition_clock.second)
+    if comment is not None:
+      name = name + "_" + comment
+    name = name + "_" + str(acquisition_number)
+
+  if name is not None:
+    print "Acquisition name:", name
+  return name
 
 def boldface(string):
   return "\x1b[1;1m" + string + "\x1b[0;0m"
