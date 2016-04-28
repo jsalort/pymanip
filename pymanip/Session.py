@@ -295,12 +295,14 @@ class Session(BaseSession):
       email_header = email_header + 'Content-Transfer-Encoding: quoted-printable\n'
     email_header = email_header + 'User-Agent: pymanip\n'
     email_header = email_header + 'To: '
-    if len(self.email_to_addrs) == 1:
-      email_header = email_header + self.email_to_addrs[0] + '\n'
-    else:
+    if isinstance(self.email_to_addrs, str):
+      email_header = email_header + self.email_to_addrs + '\n'
+    elif isinstance(self.email_to_addrs, tuple):
       for addr in self.email_to_addrs[:-1]:
         email_header = email_header + addr + ', '
       email_header = email_header + self.email_to_addrs[-1] + '\n'
+    else:
+	  raise ValueError('Adress list should be a string or a tuple')
     email_header = email_header + 'Subject: ' + self.email_subject
     
     if useMime:
