@@ -238,12 +238,13 @@ class Session(BaseSession):
       del stack
     self.save_parameter(parameter_list, dict_caller)
   
-  def save_dataset(self, data_name):
-    stack = inspect.stack()
-    try:
-      dict_caller = stack[1][0].f_locals
-    finally:
-      del stack
+  def save_dataset(self, data_name, dict_caller=None):
+    if dict_caller is None:
+      stack = inspect.stack()
+      try:
+        dict_caller = stack[1][0].f_locals
+      finally:
+        del stack
     if not self.grp_datasets_defined:
       self.grp_datasets = self.store.create_group("datasets")
       self.grp_datasets_defined = True
@@ -259,6 +260,15 @@ class Session(BaseSession):
       print colored.red('Warning: overriding existing dataset')
     else:
       raise NameError('Dataset is already defined. Use allow_override_datasets to allow override of existing saved datasets.')
+
+  def save_datasets(self, data_list):
+    stack = inspect.stack()
+    try:
+      dict_caller = stack[1][0].f_locals
+    finally:
+      del stack
+    for data_name in data_list:
+      self.save_dataset(data_name, dict_caller)
 
   def start_email(self, from_addr, to_addrs, host, subject=None, port=25):
     self.email_host = host
