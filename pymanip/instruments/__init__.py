@@ -18,3 +18,7 @@ from fluidlab.instruments.powersupply.tti_cpx400dp import TtiCpx400dp
 
 # Function generators
 from fluidlab.instruments.funcgen.tti_tsx3510p import TtiTsx3510p
+from fluidlab.instruments.funcgen.agilent_33220a import Agilent33220a
+from fluidlab.instruments.funcgen.agilent_33500b import Agilent33500b
+from fluidlab.instruments.funcgen.tektronix_afg3022b import TektronixAFG3022b
+from fluidlab.instruments.funcgen.hp_33120a import HP33120a
