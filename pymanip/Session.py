@@ -200,6 +200,7 @@ class Session(BaseSession):
       self.grp_variables = self.store.create_group("variables")
       self.parameters = self.store.attrs
       self.parameters_defined = True
+      self.parameters['email_lastSent'] = 0.0
       new_headers = True
       for var in variable_list:
         self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), shape=(0,), dtype=float)
@@ -210,7 +211,6 @@ class Session(BaseSession):
       self.datfile.write("\n")
     self.opened = True
     self.email_started = False
-    self.email_lastSent = 0.0
     
   def disp(self, texte):
     print texte
@@ -422,12 +422,17 @@ class Session(BaseSession):
     self.email_started = False
     self.email_figlist = []
     if success:
-      self.email_lastSent = time.time()
-      date_string = time.strftime(self.dateformat, time.localtime(self.email_lastSent))
+      self.parameters['email_lastSent'] = time.time()
+      date_string = time.strftime(self.dateformat, time.localtime(self.parameters['email_lastSent']))
       print date_string + ': Email successfully sent.'
 
   def time_since_last_email(self):
-    return time.time() - self.email_lastSent
+    try:
+      last = self.parameters['email_lastSent']
+    except:
+      last = 0.0
+      pass
+    return time.time() - last
     
   def Stop(self):
     if self.email_started:
