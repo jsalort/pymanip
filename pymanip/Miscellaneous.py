@@ -5,13 +5,13 @@ import platform
 import warnings
 
 if platform.system() == 'Linux':
-  try:
-    import gpib
-    has_gpib = True
-  except:
-    print 'Warning: Linux-GPIB Python bindings not found'
-    pass
-  
+    try:
+        import gpib
+        has_gpib = True
+    except:
+        print 'Warning: Linux-GPIB Python bindings not found'
+        pass
+
 def scanGpib(board):
     if not has_gpib:
         warnings.warn('Linux-GPIB not available', RuntimeWarning, stacklevel=2)
