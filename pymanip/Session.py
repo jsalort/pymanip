@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 """
 Module for experimental sessions.
+
+Useful classes are Session and SavedSession.
 """
 
 import os, sys
@@ -72,13 +74,21 @@ class BaseSession(object):
         if self.grp_datasets_defined:
             print 'List of saved datasets:'
             for dataname in self.grp_datasets.keys():
-                print ' ' + dataname
+                size = self.grp_datasets[dataname].size
+                print ' ' + dataname + (' (%d points)' % size)
         # Parameters
         if self.parameters_defined:
             if len(self.parameters.keys()) > 0:
                 print 'List of saved parameters:'
                 for name in self.parameters.keys():
-                    print ' ' + name + ' = ' + str(self.parameters[name])
+                    value = self.parameters[name]
+                    #print type(value)
+                    if isinstance(value, np.ndarray) and len(value) == 1:
+                        value = value[0]
+                    if name == 'email_lastSent':
+                        print ' ' + name + ' = ' +  time.strftime(self.dateformat, time.localtime(value))
+                    else:
+                        print ' ' + name + ' = ' + str(value) + ' (' + str(type(value)) + ')'
 
 
     def dataset(self, name):
