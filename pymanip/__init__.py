@@ -5,4 +5,4 @@
 __all__ = ["interfaces"]
 
 from .Session import Session, SavedSession
-from .Miscellaneous import scanGpib
+from .miscellaneous import scanGpib
