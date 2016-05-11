@@ -187,6 +187,12 @@ class SavedSession(BaseSession):
             timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
             print colored.blue('*** Acquisition timestamp ' + timestamp_string)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, cb):
+        self.exited = True
+        
 class Session(BaseSession):
     def __init__(self, session_name, variable_list=[], allow_override_datasets=False):
         super(Session, self).__init__(session_name)
