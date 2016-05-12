@@ -7,6 +7,16 @@ import fluidlab.instruments.daq.daqmx as daqmx
 def read_analog(resource_names, terminal_config, volt_min, volt_max,
                                 samples_per_chan=1, sample_rate=1, coupling_types='DC',
                                 output_filename=None, verbose=True):
+    """
+
+    Reads signal from analog input.
+
+    resources_names: names from MAX (Dev1/ai0)
+    terminal_config: "Diff", "RSE", "NRSE"
+    volt_min, volt_max: channel range
+
+    """
+    
     # Ensure that samples_per_chan is integer
     if not isinstance(samples_per_chan, int):
         samples_per_chan = int(samples_per_chan)
