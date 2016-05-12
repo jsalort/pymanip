@@ -1,5 +1,12 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+
+This module contains miscellaneous functions:
+
+ - scanGpib
+
+"""
 
 import platform
 import warnings
@@ -10,11 +17,14 @@ if platform.system() == 'Linux':
         has_gpib = True
     except:
         print 'Warning: Linux-GPIB Python bindings not found'
+        has_gpib = False
         pass
+else:
+    has_gpib = False
 
 def scanGpib(board):
     if not has_gpib:
-        warnings.warn('Linux-GPIB not available', RuntimeWarning, stacklevel=2)
+        warnings.warn('Linux-GPIB is not available. ScanGpib with VISA not implemented at the moment.', RuntimeWarning, stacklevel=2)
     else:
         for pad in range(1,31):
             listen = gpib.listener(board, pad)
