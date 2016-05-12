@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 Module for experimental sessions.
 
@@ -99,9 +100,12 @@ class BaseSession(object):
         if self.parameters_defined:
             return self.parameters[name]
 
+    def log_variable_list(self):
+        return self.grp_variables.keys()
+    
     def log(self, varname):
         if self.opened:
-            if varname == 'time' or varname == 't':
+            if varname == 'Time' or varname == 'time' or varname == 't':
                 return self.dset_time.value
             elif varname == '?':
                 print 'List of saved variables:'
@@ -243,7 +247,10 @@ class Session(BaseSession):
                 self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), shape=(0,), dtype=float)
         if new_headers:
             self.datfile.write('Time')
-            for var in variable_list:
+            # attention: ne pas utiliser variable_list ici car
+            # dans log_addline on utilise self.grp_variable.keys()
+            # et l'ordre n'est pas le même
+            for var in self.grp_variables.keys():
                 self.datfile.write(' ' + var)
             self.datfile.write("\n")
         self.opened = True
