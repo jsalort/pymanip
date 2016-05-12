@@ -68,7 +68,8 @@ class BaseSession(object):
     def describe(self):
         # Logged variables
         if len(self.grp_variables.keys()) > 0:
-            print 'List of saved variables:'
+            num_lines = self.dset_time.len()
+            print 'List of saved variables: (%d lines)' % num_lines
             for var in self.grp_variables.keys():
                 print ' ' + var
         # Datasets

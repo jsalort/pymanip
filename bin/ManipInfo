@@ -3,22 +3,58 @@
 This program shows the content of a saved pymanip session.
 """
 
+import sys
+import matplotlib.pyplot as plt
+from matplotlib.dates import AutoDateFormatter, AutoDateLocator, epoch2num
 from pymanip import SavedSession
 
-def main(sessionName, quiet):
+def main(sessionName, quiet, line_to_print, var_to_plot):
     if sessionName.endswith('.hdf5'):
 	N = len(sessionName)
 	sessionName = sessionName[0:(N-5)]
 
     MI = SavedSession(sessionName)
-    if not quiet:
-	MI.describe()
+    if line_to_print is not None:
+        if line_to_print >= len(MI.log('t')):
+            print 'Specified line is out of bound.'
+            sys.exit(1)
+        format_str = '{:>15} | {:>20}'
+        print 'Printing saved values on line', line_to_print
+        print format_str.format('Variable', 'Value')
+        varlist = ['Time']
+        varlist += MI.log_variable_list()
+        print '-'*38
+        for varname in varlist:
+            print format_str.format(varname, MI.log(varname)[line_to_print])
+    elif not quiet:
+        MI.describe()
+    if var_to_plot is not None:
+        if var_to_plot in MI.log_variable_list():
+            t = epoch2num(MI.log('t'))
+            vardata = MI.log(var_to_plot)
+            fig = plt.figure()
+            xtick_locator = AutoDateLocator()
+            xtick_formatter = AutoDateFormatter(xtick_locator)
+            ax = plt.axes()
+            ax.xaxis.set_major_locator(xtick_locator)
+            ax.xaxis.set_major_formatter(xtick_formatter)
+            ax.plot(t, vardata, 'o-')
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=70)
+            fig.subplots_adjust(bottom=0.2)
+            plt.ylabel(var_to_plot)
+            plt.title(sessionName)
+            plt.show()
+        else:
+            print 'Variable', var_to_plot, 'does not exist!'
+            sys.exit(1)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser(description=__doc__)
     parser.add_argument('sessionName', help="name of the saved session to inspect", metavar="session_name")
-    parser.add_argument('-q', '--quiet', action='store_true', help="do not list content")
+    parser.add_argument('-q', '--quiet', action='store_true', help="do not list content.")
+    parser.add_argument('-l', '--line', help="print specified line of logged data.", type=int, metavar="line")
+    parser.add_argument('-p', '--plot', help="plot the specified variable.", metavar="varname")
     args = parser.parse_args()
-    main(args.sessionName, args.quiet)      
+    main(args.sessionName, args.quiet, args.line, args.plot)      
     
