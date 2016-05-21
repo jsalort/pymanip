@@ -1,8 +1,5 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
-__all__ = ["interfaces"]
-
-from .Session import Session, SavedSession
+from .Session import *
 from .miscellaneous import scanGpib

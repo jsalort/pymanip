@@ -22,6 +22,8 @@ from datetime import datetime
 acquisition_clock = None
 acquisition_number = 0
 
+__all__ = ['makeAcqName', 'SavedSession', 'Session']
+
 def makeAcqName(comment=None):
     global acquisition_clock
     global acquisition_number
