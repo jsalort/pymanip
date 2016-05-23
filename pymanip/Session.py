@@ -96,7 +96,7 @@ class BaseSession(object):
 
     def has_dataset(self, name):
         if self.grp_datasets_defined:
-            return self.grp_datasets.has_key(name)
+            return (name in self.grp_datasets.keys())
         else:
             return False
 
@@ -106,7 +106,7 @@ class BaseSession(object):
 
     def has_parameter(self, name):
         if self.parameters_defined:
-            return self.parameters.has_key(name)
+            return (name in self.parameters.keys())
         else:
             return False
 
@@ -115,7 +115,7 @@ class BaseSession(object):
             return self.parameters[name]
 
     def has_log(self, name):
-        return self.grp_variables.has_key(name)
+        return (name in self.grp_variables.keys())
 
     def log_variable_list(self):
         return self.grp_variables.keys()

@@ -30,20 +30,25 @@ class Manip(object):
         elif self.properties.has_key(name):
             value = self.properties[name]
         else:
-            with SavedSession(self.session_name) as MI:
-                if MI.has_log(name):
-                    value = MI.log(name)
-                elif MI.has_dataset(name):
-                    value = MI.dataset(name)
-                elif MI.has_parameter(name):
-                    value = MI.parameter(name)
-                else:
-                    value = None
+            if self.MI.has_log(name):
+                value = self.MI.log(name)
+            elif self.MI.has_dataset(name):
+                value = self.MI.dataset(name)
+            elif self.MI.has_parameter(name):
+                value = self.MI.parameter(name)
+            else:
+                value = None
                 
         return value
 
     def __getitem__(self, key):
         return self.get(key)
+
+    @property
+    def MI(self):
+        if not hasattr(self, '_MI'):
+            self._MI = SavedSession(self.session_name)
+        return self._MI
 
 class ManipCollection(Manip):
     def __init__(self, basename, nickname=None, **kwargs):
@@ -91,8 +96,19 @@ class ManipList(object):
             return self.manips.__getitem__(key)
 
     def from_nickname(self, nickname):
+        return self.lookup(nickname=nickname)
+
+    def lookup(self, **kwargs):
         result = list()
         for m in self.manips:
-            if m.nickname == nickname:
+            keep = True
+            for key in kwargs:
+                if m.get(key) != kwargs[key]:
+                    keep = False
+            if keep:
                 result.append(m)
+        if len(result) == 0:
+            result = None
+        elif len(result) == 1:
+            result = result[0]
         return result
