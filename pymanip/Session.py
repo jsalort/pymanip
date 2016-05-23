@@ -94,14 +94,28 @@ class BaseSession(object):
                     else:
                         print ' ' + name + ' = ' + str(value) + ' (' + str(type(value)) + ')'
 
+    def has_dataset(self, name):
+        if self.grp_datasets_defined:
+            return self.grp_datasets.has_key(name)
+        else:
+            return False
 
     def dataset(self, name):
         if self.grp_datasets_defined:
             return self.grp_datasets[name].value
 
+    def has_parameter(self, name):
+        if self.parameters_defined:
+            return self.parameters.has_key(name)
+        else:
+            return False
+
     def parameter(self, name):
         if self.parameters_defined:
             return self.parameters[name]
+
+    def has_log(self, name):
+        return self.grp_variables.has_key(name)
 
     def log_variable_list(self):
         return self.grp_variables.keys()
