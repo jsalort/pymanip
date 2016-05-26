@@ -72,7 +72,12 @@ def read_analog(resource_names, terminal_config, volt_min=None, volt_max=None,
                 colored.red('WARNING: channel range too small!')
         else:
             for chan in range(num_channels):
-                channel_range = np.max([np.abs(volt_min[chan]), np.abs(volt_max[chan])])
+                try:
+                    channel_range = np.max([np.abs(volt_min[chan]), np.abs(volt_max[chan])])
+                except TypeError:
+                    channel_range = np.max([np.abs(volt_min), np.abs(volt_max)])
+                    pass
+
                 if np.max(np.abs(data[chan])) >= channel_range:
                     colored.red('WARNING: channel range is too small for channel ' + resource_names[chan])
 
