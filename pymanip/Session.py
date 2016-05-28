@@ -19,9 +19,6 @@ from platform import platform
 from clint.textui import colored
 from datetime import datetime
 
-acquisition_clock = None
-acquisition_number = 0
-
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
 def NameGenerator(prefix=None, postfix=None):
@@ -48,7 +45,7 @@ defaultGenerator = None
 def makeAcqName(comment=None):
     global defaultGenerator
 
-    if (defaultGenerator is None) or (comment == "reset"):
+    if (defaultGenerator is None) or (comment == "reset") or (defaultGenerator.gi_frame.f_locals["postfix"] != comment):
         defaultGenerator = NameGenerator(postfix=comment)
     return next(defaultGenerator)
 
