@@ -19,42 +19,44 @@ from platform import platform
 from clint.textui import colored
 from datetime import datetime
 
-acquisition_clock = None
-acquisition_number = 0
+__all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
-__all__ = ['makeAcqName', 'SavedSession', 'Session']
+def NameGenerator(prefix=None, postfix=None):
+    acquisition_clock = datetime.now()
+    acquisition_number = 1
+    name = "%d-%02d-%02d_%02d-%02d-%02d" % (acquisition_clock.year,
+                                            acquisition_clock.month,
+                                            acquisition_clock.day,
+                                            acquisition_clock.hour,
+                                            acquisition_clock.minute,
+                                            acquisition_clock.second)
+    if prefix:
+        name = prefix + "_" + name
+    if postfix:
+        name = name + "_" + postfix
+    while True:
+        name_numbered = name + "_" + str(acquisition_number)
+        print "Acquisition name:", name_numbered
+        yield name_numbered
+        acquisition_number = acquisition_number + 1
+
+defaultGenerator = None
 
 def makeAcqName(comment=None):
-    global acquisition_clock
-    global acquisition_number
+    global defaultGenerator
 
-    if comment == "reset":
-        acquisition_clock = None
-        acquisition_number = 0
-        name = None
-    else:
-        if acquisition_clock is None:
-            acquisition_clock = datetime.now()
-        acquisition_number = acquisition_number+1
-        name = "%d-%02d-%02d_%02d-%02d-%02d" % (acquisition_clock.year,
-                                                acquisition_clock.month,
-                                                acquisition_clock.day,
-                                                acquisition_clock.hour,
-                                                acquisition_clock.minute,
-                                                acquisition_clock.second)
-        if comment is not None:
-            name = name + "_" + comment
-        name = name + "_" + str(acquisition_number)
-
-    if name is not None:
-        print "Acquisition name:", name
-    return name
+    if (defaultGenerator is None) or (comment == "reset") or (defaultGenerator.gi_frame.f_locals["postfix"] != comment):
+        defaultGenerator = NameGenerator(postfix=comment)
+    return next(defaultGenerator)
 
 def boldface(string):
     return "\x1b[1;1m" + string + "\x1b[0;0m"
 
 class BaseSession(object):
-    def __init__(self, session_name):
+    def __init__(self, session_name=None):
+        if session_name is None:
+            session_name = makeAcqName()
+            
         self.session_name = session_name
         self.storename = session_name + '.hdf5'
         if platform().startswith('Windows'):
