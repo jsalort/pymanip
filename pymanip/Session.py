@@ -149,11 +149,37 @@ class BaseSession(object):
             else:
                 debut = 0
                 fin = len(t)
+            if t[debut] > self.session_opening_time:
+                # tous les points sont nouveaux
+                olddebut=None
+                oldfin=None
+                newdebut=debut
+                newfin=fin
+            elif t[-1] > self.session_opening_time:
+                # certains points sont nouveaux
+                bb = (t > self.session_opening_time)
+                olddebut=debut
+                oldfin = np.min(bb.argmax())
+                newdebut = oldfin+1
+                newfin=fin
+            else:
+                # les points sont tous anciens
+                olddebut=debut
+                oldfin=fin
+                newdebut=None
+                newfin=None
+                
             if isinstance(varlist, str):
-                plt.plot(t[debut:fin], self.log(varlist)[debut:fin], 'o-', label=varlist)
+                if olddebut:
+                    plt.plot(t[olddebut:oldfin], self.log(varlist)[olddebut:oldfin], 's-', mfc='none', label=varlist)
+                if newdebut:
+                    plt.plot(t[newdebut:newfin], self.log(varlist)[newdebut:newfin], 'o-', label=varlist)
             else:
                 for var in varlist:
-                    plt.plot(t[debut:fin], self.log(var)[debut:fin], 'o-', label=var)
+                    if olddebut:
+                        plt.plot(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 's-', mfc='none', label=var)
+                    if newdebut:
+                        plt.plot(t[newdebut:newfin], self.log(var)[newdebut:newfin], 'o-', label=var)
             plt.xlabel('t [h]')
             plt.legend(loc='upper left')
             plt.draw()
