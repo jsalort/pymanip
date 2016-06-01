@@ -1,10 +1,44 @@
-#! /usr/bin/env python
 # -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
 
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from PyQt4 import QtGui, QtCore
+import itertools
+
+myplot_colors = {'blue'      : (0.0, 0.0, 1.0),
+                 'green'     : (0.0, 1.0, 0.0),
+                 'red'       : (1.0, 0.0, 0.0),
+                 'cyan'      : (0.0, 1.0, 1.0),
+                 'magenta'   : (1.0, 0.0, 1.0),
+                 'yellow'    : (1.0, 1.0, 0.0),
+                 'k'         : (0.0, 0.0, 0.0),
+                 'igoine'    : (0.0, 0.5, 0.0),
+                 'eau'       : (0.0, 0.6, 1.0),
+                 'qarotte'   : (1.0, 0.6, 0.0),
+                 'fushia'    : (1.0, 0.0, 0.6),
+                 'lila'      : (0.6, 0.0, 1.0),
+                 'terre'     : (0.6, 0.2, 0.0),
+                 'nuit'      : (0.0, 0.2, 0.6),
+                 'anthracite': (0.4, 0.4, 0.4),
+                 'jackson'   : (0.7, 0.7, 0.7),
+                 'Red'       : (0.5, 0.0, 0.0)
+                 }
+
+def myplot_color(name):
+    for key in myplot_colors:
+        if (key == name) or (key[0] == name):
+            break
+    else:
+        key='black'
+    return myplot_colors[key]
+
+myplot_colorcycle_ = itertools.cycle(["b", "g", "r", "c", "m", "y", "k", "i", "e", "q", "f", "l", "t", "n", "a", "j", "R"])
+
+def myplot_colorcycle():
+    return myplot_color(next(myplot_colorcycle_))
 
 def myplot_gridvisibility(ax):
     return True
@@ -130,8 +164,8 @@ def myplot2tikz(fig, outputFolder):
             tex_fid.write("xmax=" + str(axe.get_xlim()[1]) + ",\n")
             tex_fid.write("ymin=" + str(axe.get_ylim()[0]) + ",\n")
             tex_fid.write("ymax=" + str(axe.get_ylim()[1]) + ",\n")
-            tex_fid.write("xlabel={" + axe.get_xlabel() + "},\n")
-            tex_fid.write("ylabel={" + axe.get_ylabel() + "},\n")
+            tex_fid.write( ("xlabel={" + axe.get_xlabel() + "},\n").encode("utf-8"))
+            tex_fid.write( ("ylabel={" + axe.get_ylabel() + "},\n").encode("utf-8"))
             tex_fid.write("%every axis x label/.style={%\n")
             tex_fid.write("%  at={(0.8,0.07)}\n")
             tex_fid.write("%},\n")
