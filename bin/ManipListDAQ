@@ -1,0 +1,20 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+
+This program lists available acquisition cards.
+
+"""
+
+from __future__ import unicode_literals, print_function
+import sys
+from pymanip.daq import DAQmx
+
+def main():
+    DAQmx.print_connected_devices()
+
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description=__doc__)
+    args = parser.parse_args()
+    main()
