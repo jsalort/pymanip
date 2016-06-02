@@ -92,3 +92,21 @@ def write_analog_end_task(task, timeout=0.):
 
 def measure_freq(resource_name, freq_min=1, freq_max=1000):
     return daqmx.measure_freq(resource_name, freq_min, freq_max)
+
+
+try:
+    from PyDAQmx import (DAQmxGetSystemInfoAttribute, 
+                         DAQmx_Sys_DevNames)
+    import ctypes
+    can_discover = True
+except ImportError:
+    can_discover = False
+    pass
+
+def connected_devices():
+    if not can_discover:
+        return None
+    bufsize = 1024
+    buf = ctypes.create_string_buffer(bufsize)
+    DAQmxGetSystemInfoAttribute(DAQmx_Sys_DevNames, ctypes.byref(buf), bufsize)
+    return buf.value
