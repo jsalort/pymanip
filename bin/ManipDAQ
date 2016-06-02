@@ -1,4 +1,4 @@
-#! /usr/bin/env pythonw
+#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals, print_function, division
@@ -44,11 +44,19 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         # Populate device list
         for dev in DAQDevice.list_connected_devices():
             self.device_ui.addItem(dev.device_name)
+        self.update_channel_properties()
 
         # Show window
         self.show()
         self.raise_()
 
+    def update_channel_properties(self):
+        selected_device = unicode(self.device_ui.currentText())
+        self.channel_ui.clear()
+        if selected_device:
+            dev = DAQDevice(selected_device)
+            self.channel_ui.addItems(dev.ai_chans)
+    
 def main():
     app = QtGui.QApplication(sys.argv)
     daq_window = DaqWindow(app)
