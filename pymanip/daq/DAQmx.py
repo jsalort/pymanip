@@ -212,7 +212,7 @@ class DAQDevice(object):
         from PyDAQmx import DAQError
         bus = self.bus_type
         if bus == 'PCI':
-            desc = bus + ' ' + self.pci_busnum + ',' + self.pci_devnum
+            desc = 'PCI {:d}, {:d}'.format(self.pci_busnum, self.pci_devnum)
         elif bus == 'PXI':
             try:
                 desc = 'PXI chassis {:d} slot {:d}'.format(self.pxi_chassisnum, self.pxi_slotnum)
