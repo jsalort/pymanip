@@ -3,8 +3,85 @@
 
 import numpy as np
 from clint.textui import colored
-
+import ctypes
 import fluidlab.instruments.daq.daqmx as daqmx
+
+class DAQDevice(object):
+    """
+    This class is represents a DAQmx device
+    """
+    
+    @staticmethod
+    def list_connected_devices():
+        try:
+            from PyDAQmx import (DAQmxGetSystemInfoAttribute, 
+                                 DAQmx_Sys_DevNames)
+            bufsize = 1024
+            buf = ctypes.create_string_buffer(bufsize)
+            DAQmxGetSystemInfoAttribute(DAQmx_Sys_DevNames, ctypes.byref(buf), bufsize)
+            return [DAQDevice(s.strip()) for s in buf.value.split(',')]
+        except ImportError:
+            print 'Cannot list connected devices.'
+            return None
+            pass
+
+    def __init__(self, device_name):
+        self.device_name = device_name
+
+    @property
+    def product_category(self):
+        from PyDAQmx import (DAQmxGetDevProductCategory,
+                             DAQmx_Val_MSeriesDAQ,
+                             DAQmx_Val_XSeriesDAQ,
+                             DAQmx_Val_ESeriesDAQ,
+                             DAQmx_Val_SSeriesDAQ,
+                             DAQmx_Val_BSeriesDAQ,
+                             DAQmx_Val_SCSeriesDAQ,
+                             DAQmx_Val_USBDAQ,
+                             DAQmx_Val_AOSeries,
+                             DAQmx_Val_DigitalIO,
+                             DAQmx_Val_TIOSeries,
+                             DAQmx_Val_DynamicSignalAcquisition,
+                             DAQmx_Val_Switches,
+                             DAQmx_Val_CompactDAQChassis,
+                             DAQmx_Val_CSeriesModule,
+                             DAQmx_Val_SCXIModule,
+                             DAQmx_Val_SCCConnectorBlock,
+                             DAQmx_Val_SCCModule,
+                             DAQmx_Val_NIELVIS,
+                             DAQmx_Val_NetworkDAQ,
+                             DAQmx_Val_SCExpress,
+                             DAQmx_Val_Unknown)
+        category = ctypes.c_int32(DAQmx_Val_Unknown)
+        DAQmxGetDevProductCategory(self.device_name, ctypes.byref(category))
+        return {DAQmx_Val_MSeriesDAQ: 'M Series DAQ', 
+                DAQmx_Val_XSeriesDAQ: 'X Series DAQ', 
+                DAQmx_Val_ESeriesDAQ: 'E Series DAQ', 
+                DAQmx_Val_SSeriesDAQ: 'S Series DAQ', 
+                DAQmx_Val_BSeriesDAQ: 'B Series DAQ', 
+                DAQmx_Val_SCSeriesDAQ:  'SC Series DAQ', 
+                DAQmx_Val_USBDAQ: 'USB DAQ', 
+                DAQmx_Val_AOSeries: 'AO Series', 
+                DAQmx_Val_DigitalIO: 'Digital I/O', 
+                DAQmx_Val_TIOSeries: 'TIO Series', 
+                DAQmx_Val_DynamicSignalAcquisition: 'Dynamic Signal Acquisition', 
+                DAQmx_Val_Switches: 'Switches', 
+                DAQmx_Val_CompactDAQChassis: 'CompactDAQ chassis', 
+                DAQmx_Val_CSeriesModule: 'C Series I/O module', 
+                DAQmx_Val_SCXIModule: 'SCXI module', 
+                DAQmx_Val_SCCConnectorBlock: 'SCC Connector Block', 
+                DAQmx_Val_SCCModule: 'SCC Module', 
+                DAQmx_Val_NIELVIS: 'NI ELVIS', 
+                DAQmx_Val_NetworkDAQ: 'Network DAQ', 
+                DAQmx_Val_SCExpress: 'SC Express', 
+                DAQmx_Val_Unknown: 'Unknown by DAQmx'}.get(category.value, 'Unknown')
+
+
+def print_connected_devices():
+    for device in DAQDevice.list_connected_devices():
+        print device.device_name, '(' + device.product_category + ')'
+    
+
 
 # Ici read_analog est verbose=True par défaut contrairement à fluidlab
 # et on ajoute une fonction "autoset" si volt_min, volt_max sont None
@@ -94,19 +171,5 @@ def measure_freq(resource_name, freq_min=1, freq_max=1000):
     return daqmx.measure_freq(resource_name, freq_min, freq_max)
 
 
-try:
-    from PyDAQmx import (DAQmxGetSystemInfoAttribute, 
-                         DAQmx_Sys_DevNames)
-    import ctypes
-    can_discover = True
-except ImportError:
-    can_discover = False
-    pass
 
-def connected_devices():
-    if not can_discover:
-        return None
-    bufsize = 1024
-    buf = ctypes.create_string_buffer(bufsize)
-    DAQmxGetSystemInfoAttribute(DAQmx_Sys_DevNames, ctypes.byref(buf), bufsize)
-    return buf.value
+    
