@@ -203,7 +203,7 @@ class BaseSession(object):
         sys.stdout.write("\n")
 
 class SavedSession(BaseSession):
-    def __init__(self, session_name):
+    def __init__(self, session_name, cache_override=False, cache_location='.'):
         super(SavedSession, self).__init__(session_name)
         self.store = h5py.File(self.storename, 'r')
         self.dset_time = self.store["time"]
@@ -235,6 +235,97 @@ class SavedSession(BaseSession):
         if self.grp_datasets_defined:
             timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
             print colored.blue('*** Acquisition timestamp ' + timestamp_string)
+        self.cachestorename = os.path.join(os.path.realpath(cache_location), 'cache',  os.path.basename(self.storename))
+        if cache_override:
+            self.cachemode = 'w'
+        else:
+            self.cachemode = 'r+'
+        try:
+            self.cachestore = h5py.File(self.cachestorename, self.cachemode)
+            print colored.yellow('*** Cache store found at ' + self.cachestorename)
+            self.has_cachestore = True
+        except IOError:
+            self.has_cachestore = False
+            pass
+
+    @property
+    def cachedvars(self):
+        if self.has_cachestore:
+            return self.cachestore.keys()
+        else:
+            return []
+
+    def cached(self, *args):
+        """
+        cached('var1', 'var2', ...)
+        or
+        cached(['var1', 'var2'])
+
+        returns True if all specified variables are present in the cachestore
+        """
+        if len(args) == 1:
+            name = args[0]
+        else:
+            name = [a for a in args]
+        if isinstance(name, str):
+            return (name in self.cachedvars)
+        else:
+            return all([(n in self.cachedvars) for n in name])
+
+    def cachedvalue(self, varname):
+        if self.has_cachestore:
+            print colored.yellow('Retriving ' + varname + ' from cache')
+            return self.cachestore[varname].value
+        else:
+            return None
+        
+    def cache(self, name, dict_caller=None):
+        if dict_caller is None:
+            stack = inspect.stack()
+            try:
+                dict_caller = stack[1][0].f_locals
+            finally:
+                del stack
+        if not isinstance(name, str):
+            for var in name:
+                self.cache(var, dict_caller)
+            return
+        if not self.has_cachestore:
+            try:
+                os.mkdir(os.path.dirname(self.cachestorename))
+            except OSError:
+                pass
+            try:
+                self.cachestore = h5py.File(self.cachestorename, 'w')
+                self.has_cachestore = True
+                print colored.yellow('*** Cache store created at ' + self.cachestorename)
+            except IOError as ioe:
+                self.has_cachestore = False
+                print colored.red('Cannot create cache store')
+                print colored.red(ioe.message)
+                pass
+        
+        if self.has_cachestore:
+            print colored.yellow('Saving ' + name + ' in cache')
+            try:
+                new_length = len(dict_caller[name])
+            except TypeError:
+                new_length = 1
+                pass
+            if name in self.cachestore.keys():
+                if len(self.cachestore[name]) != new_length:
+                    self.cachestore[name].resize( (new_length, ))
+                self.cachestore[name][:] = dict_caller[name]
+            else:
+                if new_length > 1:
+                    self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), data=dict_caller[name])
+                else:
+                    self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
+                    self.cachestore[name][:] = dict_caller[name]
+         
+    def __del__(self):
+        if self.has_cachestore:
+            self.cachestore.close()
 
     def __enter__(self):
         return self
