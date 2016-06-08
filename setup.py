@@ -14,7 +14,7 @@ setup(name='pymanip',
       url='http://www.juliensalort.org/git/?p=pymanip.git',
       author='Julien Salort',
       author_email='julien.salort@ens-lyon.fr',
-      license='Apache',
+      license='CeCILL-B',
       packages=['pymanip'],
       install_requires=[
         'h5py', 'clint', 'fluidlab', 'fluiddyn',
