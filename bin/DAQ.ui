@@ -20,7 +20,7 @@
       <x>10</x>
       <y>10</y>
       <width>271</width>
-      <height>241</height>
+      <height>251</height>
      </rect>
     </property>
     <property name="title">
@@ -32,7 +32,7 @@
        <x>9</x>
        <y>29</y>
        <width>251</width>
-       <height>205</height>
+       <height>213</height>
       </rect>
      </property>
      <layout class="QGridLayout" name="gridLayout">
@@ -93,9 +93,6 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QComboBox" name="range_ui"/>
-      </item>
       <item row="0" column="0">
        <widget class="QLabel" name="label_7">
         <property name="text">
@@ -106,6 +103,9 @@
       <item row="0" column="1">
        <widget class="QComboBox" name="device_ui"/>
       </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="range_ui"/>
+      </item>
      </layout>
     </widget>
    </widget>
@@ -113,7 +113,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>250</y>
+      <y>270</y>
       <width>271</width>
       <height>291</height>
      </rect>
@@ -198,7 +198,7 @@
    <widget class="QPushButton" name="pushButton_2">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>160</x>
       <y>660</y>
       <width>110</width>
       <height>32</height>
@@ -215,7 +215,7 @@
      <x>0</x>
      <y>0</y>
      <width>969</width>
-     <height>22</height>
+     <height>23</height>
     </rect>
    </property>
   </widget>

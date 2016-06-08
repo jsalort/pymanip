@@ -23,12 +23,14 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         super(DaqWindow, self).__init__()
         self.app = app
 
-        # User settings
-        self.settings = QtCore.QSettings('pymanip', 'ManipDAQ')
-
         # Create layout
         self.setupUi(self)
 
+        # User settings
+        self.settings = QtCore.QSettings('pymanip', 'ManipDAQ')
+        range_val, success = self.settings.value('range', defaultValue=10.0).toDouble()
+        self.range_ui.setText("{:.2f} V".format(range_val))
+        
         # Create matplotlib canvas
         self.figure_t = Figure()
         self.canvas_t = FigureCanvas(self.figure_t)
@@ -45,6 +47,10 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         for dev in DAQDevice.list_connected_devices():
             self.device_ui.addItem(dev.device_name)
         self.update_channel_properties()
+
+        # Populate Terminal config list
+        self.terminal_config_ui.addItems( ('RSE', 'NRSE', 'Diff', 'PseudoDiff') )
+
 
         # Show window
         self.show()
