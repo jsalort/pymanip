@@ -18,6 +18,7 @@ import tempfile
 from platform import platform
 from clint.textui import colored
 from datetime import datetime
+from convbox.myplot import ColorGenerator
 
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
@@ -144,13 +145,13 @@ class BaseSession(object):
             plt.ion()
             plt.show()
             t = self.log('t')
-            t = (t-t[0])/3600.
             if len(t) > maxvalues:
                 debut = len(t) - 1000
                 fin = len(t)
             else:
                 debut = 0
                 fin = len(t)
+            print('len = ', len(t))
             if t[debut] > self.session_opening_time:
                 # tous les points sont nouveaux
                 olddebut=None
@@ -162,7 +163,7 @@ class BaseSession(object):
                 bb = (t > self.session_opening_time)
                 olddebut=debut
                 oldfin = np.min(bb.argmax())
-                newdebut = oldfin+1
+                newdebut = oldfin
                 newfin=fin
             else:
                 # les points sont tous anciens
@@ -170,18 +171,27 @@ class BaseSession(object):
                 oldfin=fin
                 newdebut=None
                 newfin=None
-                
+            t = (t-t[0])/3600.
+            #print(olddebut, oldfin, newdebut, newfin)
+
             if isinstance(varlist, str):
-                if olddebut:
-                    plt.plot(t[olddebut:oldfin], self.log(varlist)[olddebut:oldfin], 's-', mfc='none', label=varlist)
-                if newdebut:
-                    plt.plot(t[newdebut:newfin], self.log(varlist)[newdebut:newfin], 'o-', label=varlist)
+                lab = varlist
+                col = (0,0,1)
+                if newdebut != None:
+                    plt.plot(t[newdebut:newfin], self.log(varlist)[newdebut:newfin], 'o-', color=col, mec=col, mfc=col, label=lab)
+                    lab=None
+                if olddebut != None:
+                    plt.plot(t[olddebut:oldfin], self.log(varlist)[olddebut:oldfin], 'o-', mfc='none', mec=col, color=col, label=lab)
+                
             else:
-                for var in varlist:
-                    if olddebut:
-                        plt.plot(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 's-', mfc='none', label=var)
-                    if newdebut:
-                        plt.plot(t[newdebut:newfin], self.log(var)[newdebut:newfin], 'o-', label=var)
+                for var, coul in zip(varlist, ColorGenerator()):
+                    lab = var
+                    if newdebut != None:
+                        plt.plot(t[newdebut:newfin], self.log(var)[newdebut:newfin], 'o-', mfc=coul, mec=coul, color=coul, label=lab)
+                        lab = None
+                    if olddebut != None:
+                        plt.plot(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 'o-', mfc='none', mec=coul, color=coul, label=lab)
+                    
             plt.xlabel('t [h]')
             plt.legend(loc='upper left')
             plt.draw()

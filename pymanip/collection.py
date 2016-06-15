@@ -27,6 +27,8 @@ class Manip(object):
         value = None
         if name == 'basename' or name == 'session_name':
             value = self.session_name
+        elif name == 'nickname':
+            value = self.nickname
         elif self.properties.has_key(name):
             value = self.properties[name]
         else:
@@ -96,7 +98,7 @@ class ManipList(object):
             return self.manips.__getitem__(key)
 
     def from_nickname(self, nickname):
-        return self.lookup(nickname=nickname)
+        return self.lookup(nickname=nickname)[0]
 
     def lookup(self, **kwargs):
         result = list()
@@ -107,8 +109,4 @@ class ManipList(object):
                     keep = False
             if keep:
                 result.append(m)
-        if len(result) == 0:
-            result = None
-        elif len(result) == 1:
-            result = result[0]
         return result
