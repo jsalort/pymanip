@@ -174,7 +174,7 @@ class BaseSession(object):
             t = (t-t[0])/3600.
             #print(olddebut, oldfin, newdebut, newfin)
 
-            if isinstance(varlist, str):
+            if isinstance(varlist, str) or isinstance(varlist, unicode):
                 lab = varlist
                 col = (0,0,1)
                 if newdebut != None:
@@ -277,7 +277,7 @@ class SavedSession(BaseSession):
             name = args[0]
         else:
             name = [a for a in args]
-        if isinstance(name, str):
+        if isinstance(name, str) or isinstance(name, unicode):
             return (name in self.cachedvars)
         else:
             return all([(n in self.cachedvars) for n in name])
@@ -296,7 +296,7 @@ class SavedSession(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if not isinstance(name, str):
+        if (not isinstance(name, str)) and (not isinstance(name, unicode)):
             for var in name:
                 self.cache(var, dict_caller)
             return
@@ -442,7 +442,7 @@ class Session(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if isinstance(parameter_name, str):
+        if isinstance(parameter_name, str) or isinstance(parameter_name, unicode):
             value = dict_caller[parameter_name]
             self.parameters[parameter_name] = value
         else:
@@ -525,7 +525,7 @@ class Session(BaseSession):
             email_header = email_header + 'Content-Transfer-Encoding: quoted-printable\n'
         email_header = email_header + 'User-Agent: pymanip\n'
         email_header = email_header + 'To: '
-        if isinstance(self.email_to_addrs, str):
+        if isinstance(self.email_to_addrs, str) or isinstance(self.email_to_addrs, unicode):
             email_header = email_header + self.email_to_addrs + '\n'
         elif isinstance(self.email_to_addrs, tuple):
             for addr in self.email_to_addrs[:-1]:
