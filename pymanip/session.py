@@ -153,7 +153,6 @@ class BaseSession(object):
             else:
                 debut = 0
                 fin = len(t)
-            print('len = ', len(t))
             if t[debut] > self.session_opening_time:
                 # tous les points sont nouveaux
                 olddebut=None
