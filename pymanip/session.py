@@ -118,6 +118,8 @@ class BaseSession(object):
             return self.parameters[name]
 
     def has_log(self, name):
+        if name == 'Time' or name == 'time' or name == 't':
+            return True
         return (name in self.grp_variables.keys())
 
     def log_variable_list(self):
