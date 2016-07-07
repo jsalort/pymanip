@@ -85,8 +85,14 @@ class ManipCollection(Manip):
             return self.__getitem__(c)
 
 class ManipList(object):
-    def __init__(self, manips):
-        self.manips = manips
+    def __init__(self, *args):
+	if len(args) == 1:
+	    if isinstance(args[0], list):
+                self.manips = args[0]
+	    else:
+		self.manips = [args[0]]
+	else:
+	    self.manips = args
 
     def __iter__(self):
         return self.manips.__iter__()
