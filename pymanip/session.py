@@ -214,7 +214,7 @@ class BaseSession(object):
         sys.stdout.write("\n")
 
 class SavedSession(BaseSession):
-    def __init__(self, session_name, cache_override=False, cache_location='.'):
+    def __init__(self, session_name, cache_override=False, cache_location='.', verbose=True):
         super(SavedSession, self).__init__(session_name)
         self.store = h5py.File(self.storename, 'r')
         self.dset_time = self.store["time"]
@@ -232,20 +232,24 @@ class SavedSession(BaseSession):
             self.grp_datasets_defined = False
             pass
         self.opened = True
-        print 'Loading saved session from file', self.storename
+        if verbose:
+            print 'Loading saved session from file', self.storename
         total_size = self.dset_time.len()
         if total_size > 0:
             start_t = self.dset_time[0]
             end_t = self.dset_time[total_size-1]
             start_string = time.strftime(self.dateformat, time.localtime(start_t))
             end_string = time.strftime(self.dateformat, time.localtime(end_t))
-            print colored.blue('*** Start date: ' + start_string)
-            print colored.blue('***  End date: ' + end_string)
+            if verbose:
+                print colored.blue('*** Start date: ' + start_string)
+                print colored.blue('***  End date: ' + end_string)
         elif not self.grp_datasets_defined:
-            print colored.red('No logged variables')
+            if verbose:
+                print colored.red('No logged variables')
         if self.grp_datasets_defined:
             timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
-            print colored.blue('*** Acquisition timestamp ' + timestamp_string)
+            if verbose:
+                print colored.blue('*** Acquisition timestamp ' + timestamp_string)
         self.cachestorename = os.path.join(os.path.realpath(cache_location), 'cache',  os.path.basename(self.storename))
         if cache_override:
             self.cachemode = 'w'
@@ -253,7 +257,8 @@ class SavedSession(BaseSession):
             self.cachemode = 'r+'
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
-            print colored.yellow('*** Cache store found at ' + self.cachestorename)
+            if verbose:
+                print colored.yellow('*** Cache store found at ' + self.cachestorename)
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False

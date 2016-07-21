@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from pymanip import SavedSession
+import os
 
 class Manip(object):
-    def __init__(self, session_name, nickname=None, **kwargs):
+    def __init__(self, session_name, nickname=None, directory=None, verbose=True, **kwargs):
         self.properties = dict()
         for key in kwargs:
             self.properties[key] = kwargs[key]
@@ -13,6 +14,8 @@ class Manip(object):
             self.nickname = nickname
         else:
             self.nickname = session_name
+        self.directory = directory
+        self.verbose = verbose
 
     def __str__(self):
         return self.nickname
@@ -49,7 +52,11 @@ class Manip(object):
     @property
     def MI(self):
         if not hasattr(self, '_MI'):
-            self._MI = SavedSession(self.session_name)
+            if self.directory:
+                name = os.path.join(self.directory, self.session_name)
+            else:
+                name = self.session_name
+            self._MI = SavedSession(name, verbose=self.verbose)
         return self._MI
 
 class ManipCollection(Manip):
@@ -86,13 +93,13 @@ class ManipCollection(Manip):
 
 class ManipList(object):
     def __init__(self, *args):
-	if len(args) == 1:
-	    if isinstance(args[0], list):
+        if len(args) == 1:
+            if isinstance(args[0], list):
                 self.manips = args[0]
-	    else:
-		self.manips = [args[0]]
-	else:
-	    self.manips = args
+            else:
+                self.manips = [args[0]]
+        else:
+            self.manips = args
 
     def __iter__(self):
         return self.manips.__iter__()
