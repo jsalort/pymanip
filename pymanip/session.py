@@ -6,6 +6,8 @@ Module for experimental sessions.
 Useful classes are Session and SavedSession.
 """
 
+from __future__ import unicode_literals
+
 import os, sys
 import h5py
 import numpy as np
@@ -93,7 +95,7 @@ class BaseSession(object):
                     if isinstance(value, np.ndarray) and len(value) == 1:
                         value = value[0]
                     if name == 'email_lastSent':
-                        print ' ' + name + ' = ' +  time.strftime(self.dateformat, time.localtime(value))
+                        print ' ' + name + ' = ' +  time.strftime(self.dateformat, time.localtime(value)).decode('utf-8')
                     else:
                         print ' ' + name + ' = ' + str(value) + ' (' + str(type(value)) + ')'
 
@@ -205,7 +207,7 @@ class BaseSession(object):
     def sleep(self, duration):
         debut = time.time()
         while (time.time() - debut) < duration:
-            sys.stdout.write("Sleeping for " + str(-int(time.time()-debut-duration)) + " s                                   \r")
+            sys.stdout.write( ("Sleeping for " + str(-int(time.time()-debut-duration)) + " s                                   \r").encode('utf-8') )
             sys.stdout.flush()
             #time.sleep(1.0)
             with warnings.catch_warnings():
@@ -238,8 +240,8 @@ class SavedSession(BaseSession):
         if total_size > 0:
             start_t = self.dset_time[0]
             end_t = self.dset_time[total_size-1]
-            start_string = time.strftime(self.dateformat, time.localtime(start_t))
-            end_string = time.strftime(self.dateformat, time.localtime(end_t))
+            start_string = time.strftime(self.dateformat, time.localtime(start_t)).decode('utf-8')
+            end_string = time.strftime(self.dateformat, time.localtime(end_t)).decode('utf-8')
             if verbose:
                 print colored.blue('*** Start date: ' + start_string)
                 print colored.blue('***  End date: ' + end_string)
@@ -247,7 +249,7 @@ class SavedSession(BaseSession):
             if verbose:
                 print colored.red('No logged variables')
         if self.grp_datasets_defined:
-            timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
+            timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp'])).decode('utf-8')
             if verbose:
                 print colored.blue('*** Acquisition timestamp ' + timestamp_string)
         self.cachestorename = os.path.join(os.path.realpath(cache_location), 'cache',  os.path.basename(self.storename))
@@ -358,8 +360,8 @@ class Session(BaseSession):
         self.logfile = open(self.logname, 'a')
         self.allow_override_datasets = allow_override_datasets
 
-        date_string = time.strftime(self.dateformat, time.localtime(self.session_opening_time))
-        self.logfile.write("Session opened on " + date_string)
+        date_string = time.strftime(self.dateformat, time.localtime(self.session_opening_time)).decode('utf-8')
+        self.logfile.write( ("Session opened on " + date_string).encode('utf-8') )
         self.logfile.flush()
         try:
             self.store = h5py.File(self.storename, 'r+')
@@ -385,7 +387,7 @@ class Session(BaseSession):
             print colored.blue(boldface("Session reloaded from file ") + self.storename)
             if original_size > 0:
                 last_t = self.dset_time[original_size-1]
-                date_string = time.strftime(self.dateformat, time.localtime(last_t))
+                date_string = time.strftime(self.dateformat, time.localtime(last_t)).decode('utf-8')
                 print boldface("Last point recorded:") + " " + date_string
         except IOError:
             self.store = h5py.File(self.storename, 'w')
@@ -414,7 +416,7 @@ class Session(BaseSession):
             self.email_body = self.email_body + texte + '<br />\n'
         if not texte.endswith("\n"):
             texte = texte + "\n"
-        self.logfile.write(texte)
+        self.logfile.write(texte.encode('utf-8'))
         self.logfile.flush()
 
     def log_addline(self):
@@ -501,7 +503,7 @@ class Session(BaseSession):
         self.email_port = port
         self.email_from_addr = from_addr
         self.email_to_addrs = to_addrs
-        date_string = time.strftime(self.dateformat, time.localtime(time.time()))
+        date_string = time.strftime(self.dateformat, time.localtime(time.time())).decode('utf-8')
         if subject != None:
             self.email_subject = subject
         else:
@@ -547,7 +549,7 @@ class Session(BaseSession):
             body = body + '--' + mime_boundary + '\n'
             body = body + 'Content-Type: text/html; charset=UTF-8\n'
             body = body + 'Content-Transfer-Encoding: quoted-printable\n\n'
-            body = body + quopri.encodestring(self.email_body) + '\n'
+            body = body + quopri.encodestring(self.email_body.encode('utf-8')).decode('utf-8') + '\n'
 
             # Add figures
             for fig in self.email_figlist:
@@ -619,7 +621,7 @@ class Session(BaseSession):
         self.email_figlist = []
         if success:
             self.parameters['email_lastSent'] = time.time()
-            date_string = time.strftime(self.dateformat, time.localtime(self.parameters['email_lastSent']))
+            date_string = time.strftime(self.dateformat, time.localtime(self.parameters['email_lastSent'])).decode('utf-8')
             print date_string + ': Email successfully sent.'
 
     def time_since_last_email(self):
@@ -636,8 +638,8 @@ class Session(BaseSession):
         if self.opened:
             self.store.close()
             self.datfile.close()
-            date_string = time.strftime(self.dateformat, time.localtime(time.time()))
-            self.logfile.write("Session closed on " + date_string)
+            date_string = time.strftime(self.dateformat, time.localtime(time.time())).decode('utf-8')
+            self.logfile.write( ("Session closed on " + date_string).encode('utf-8') )
             self.logfile.flush()
             self.logfile.close()
             self.opened = False
