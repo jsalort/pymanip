@@ -32,15 +32,15 @@
        <x>9</x>
        <y>29</y>
        <width>251</width>
-       <height>213</height>
+       <height>220</height>
       </rect>
      </property>
      <layout class="QGridLayout" name="gridLayout">
       <item row="5" column="1">
-       <widget class="QLineEdit" name="lineEdit"/>
+       <widget class="QLineEdit" name="sampleRate_ui"/>
       </item>
       <item row="6" column="1">
-       <widget class="QLineEdit" name="lineEdit_2"/>
+       <widget class="QLineEdit" name="samplesPerChan_ui"/>
       </item>
       <item row="3" column="1">
        <widget class="QComboBox" name="terminal_config_ui"/>
@@ -169,7 +169,7 @@
      <layout class="QVBoxLayout" name="plot_layout"/>
     </widget>
    </widget>
-   <widget class="QCheckBox" name="checkBox">
+   <widget class="QCheckBox" name="continuous_ui">
     <property name="geometry">
      <rect>
       <x>20</x>
@@ -182,7 +182,7 @@
      <string>Continuous</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton">
+   <widget class="QPushButton" name="startButton">
     <property name="geometry">
      <rect>
       <x>10</x>
@@ -195,7 +195,7 @@
      <string>Start</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton_2">
+   <widget class="QPushButton" name="stopButton">
     <property name="geometry">
      <rect>
       <x>160</x>
@@ -215,12 +215,49 @@
      <x>0</x>
      <y>0</y>
      <width>969</width>
-     <height>23</height>
+     <height>24</height>
     </rect>
    </property>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>startButton</sender>
+   <signal>clicked()</signal>
+   <receiver>DAQ</receiver>
+   <slot>start_acquisition()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>100</x>
+     <y>696</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>44</x>
+     <y>-4</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>continuous_ui</sender>
+   <signal>stateChanged(int)</signal>
+   <receiver>DAQ</receiver>
+   <slot>continuous_changed()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>52</x>
+     <y>660</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>194</x>
+     <y>-12</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>start_acquisition()</slot>
+  <slot>continuous_changed()</slot>
+ </slots>
 </ui>

@@ -12,11 +12,22 @@ from matplotlib.figure import Figure
 
 import numpy as np
 
-from pymanip.daq.DAQmx import DAQDevice
+from pymanip.daq.DAQmx import DAQDevice, read_analog
+from PyDAQmx import DAQError
 
 # Load the GUI info
 directory = os.path.dirname(os.path.realpath(__file__))
 DaqUi = uic.loadUiType(directory + '/DAQ.ui')[0]
+
+def show_daq_error(daq_error):
+    msg = QtGui.QMessageBox()
+    msg.setIcon(QtGui.QMessageBox.Critical)
+    msg.setText(str(daq_error))
+    msg.setInformativeText(daq_error.message)
+    msg.setWindowTitle("DAQ Error")
+    #msg.setDetailedText("detailed text")
+    msg.setStandardButtons(QtGui.QMessageBox.Ok)
+    msg.exec_()
 
 class DaqWindow(QtGui.QMainWindow, DaqUi):
     def __init__(self, app):
@@ -30,14 +41,23 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         self.settings = QtCore.QSettings('pymanip', 'ManipDAQ')
         range_val, success = self.settings.value('range', defaultValue=10.0).toDouble()
         self.range_ui.setText("{:.2f} V".format(range_val))
-        
+        sampleRate_val, success = self.settings.value('sampleRate', defaultValue=1e3).toDouble()
+        self.sampleRate_ui.setText("{:.2f} Hz".format(sampleRate_val))
+        samplesPerChan_val, success = self.settings.value('samplesPerChan', defaultValue=10000).toInt()
+        self.samplesPerChan_ui.setText("{:d}".format(samplesPerChan_val))
+        continuous_val = self.settings.value('continuous', defaultValue=False).toBool()
+        self.continuous_ui.setCheckState(continuous_val)
+        self.continuous_changed()
+
         # Create matplotlib canvas
         self.figure_t = Figure()
         self.canvas_t = FigureCanvas(self.figure_t)
         self.toolbar_t = NavigationToolbar(self.canvas_t, self)
+        self.axes_t = self.figure_t.add_axes( (0.1, 0.1, 0.8, 0.85) )
         self.figure_f = Figure()
         self.canvas_f = FigureCanvas(self.figure_f)
         self.toolbar_f = NavigationToolbar(self.canvas_f, self)
+        self.axes_f = self.figure_f.add_axes( (0.1, 0.1, 0.8, 0.85) )
         self.plot_layout.addWidget(self.toolbar_t)
         self.plot_layout.addWidget(self.canvas_t)
         self.plot_layout.addWidget(self.toolbar_f)
@@ -49,8 +69,26 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         self.update_channel_properties()
 
         # Populate Terminal config list
-        self.terminal_config_ui.addItems( ('RSE', 'NRSE', 'Diff', 'PseudoDiff') )
-
+        terminal_config_list = ('RSE', 'NRSE', 'Diff', 'PseudoDiff') 
+        self.terminal_config_ui.addItems(terminal_config_list)
+        terminal_config_val = self.settings.value('terminal_config', defaultValue='Diff').toString()
+        for index, val in enumerate(terminal_config_list):
+            if val == terminal_config_val:
+                break
+        else:
+            index = 2
+        self.terminal_config_ui.setCurrentIndex(index)
+        
+        # Populate Coupling list
+        coupling_list = ('DC', 'AC')
+        self.coupling_ui.addItems(coupling_list)
+        coupling_val = self.settings.value('coupling', defaultValue='DC').toString()
+        for index, val in enumerate(coupling_list):
+            if val == coupling_val:
+                break
+        else:
+            index = 0
+        self.coupling_ui.setCurrentIndex(index)
 
         # Show window
         self.show()
@@ -62,11 +100,98 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         if selected_device:
             dev = DAQDevice(selected_device)
             self.channel_ui.addItems(dev.ai_chans)
-    
+
+    def continuous_changed(self):
+        if self.continuous_ui.checkState():
+            self.stopButton.setEnabled(True)
+        else:
+            self.stopButton.setEnabled(False)
+        self.settings.setValue('continuous', self.continuous_ui.checkState())
+
+    @property
+    def selected_channel(self):
+        return str(self.channel_ui.currentText())
+
+    @property
+    def selected_terminal_config(self):
+        return str(self.terminal_config_ui.currentText())
+
+    @property
+    def selected_range(self):
+        data = unicode(self.range_ui.text()).split()
+        value = float(data[0])
+        try:
+            unit = data[1]
+            if unit == "mV":
+                value*=1e-3
+            elif unit=="V":
+                pass
+            else:
+                print("Unknown unit " + unit)
+        finally:
+            pass
+        return value
+
+    @property
+    def selected_sample_rate(self):
+        data = unicode(self.sampleRate_ui.text()).split()
+        value = float(data[0])
+        try:
+            unit = data[1]
+            factor = {'': 1.0, 'Hz': 1.0, 'kHz': 1e3, 'mHz': 1e-3, 'MHz': 1e6}[unit]
+            value*=factor
+        except:
+            pass
+        return value
+
+    @property
+    def selected_samples_per_chan(self):
+        return int(self.samplesPerChan_ui.text())
+
+    @property
+    def selected_coupling(self):
+        return str(self.coupling_ui.currentText())
+
+    def save_settings(self):
+        self.settings.setValue('range', self.selected_range)
+        self.settings.setValue('sampleRate', self.selected_sample_rate)
+        self.settings.setValue('samplesPerChan', self.selected_samples_per_chan)
+        self.settings.setValue('terminal_config', self.selected_terminal_config)
+        self.settings.setValue('coupling', self.selected_coupling)
+
+    def start_acquisition(self):
+        self.startButton.setEnabled(False)
+        try:
+            data, = read_analog(self.selected_channel,
+                    self.selected_terminal_config,
+                    -self.selected_range, +self.selected_range,
+                    self.selected_samples_per_chan, self.selected_sample_rate,
+                    self.selected_coupling)
+            self.plot_data(data)
+        except DAQError as daq_error:
+            show_daq_error(daq_error)
+            pass
+        self.startButton.setEnabled(True)
+
+    def plot_data(self, data):
+        self.axes_t.cla()
+        t = np.arange(data.size)/self.selected_sample_rate
+        self.axes_t.plot(t, data, 'b-')
+        self.axes_t.set_xlim( (0.0, np.max(t)) )
+        self.canvas_t.draw()
+
+        self.axes_f.cla()
+        fft = np.fft.fft(data)
+        f = np.fft.fftfreq(data.size, 1.0/self.selected_sample_rate)
+        self.axes_f.loglog(f, np.power(np.abs(fft), 2), 'b-')
+        self.canvas_f.draw()
+
 def main():
     app = QtGui.QApplication(sys.argv)
     daq_window = DaqWindow(app)
-    sys.exit(app.exec_())
+    retval = app.exec_()
+    daq_window.save_settings()
+    sys.exit(retval)
 
 if __name__ == '__main__':
     main()
