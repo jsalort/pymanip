@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-from clint.textui import colored
+try:
+    from clint.textui import colored
+except ImportError:
+    def colored(string):
+        return string
+ 
 import ctypes
 import fluidlab.instruments.daq.daqmx as daqmx
 
