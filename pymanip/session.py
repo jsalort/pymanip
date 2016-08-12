@@ -18,7 +18,7 @@ import warnings
 import smtplib, base64, quopri
 import tempfile
 from platform import platform
-try
+try:
     from clint.textui import colored
 except ImportError:
     print 'Clint is not available: no color support'
