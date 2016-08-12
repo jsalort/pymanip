@@ -17,7 +17,7 @@ setup(name='pymanip',
       license='CeCILL-B',
       packages=['pymanip'],
       install_requires=[
-        'h5py', 'clint', 'fluidlab', 'fluiddyn',
+        'h5py', #'clint', 'fluidlab', 'fluiddyn',
       ],
       include_package_data=True,
       zip_safe=False)
