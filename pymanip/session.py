@@ -25,8 +25,12 @@ except ImportError:
     def colored(string):
         return string
 from datetime import datetime
-from convbox.myplot import ColorGenerator
-
+try:
+    from convbox.myplot import ColorGenerator
+except ImportError:
+    import itertools
+    def ColorGenerator():
+        return itertools.cycle(['b', 'r', 'g', 'k', 'm', 'c'])
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
 def NameGenerator(prefix=None, postfix=None):
