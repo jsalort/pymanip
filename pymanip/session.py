@@ -151,6 +151,16 @@ class BaseSession(object):
         else:
             print colored.red('Session is not opened')
 
+    def __getitem__(self, key):
+        if self.has_log(key):
+            return self.log(key)
+        elif self.has_parameter(key):
+            return self.parameter(key)
+        elif self.has_dataset(key):
+            return self.dataset(key)
+        else:
+            raise KeyError('Unknown key "' + key + '"')
+
     def log_plot(self, fignum, varlist, maxvalues=1000):
         if self.opened:
             plt.figure(fignum)
