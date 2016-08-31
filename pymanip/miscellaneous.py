@@ -28,7 +28,7 @@ def scanGpib(board):
     else:
         for pad in range(1,31):
             listen = gpib.listener(board, pad)
-            print board, pad, listen
+            #print board, pad, listen
             if listen:
                 print 'GPIB' + str(board) + '::' + str(pad)
                 try:

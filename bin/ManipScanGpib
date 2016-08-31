@@ -16,7 +16,9 @@ def main(board):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument('boardNumber', help="GPIB board to scan for connected instruments", metavar="board_number", type=int)
+    parser.add_argument('boardNumber', 
+            help="GPIB board to scan for connected instruments", 
+            metavar="board_number", type=int, default=0, nargs='?')
     args = parser.parse_args()
     board = int(args.boardNumber)        
     main(board)
