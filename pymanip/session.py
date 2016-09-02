@@ -81,6 +81,9 @@ class BaseSession(object):
         self.grp_datasets_defined = False
         self.allow_override_datasets = False
 
+    def __str__(self):
+        return self.session_name
+
     def describe(self):
         # Logged variables
         if len(self.grp_variables.keys()) > 0:

@@ -3,6 +3,7 @@
 
 from pymanip import SavedSession
 import os
+import six
 
 class Manip(object):
     def __init__(self, session_name, nickname=None, directory=None, verbose=True, **kwargs):
@@ -69,13 +70,19 @@ class ManipCollection(Manip):
             self.num = 1
 
     def __getitem__(self, key):
-        if isinstance(key, str):
+        if isinstance(key, six.string_types):
             return super(ManipCollection, self).__getitem__(key)
         else:
             try:
-                MI = SavedSession(self.basename + '_' + str(key))
-            except IOError:
-                print self.basename + '_' + str(key), 'does not exist'
+                if self.directory:
+                    name = os.path.join(self.directory, self.basename + '_' + str(key))
+                else:
+                    name = self.basename + '_' + str(key)
+                MI = SavedSession(name)
+            except IOError as e:
+                print 'Unable to read file "' + str(e.filename) + "'."
+                print 'Errno = ' + str(e.errno)
+                print 'Message: ' + str(e.message)
                 raise IndexError
             return MI
 
@@ -101,11 +108,14 @@ class ManipList(object):
         else:
             self.manips = args
 
+    def __len__(self):
+        return len(self.manips)
+
     def __iter__(self):
         return self.manips.__iter__()
 
     def __getitem__(self, key):
-        if isinstance(key, str):
+        if isinstance(key, six.string_types):
             return self.from_nickname(key)
         else:
             return self.manips.__getitem__(key)
