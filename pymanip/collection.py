@@ -17,6 +17,13 @@ class Manip(object):
             self.nickname = session_name
         self.directory = directory
         self.verbose = verbose
+        try:
+            self.cachedvars = self.MI.cachedvars
+            self.cached = self.MI.cached
+            self.cachedvalue = self.MI.cachedvalue
+            self.cache = self.MI.cache
+        except:
+            pass
 
     def __str__(self):
         return self.nickname
