@@ -4,7 +4,7 @@
 import os
 import numpy as np
 
-def load_octmi(acquisitionName, basePath='.'):
+def load_octmi_dat(acquisitionName, basePath='.'):
     # Vérification de l'existence du fichier
     datFilePath = os.path.normpath(basePath) + '/' + acquisitionName + '_MI.dat'
     if not os.path.exists(datFilePath):
