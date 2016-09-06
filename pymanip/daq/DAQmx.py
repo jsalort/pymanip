@@ -10,6 +10,7 @@ except ImportError:
  
 import ctypes
 import fluidlab.instruments.daq.daqmx as daqmx
+import six
 
 class DAQDevice(object):
     """
@@ -254,14 +255,22 @@ def read_analog(resource_names, terminal_config, volt_min=None, volt_max=None,
 
     """
     
+    # Les type checks ci-dessous ne sont pas très pythoniques
+    # mais nécessaire parce que PyDAQmx est une passerelle vers le C
+    # et il y a des sous-entendus de type.
+
     # Ensure that samples_per_chan is integer
     if not isinstance(samples_per_chan, int):
         samples_per_chan = int(samples_per_chan)
 
-    if isinstance(resource_names, str):
+    # Ensure resource_names is str or list of str
+    if isinstance(resource_names, six.string_types):
         num_channels = 1
+        resource_names = str(resource_names)
     else:
         num_channels = len(resource_names)
+        resource_names = [str(r) for r in resource_names]
+    
 
     # If no range is provided, take a 5s sample
     if volt_min is None or volt_max is None:
