@@ -290,6 +290,8 @@ class SavedSession(BaseSession):
 
     @property
     def cachedvars(self):
+        if not hasattr(self, 'has_cachestore'):
+            return []
         if self.has_cachestore:
             return self.cachestore.keys()
         else:

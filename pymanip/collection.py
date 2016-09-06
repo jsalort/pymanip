@@ -17,13 +17,11 @@ class Manip(object):
             self.nickname = session_name
         self.directory = directory
         self.verbose = verbose
-        try:
-            self.cachedvars = self.MI.cachedvars
-            self.cached = self.MI.cached
-            self.cachedvalue = self.MI.cachedvalue
-            self.cache = self.MI.cache
-        except:
-            pass
+        self.cachedvars = self.MI.cachedvars
+        self.cached = self.MI.cached
+        self.cachedvalue = self.MI.cachedvalue
+        self.cache = self.MI.cache
+        
 
     def __str__(self):
         return self.nickname
@@ -69,13 +67,14 @@ class Manip(object):
 
 class ManipCollection(Manip):
     def __init__(self, basename, nickname=None, **kwargs):
-        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, **kwargs)
         self.basename = basename
         if 'num' in kwargs:
             self.num = kwargs['num']
         else:
             self.num = 1
 
+        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, **kwargs)
+        
     def __getitem__(self, key):
         if isinstance(key, six.string_types):
             return super(ManipCollection, self).__getitem__(key)
@@ -92,6 +91,12 @@ class ManipCollection(Manip):
                 print 'Message: ' + str(e.message)
                 raise IndexError
             return MI
+
+    @property
+    def MI(self):
+        if hasattr(self, 'current_acq'):
+            return self[self.current_acq]
+        return self[1]
 
     def __iter__(self):
         self.current_acq = 1
