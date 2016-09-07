@@ -366,7 +366,7 @@ class SavedSession(BaseSession):
                     self.cachestore[name][:] = dict_caller[name]
          
     def __del__(self):
-        if self.has_cachestore:
+        if hasattr(self, 'has_cachestore') and self.has_cachestore:
             self.cachestore.close()
 
     def __enter__(self):

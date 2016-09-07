@@ -6,14 +6,14 @@ This program shows the content of a saved pymanip session.
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.dates import AutoDateFormatter, AutoDateLocator, epoch2num
-from pymanip import SavedSession
+from pymanip.collection import Manip
 
 def main(sessionName, quiet, line_to_print, var_to_plot):
     if sessionName.endswith('.hdf5'):
-	N = len(sessionName)
-	sessionName = sessionName[0:(N-5)]
+        N = len(sessionName)
+        sessionName = sessionName[0:(N-5)]
 
-    MI = SavedSession(sessionName)
+    MI = Manip(sessionName).MI
     if line_to_print is not None:
         if line_to_print >= len(MI.log('t')):
             print 'Specified line is out of bound.'

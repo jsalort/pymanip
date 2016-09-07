@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from pymanip import SavedSession
+from pymanip.legacy_session import OctSession
 import os
 import six
 
@@ -62,7 +63,13 @@ class Manip(object):
                 name = os.path.join(self.directory, self.session_name)
             else:
                 name = self.session_name
-            self._MI = SavedSession(name, verbose=self.verbose)
+            try:
+                self._MI = SavedSession(name, verbose=self.verbose)
+            except IOError:
+                # Try OctMI session
+                self._MI = OctSession(name, verbose=self.verbose)
+                #print('OctMI legacy mode')
+
         return self._MI
 
 class ManipCollection(Manip):
