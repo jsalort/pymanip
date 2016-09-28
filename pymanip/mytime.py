@@ -9,8 +9,9 @@ are roughly in RFC 3339 format.
 
 from __future__ import unicode_literals, print_function, division
 import dateutil.parser
-from dateutil.tz import tzutc
+from dateutil.tz import tzutc, tzlocal
 import datetime
+from time import time
 
 def datestr2epoch(string):
     """
@@ -41,12 +42,16 @@ def epoch2datestr(epoch, tz=None):
     If no tz is given, the output is given in Coordinated Universal Time
     """
     if not tz:
+        #print("Swiching to UTC")
         tz = tzutc()
     date = datetime.datetime.fromtimestamp(epoch, tz=tz)
     return date.isoformat()
 
 
 if __name__ == '__main__':
+    now = time()
+    print("Now in local TZ:", epoch2datestr(now, tz=tzlocal()))
+    print("Now in UTC:", epoch2datestr(now))
     reference = datestr2epoch('2016-02-25T17:36UTC')
     for datestr in ['2016-02-25T17:36UTC', '2016-02-25T18:36UTC+1', '2016-02-25T18:36UTC+01', '2016-02-25T18:36UTC+0100', '2016-02-25T19:36UTC+02:00', '2016-02-25T18:36+0100', '2016-02-25T17:36+0000']:
         epoch = datestr2epoch(datestr)
