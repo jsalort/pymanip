@@ -65,9 +65,14 @@ class Manip(object):
                 name = self.session_name
             try:
                 self._MI = SavedSession(name, verbose=self.verbose)
-            except IOError:
-                # Try OctMI session
-                self._MI = OctSession(name, verbose=self.verbose)
+            except IOError as a:
+                try: 
+                    self._MI = OctSession(name, verbose=self.verbose)
+                except IOError as b:
+                    print("None of the possible files can be found:")
+                    print(" 1. {:}".format(a.filename))
+                    print(" 2. {:}".format(b.filename))
+                    raise IOError('Cannot open session "{:}" for reading'.format(name))
                 #print('OctMI legacy mode')
 
         return self._MI

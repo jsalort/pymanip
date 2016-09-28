@@ -35,7 +35,7 @@ class OctSession(object):
 
     def describe(self):
         if len(self.variables) > 0:
-            print 'List of saved variables: (%d lines)' % len(self.variables)
+            print 'List of saved variables: (%d lines)' % len(self.time)
             for key, var in self.variables.iteritems():
                 print ' ' + key
 

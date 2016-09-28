@@ -25,7 +25,12 @@ def main(sessionName, quiet, line_to_print, var_to_plot):
         varlist += MI.log_variable_list()
         print '-'*38
         for varname in varlist:
-            print format_str.format(varname, MI.log(varname)[line_to_print])
+            valtab = MI.log(varname)
+            if isinstance(valtab, (float, int) ):
+                # might occur if only one line
+                print format_str.format(varname, MI.log(varname))
+            else:
+                print format_str.format(varname, MI.log(varname)[line_to_print])
     elif not quiet:
         MI.describe()
     if var_to_plot is not None:
