@@ -56,7 +56,7 @@ def datestr2epoch(string):
             if not date.tzinfo:
                 raise TypeError("datestr with no timezone information is ambiguous !")
             dlist.append((date - datetime.datetime(1970, 1, 1, tzinfo=tzutc())).total_seconds())
-     return dlist
+        return dlist
 
 
 def epoch2datestr(epoch, tz=None):
