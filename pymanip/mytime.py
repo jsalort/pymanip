@@ -70,6 +70,14 @@ def epoch2datestr(epoch, tz=None):
     date = datetime.datetime.fromtimestamp(epoch, tz=tz)
     return date.isoformat()
 
+tic_starts = []
+
+def tic():
+    tic_starts.append(time())
+
+def toc():
+    print("Elapsed time {:.2f} seconds.".format(time() - tic_starts[-1]))
+
 
 if __name__ == '__main__':
     now = time()
