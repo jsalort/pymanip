@@ -12,6 +12,7 @@ import dateutil.parser
 from dateutil.tz import tzutc, tzlocal
 import datetime
 from time import time
+import numpy as np
 
 def datestr2epoch(string):
     """
@@ -19,22 +20,44 @@ def datestr2epoch(string):
     Correct string is:
     '2016-02-25T17:36+0100' or '2016-02-25T17:36+01:00'
     UTC+1 or UTC+0100 is also accepted by this function
+    Accepts a single string or a list of string
     """
-    string = string.upper()
-    # Ci-dessous, on remplace UTC+1, UTC+01, UTC+0100 par +0100
-    if 'UTC' in string:
-        parts = string.split('UTC')
-        offset = parts[1].replace(':','')
+    if isinstance(string,str):
+        string = string.upper()
+        # Ci-dessous, on remplace UTC+1, UTC+01, UTC+0100 par +0100
+        if 'UTC' in string:
+            parts = string.split('UTC')
+            offset = parts[1].replace(':','')
         if len(offset) == 0:
             offset = '+0000'
         elif int(offset) <= 12:
             offset = '{:+03d}00'.format(int(offset))
         string = parts[0] + offset
         #print('New string: ', string)
-    date = dateutil.parser.parse(string)
-    if not date.tzinfo:
-        raise TypeError("datestr with no timezone information is ambiguous !")
-    return (date - datetime.datetime(1970, 1, 1, tzinfo=tzutc())).total_seconds()
+        date = dateutil.parser.parse(string)
+        if not date.tzinfo:
+            raise TypeError("datestr with no timezone information is ambiguous !")
+        return (date - datetime.datetime(1970, 1, 1, tzinfo=tzutc())).total_seconds()
+    else:
+        dlist=[]
+        for s in string:
+            s = s.upper()
+            # Ci-dessous, on remplace UTC+1, UTC+01, UTC+0100 par +0100
+            if 'UTC' in s:
+                parts = s.split('UTC')
+                offset = parts[1].replace(':','')
+            if len(offset) == 0:
+                offset = '+0000'
+            elif int(offset) <= 12:
+                offset = '{:+03d}00'.format(int(offset))
+            s = parts[0] + offset
+            #print('New string: ', string)
+            date = dateutil.parser.parse(s)
+            if not date.tzinfo:
+                raise TypeError("datestr with no timezone information is ambiguous !")
+            dlist.append((date - datetime.datetime(1970, 1, 1, tzinfo=tzutc())).total_seconds())
+     return dlist
+
 
 def epoch2datestr(epoch, tz=None):
     """
