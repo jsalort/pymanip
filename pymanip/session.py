@@ -9,6 +9,7 @@ Useful classes are Session and SavedSession.
 from __future__ import unicode_literals
 
 import os, sys
+import six
 import h5py
 import numpy as np
 import time
@@ -317,7 +318,19 @@ class SavedSession(BaseSession):
     def cachedvalue(self, varname):
         if self.has_cachestore:
             print colored.yellow('Retriving ' + varname + ' from cache')
-            return self.cachestore[varname].value
+            content = self.cachestore[varname]
+            if hasattr(content, "value"): 
+                return content.value
+            else:
+                result = list()
+                i=0
+                while True:
+                    try:
+                        result.append(content[str(i)].value)
+                        i=i+1
+                    except KeyError:
+                        break
+                return result
         else:
             return None
         
@@ -332,6 +345,7 @@ class SavedSession(BaseSession):
             for var in name:
                 self.cache(var, dict_caller)
             return
+            
         if not self.has_cachestore:
             try:
                 os.mkdir(os.path.dirname(self.cachestorename))
@@ -349,21 +363,38 @@ class SavedSession(BaseSession):
         
         if self.has_cachestore:
             print colored.yellow('Saving ' + name + ' in cache')
-            try:
-                new_length = len(dict_caller[name])
-            except TypeError:
-                new_length = 1
-                pass
-            if name in self.cachestore.keys():
-                if len(self.cachestore[name]) != new_length:
-                    self.cachestore[name].resize( (new_length, ))
-                self.cachestore[name][:] = dict_caller[name]
+
+            if isinstance(dict_caller[name], list):
+                # Sauvegarde d'une liste d'objets
+                # Dans ce cas, on crée un groupe du nom "name" et on récurse
+                # Si le groupe existe déjà, on le supprime et on le recrée
+                try:
+                    del self.cachestore[name]
+                except KeyError:
+                    pass
+                grp = self.cachestore.create_group(name)
+                for itemnum, item in enumerate(dict_caller[name]):
+                    if not isinstance(item, (six.integer_types, float) ):
+                        grp.create_dataset(str(itemnum), chunks=True, data=item, compression='gzip')
+                    else:
+                        grp.create_dataset(str(itemnum), data=item)
             else:
-                if new_length > 1:
-                    self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), data=dict_caller[name])
-                else:
-                    self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
+
+                try:
+                    new_length = len(dict_caller[name])
+                except TypeError:
+                    new_length = 1
+                    pass
+                if name in self.cachestore.keys():
+                    if len(self.cachestore[name]) != new_length:
+                        self.cachestore[name].resize( (new_length, ))
                     self.cachestore[name][:] = dict_caller[name]
+                else:
+                    if new_length > 1:
+                        self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), data=dict_caller[name])
+                    else:
+                        self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
+                        self.cachestore[name][:] = dict_caller[name]
          
     def __del__(self):
         if hasattr(self, 'has_cachestore') and self.has_cachestore:
