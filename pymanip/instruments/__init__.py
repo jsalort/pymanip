@@ -29,14 +29,18 @@ for instrument_type in instruments.__all__:
     if verbose_import:
         sys.stdout.write('* ' + instrument_type + ': ')
     for instrument_file in instrument_type_module.__all__:
-        exec("import fluidlab.instruments." + instrument_type + "." + instrument_file + " as " + instrument_file)
-        exec("instrument_file_module = " + instrument_file)
-        for instrument_classname in instrument_file_module.__all__:
-            exec("from fluidlab.instruments." + instrument_type + "." + instrument_file + " import " + instrument_classname)
-            __doc__ += instrument_classname + " "
-            if verbose_import:
-                sys.stdout.write(instrument_classname + " ")
-            __all__.append(instrument_classname)
+        try:
+            exec("import fluidlab.instruments." + instrument_type + "." + instrument_file + " as " + instrument_file)
+            exec("instrument_file_module = " + instrument_file)
+            for instrument_classname in instrument_file_module.__all__:
+                exec("from fluidlab.instruments." + instrument_type + "." + instrument_file + " import " + instrument_classname)
+                __doc__ += instrument_classname + " "
+                if verbose_import:
+                    sys.stdout.write(instrument_classname + " ")
+                __all__.append(instrument_classname)
+        except ImportError:
+            print 'Unable to import', instrument_type + '.' + instrument_file + '.' + instrument_classname
+            
     __doc__ += "\n"
     if verbose_import:
         sys.stdout.write("\n")
