@@ -165,7 +165,7 @@ class BaseSession(object):
         else:
             raise KeyError('Unknown key "' + key + '"')
 
-    def log_plot(self, fignum, varlist, maxvalues=1000):
+    def log_plot(self, fignum, varlist, maxvalues=1000, plotfunc=plt.plot):
         if self.opened:
             plt.figure(fignum)
             plt.clf()
@@ -213,10 +213,10 @@ class BaseSession(object):
                 for var, coul in zip(varlist, ColorGenerator()):
                     lab = var
                     if newdebut != None:
-                        plt.plot(t[newdebut:newfin], self.log(var)[newdebut:newfin], 'o-', mfc=coul, mec=coul, color=coul, label=lab)
+                        plotfunc(t[newdebut:newfin], self.log(var)[newdebut:newfin], 'o-', mfc=coul, mec=coul, color=coul, label=lab)
                         lab = None
                     if olddebut != None:
-                        plt.plot(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 'o-', mfc='none', mec=coul, color=coul, label=lab)
+                        plotfunc(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 'o-', mfc='none', mec=coul, color=coul, label=lab)
                     
             plt.xlabel('t [h]')
             plt.legend(loc='upper left')
