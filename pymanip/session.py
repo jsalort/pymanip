@@ -197,7 +197,12 @@ class BaseSession(object):
                 oldfin=fin
                 newdebut=None
                 newfin=None
-            t = (t-t[0])/3600.
+            if t[-1]-t[0] < 3600:
+                t = (t-t[0])/60.0
+                xlab = 't [min]'
+            else:
+                t = (t-t[0])/3600.
+                xlab = 't [h]'
             #print(olddebut, oldfin, newdebut, newfin)
 
             if isinstance(varlist, str) or isinstance(varlist, unicode):
@@ -218,7 +223,7 @@ class BaseSession(object):
                     if olddebut != None:
                         plotfunc(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 'o-', mfc='none', mec=coul, color=coul, label=lab)
                     
-            plt.xlabel('t [h]')
+            plt.xlabel(xlab)
             plt.legend(loc='upper left')
             plt.draw()
             with warnings.catch_warnings():
