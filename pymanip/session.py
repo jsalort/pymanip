@@ -23,8 +23,13 @@ try:
     from clint.textui import colored
 except ImportError:
     print 'Clint is not available: no color support'
-    def colored(string):
-        return string
+    class Colored(object):
+        def blue(self, txt):
+            return txt
+        def red(self, txt):
+            return txt
+    colored = Colored()
+
 from datetime import datetime
 try:
     from convbox.myplot import ColorGenerator
@@ -32,6 +37,7 @@ except ImportError:
     import itertools
     def ColorGenerator():
         return itertools.cycle(['b', 'r', 'g', 'k', 'm', 'c'])
+
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
 def NameGenerator(prefix=None, postfix=None):
