@@ -19,7 +19,7 @@ def read_analog(Scope_slot, Scope_channels, DAQmx_channels, volt_range, samples_
     scope.ConfigureHorizontalTiming(sampleRate=sample_rate, numPts=samples_per_chan)
     scope.ConfigureVertical(channelList=Scope_channels, voltageRange=volt_range)
     scope.ConfigureTrigger('Immediate')
-    scope.ExportSignal('VAL_START_TRIGGER', 'Trigger start', 'VAL_RTSI_1')
+    scope.ExportSignal(niScope.NISCOPE_VAL_START_TRIGGER, 'Trigger start', 'VAL_RTSI_1')
 
     # Configure DAQmx channels
     task = PyDAQmx.Task()
