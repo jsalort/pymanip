@@ -6,7 +6,7 @@ Module for experimental sessions.
 Useful classes are Session and SavedSession.
 """
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
 import os, sys
 import six
@@ -22,7 +22,7 @@ from platform import platform
 try:
     from clint.textui import colored
 except ImportError:
-    print 'Clint is not available: no color support'
+    print('Clint is not available: no color support')
     class Colored(object):
         def blue(self, txt):
             return txt
@@ -55,7 +55,7 @@ def NameGenerator(prefix=None, postfix=None):
         name = name + "_" + postfix
     while True:
         name_numbered = name + "_" + str(acquisition_number)
-        print "Acquisition name:", name_numbered
+        print("Acquisition name:", name_numbered)
         yield name_numbered
         acquisition_number = acquisition_number + 1
 
@@ -95,28 +95,28 @@ class BaseSession(object):
         # Logged variables
         if len(self.grp_variables.keys()) > 0:
             num_lines = self.dset_time.len()
-            print 'List of saved variables: (%d lines)' % num_lines
+            print('List of saved variables: (%d lines)' % num_lines)
             for var in self.grp_variables.keys():
-                print ' ' + var
+                print(' ' + var)
         # Datasets
         if self.grp_datasets_defined:
-            print 'List of saved datasets:'
+            print('List of saved datasets:')
             for dataname in self.grp_datasets.keys():
                 size = self.grp_datasets[dataname].size
-                print ' ' + dataname + (' (%d points)' % size)
+                print(' ' + dataname + (' (%d points)' % size))
         # Parameters
         if self.parameters_defined:
             if len(self.parameters.keys()) > 0:
-                print 'List of saved parameters:'
+                print('List of saved parameters:')
                 for name in self.parameters.keys():
                     value = self.parameters[name]
-                    #print type(value)
+                    #print(type(value))
                     if isinstance(value, np.ndarray) and len(value) == 1:
                         value = value[0]
                     if name == 'email_lastSent':
-                        print ' ' + name + ' = ' +  time.strftime(self.dateformat, time.localtime(value)).decode('utf-8')
+                        print(' ' + name + ' = ' +  time.strftime(self.dateformat, time.localtime(value)).decode('utf-8'))
                     else:
-                        print ' ' + name + ' = ' + str(value) + ' (' + str(type(value)) + ')'
+                        print(' ' + name + ' = ' + str(value) + ' (' + str(type(value)) + ')')
 
     def has_dataset(self, name):
         if self.grp_datasets_defined:
@@ -151,15 +151,15 @@ class BaseSession(object):
             if varname == 'Time' or varname == 'time' or varname == 't':
                 return self.dset_time.value
             elif varname == '?':
-                print 'List of saved variables:'
+                print('List of saved variables:')
                 for var in self.grp_variables.keys():
-                    print var
+                    print(var)
             elif varname in self.grp_variables.keys():
                 return self.grp_variables[varname].value
             else:
-                print colored.red('Variable is not defined: ') + varname
+                print(colored.red('Variable is not defined: ') + varname)
         else:
-            print colored.red('Session is not opened')
+            print(colored.red('Session is not opened'))
 
     def __getitem__(self, key):
         if self.has_log(key):
@@ -236,7 +236,7 @@ class BaseSession(object):
                 warnings.simplefilter("ignore")
                 plt.pause(0.0001)
         else:
-            print colored.red('Session is not opened')
+            print(colored.red('Session is not opened'))
 
     def sleep(self, duration):
         debut = time.time()
@@ -269,7 +269,7 @@ class SavedSession(BaseSession):
             pass
         self.opened = True
         if verbose:
-            print 'Loading saved session from file', self.storename
+            print('Loading saved session from file', self.storename)
         total_size = self.dset_time.len()
         if total_size > 0:
             start_t = self.dset_time[0]
@@ -277,15 +277,15 @@ class SavedSession(BaseSession):
             start_string = time.strftime(self.dateformat, time.localtime(start_t)).decode('utf-8')
             end_string = time.strftime(self.dateformat, time.localtime(end_t)).decode('utf-8')
             if verbose:
-                print colored.blue('*** Start date: ' + start_string)
-                print colored.blue('***  End date: ' + end_string)
+                print(colored.blue('*** Start date: ' + start_string))
+                print(colored.blue('***  End date: ' + end_string))
         elif not self.grp_datasets_defined:
             if verbose:
-                print colored.red('No logged variables')
+                print(colored.red('No logged variables'))
         if self.grp_datasets_defined:
             timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp'])).decode('utf-8')
             if verbose:
-                print colored.blue('*** Acquisition timestamp ' + timestamp_string)
+                print(colored.blue('*** Acquisition timestamp ' + timestamp_string))
         self.cachestorename = os.path.join(os.path.realpath(cache_location), 'cache',  os.path.basename(self.storename))
         if cache_override:
             self.cachemode = 'w'
@@ -294,7 +294,7 @@ class SavedSession(BaseSession):
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
             if verbose:
-                print colored.yellow('*** Cache store found at ' + self.cachestorename)
+                print(colored.yellow('*** Cache store found at ' + self.cachestorename))
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False
@@ -328,7 +328,7 @@ class SavedSession(BaseSession):
 
     def cachedvalue(self, varname):
         if self.has_cachestore:
-            print colored.yellow('Retriving ' + varname + ' from cache')
+            print(colored.yellow('Retriving ' + varname + ' from cache'))
             content = self.cachestore[varname]
             if hasattr(content, "value"): 
                 return content.value
@@ -365,15 +365,15 @@ class SavedSession(BaseSession):
             try:
                 self.cachestore = h5py.File(self.cachestorename, 'w')
                 self.has_cachestore = True
-                print colored.yellow('*** Cache store created at ' + self.cachestorename)
+                print(colored.yellow('*** Cache store created at ' + self.cachestorename))
             except IOError as ioe:
                 self.has_cachestore = False
-                print colored.red('Cannot create cache store')
-                print colored.red(ioe.message)
+                print(colored.red('Cannot create cache store'))
+                print(colored.red(ioe.message))
                 pass
         
         if self.has_cachestore:
-            print colored.yellow('Saving ' + name + ' in cache')
+            print(colored.yellow('Saving ' + name + ' in cache'))
 
             if isinstance(dict_caller[name], list):
                 # Sauvegarde d'une liste d'objets
@@ -450,11 +450,11 @@ class Session(BaseSession):
                 if var not in self.grp_variables.keys():
                     self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), data=arr)
                     new_headers = True
-            print colored.blue(boldface("Session reloaded from file ") + self.storename)
+            print(colored.blue(boldface("Session reloaded from file ") + self.storename))
             if original_size > 0:
                 last_t = self.dset_time[original_size-1]
                 date_string = time.strftime(self.dateformat, time.localtime(last_t)).decode('utf-8')
-                print boldface("Last point recorded:") + " " + date_string
+                print(boldface("Last point recorded:") + " " + date_string)
         except IOError:
             self.store = h5py.File(self.storename, 'w')
             self.dset_time = self.store.create_dataset("time", chunks=True, maxshape=(None,), shape=(0,), dtype=float)
@@ -477,7 +477,7 @@ class Session(BaseSession):
         self.email_started = False
 
     def disp(self, texte):
-        print texte
+        print(texte)
         if self.email_started:
             self.email_body = self.email_body + texte + '<br />\n'
         if not texte.endswith("\n"):
@@ -502,7 +502,7 @@ class Session(BaseSession):
                 d[newsize-1] = dict_caller[varname]
                 self.datfile.write(" %f" % dict_caller[varname])
             except:
-                print colored.red('Variable is not defined: ') + varname
+                print(colored.red('Variable is not defined: ') + varname)
                 d[newsize-1] = 0.
                 pass
         self.datfile.write("\n")
@@ -551,7 +551,7 @@ class Session(BaseSession):
                 self.grp_datasets[data_name].resize( (new_length,) )
             self.grp_datasets[data_name][:] = dict_caller[data_name]
             self.grp_datasets.attrs['timestamp'] = time.time()
-            print colored.red('Warning: overriding existing dataset')
+            print(colored.red('Warning: overriding existing dataset'))
         else:
             raise NameError('Dataset is already defined. Use allow_override_datasets to allow override of existing saved datasets.')
 
@@ -648,16 +648,16 @@ class Session(BaseSession):
                 if len(error_list) == 0:
                     success = True
             except smtplib.SMTPHeloError:
-                print 'SMTP Helo Error'
+                print('SMTP Helo Error')
                 pass
             except smtplib.SMTPRecipientsRefused:
-                print 'Some recipients have been rejected by SMTP server'
+                print('Some recipients have been rejected by SMTP server')
                 pass
             except smtplib.SMTPSenderRefused:
-                print 'SMTP server refused sender ' + self.email_from_addr
+                print('SMTP server refused sender ' + self.email_from_addr)
                 pass
             except smtplib.SMTPDataError:
-                print 'SMTP Data Error'
+                print('SMTP Data Error')
                 pass
 
         else:
@@ -669,16 +669,16 @@ class Session(BaseSession):
                 if len(error_list) == 0:
                     success = True
             except smtplib.SMTPHeloError:
-                print 'SMTP Helo Error'
+                print('SMTP Helo Error')
                 pass
             except smtplib.SMTPRecipientsRefused:
-                print 'Some recipients have been rejected by SMTP server'
+                print('Some recipients have been rejected by SMTP server')
                 pass
             except smtplib.SMTPSenderRefused:
-                print 'SMTP server refused sender ' + self.email_from_addr
+                print('SMTP server refused sender ' + self.email_from_addr)
                 pass
             except smtplib.SMTPDataError:
-                print 'SMTP Data Error'
+                print('SMTP Data Error')
                 pass
 
         smtp.quit()
@@ -688,7 +688,7 @@ class Session(BaseSession):
         if success:
             self.parameters['email_lastSent'] = time.time()
             date_string = time.strftime(self.dateformat, time.localtime(self.parameters['email_lastSent'])).decode('utf-8')
-            print date_string + ': Email successfully sent.'
+            print(date_string + ': Email successfully sent.')
 
     def time_since_last_email(self):
         try:
