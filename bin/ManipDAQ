@@ -51,25 +51,25 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
             range_val, success = self.settings.value('range', defaultValue=10.0).toDouble()
         else:
             range_val = self.settings.value('range', defaultValue=10.0)
-        self.range_ui.setText("{:.2f} V".format(range_val))
+        self.range_ui.setText("{:.2f} V".format(float(range_val)))
         
         if qt_version == 4:
             sampleRate_val, success = self.settings.value('sampleRate', defaultValue=1e3).toDouble()
         else:
             sampleRate_val = self.settings.value('sampleRate', defaultValue=1e3)
-        self.sampleRate_ui.setText("{:.2f} Hz".format(sampleRate_val))
+        self.sampleRate_ui.setText("{:.2f} Hz".format(float(sampleRate_val)))
         
         if qt_version == 4:
             samplesPerChan_val, success = self.settings.value('samplesPerChan', defaultValue=10000).toInt()
         else:
             samplesPerChan_val = self.settings.value('samplesPerChan', defaultValue=10000)
-        self.samplesPerChan_ui.setText("{:d}".format(samplesPerChan_val))
+        self.samplesPerChan_ui.setText("{:d}".format(int(samplesPerChan_val)))
         
         if qt_version == 4:
             continuous_val = self.settings.value('continuous', defaultValue=False).toBool()
         else:
             continuous_val = self.settings.value('continuous', defaultValue=False)
-        self.continuous_ui.setCheckState(continuous_val)
+        self.continuous_ui.setCheckState(bool(continuous_val))
         self.continuous_changed()
 
         # Create matplotlib canvas
