@@ -100,7 +100,7 @@ class DAQDevice(object):
         from PyDAQmx import DAQmxGetDevProductNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevProductNum(self.device_name, ctypes.byref(num))
-        return num.value.decode('ascii')
+        return num.value
 
     @property
     def ai_chans(self):
@@ -192,28 +192,28 @@ class DAQDevice(object):
         from PyDAQmx import DAQmxGetDevPCIBusNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPCIBusNum(self.device_name, ctypes.byref(num))
-        return num.value.decode('ascii')
+        return num.value
 
     @property
     def pci_devnum(self):
         from PyDAQmx import DAQmxGetDevPCIDevNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPCIDevNum(self.device_name, ctypes.byref(num))
-        return num.value.decode('ascii')
+        return num.value
 
     @property
     def pxi_chassisnum(self):
         from PyDAQmx import DAQmxGetDevPXIChassisNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPXIChassisNum(self.device_name, ctypes.byref(num))
-        return num.value.decode('ascii')
+        return num.value
 
     @property
     def pxi_slotnum(self):
         from PyDAQmx import DAQmxGetDevPXISlotNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPXISlotNum(self.device_name, ctypes.byref(num))
-        return num.value.decode('ascii')
+        return num.value
 
     @property
     def location(self):
@@ -272,7 +272,6 @@ def read_analog(resource_names, terminal_config, volt_min=None, volt_max=None,
     else:
         num_channels = len(resource_names)
         resource_names = [str(r) for r in resource_names]
-    
 
     # If no range is provided, take a 5s sample
     if volt_min is None or volt_max is None:
