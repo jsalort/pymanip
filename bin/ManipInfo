@@ -3,6 +3,8 @@
 This program shows the content of a saved pymanip session.
 """
 
+from __future__ import print_function
+
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.dates import AutoDateFormatter, AutoDateLocator, epoch2num
@@ -16,21 +18,21 @@ def main(sessionName, quiet, line_to_print, var_to_plot):
     MI = Manip(sessionName).MI
     if line_to_print is not None:
         if line_to_print >= len(MI.log('t')):
-            print 'Specified line is out of bound.'
+            print('Specified line is out of bound.')
             sys.exit(1)
         format_str = '{:>15} | {:>20}'
-        print 'Printing saved values on line', line_to_print
-        print format_str.format('Variable', 'Value')
+        print('Printing saved values on line', line_to_print)
+        print(format_str.format('Variable', 'Value'))
         varlist = ['Time']
         varlist += MI.log_variable_list()
-        print '-'*38
+        print('-'*38)
         for varname in varlist:
             valtab = MI.log(varname)
             if isinstance(valtab, (float, int) ):
                 # might occur if only one line
-                print format_str.format(varname, MI.log(varname))
+                print(format_str.format(varname, MI.log(varname)))
             else:
-                print format_str.format(varname, MI.log(varname)[line_to_print])
+                print(format_str.format(varname, MI.log(varname)[line_to_print]))
     elif not quiet:
         MI.describe()
     if var_to_plot is not None:
@@ -50,7 +52,7 @@ def main(sessionName, quiet, line_to_print, var_to_plot):
             plt.title(sessionName)
             plt.show()
         else:
-            print 'Variable', var_to_plot, 'does not exist!'
+            print('Variable', var_to_plot, 'does not exist!')
             sys.exit(1)
 
 if __name__ == '__main__':

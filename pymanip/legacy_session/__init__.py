@@ -7,6 +7,8 @@ use by the collection classes.
 
 """
 
+from __future__ import print_function
+
 from .octmi_binary import read_OctMI_session
 import os.path
 import h5py
@@ -24,7 +26,7 @@ class OctSession(object):
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
             if verbose:
-                print colored.yellow('*** Cache store found at ' + self.cachestorename)
+                print(colored.yellow('*** Cache store found at ' + self.cachestorename))
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False
@@ -35,9 +37,9 @@ class OctSession(object):
 
     def describe(self):
         if len(self.variables) > 0:
-            print 'List of saved variables: (%d lines)' % len(self.time)
+            print('List of saved variables: (%d lines)' % len(self.time))
             for key, var in self.variables.iteritems():
-                print ' ' + key
+                print(' ' + key)
 
     def has_dataset(self, name):
         return False
@@ -63,11 +65,11 @@ class OctSession(object):
         if varname in ['Time', 'time', 't']:
             return self.time
         elif varname == '?':
-            print self.log_variable_list()
+            print(self.log_variable_list())
         elif varname in self.variables:
             return self.variables[varname]
         else:
-            print colored.red('Variable is not defined: ' + varname)
+            print(colored.red('Variable is not defined: ' + varname))
 
     def __getitem__(self, key):
         return self.log(key)
@@ -101,7 +103,7 @@ class OctSession(object):
 
     def cachedvalue(self, varname):
         if self.has_cachestore:
-            print colored.yellow('Retriving ' + varname + ' from cache')
+            print(colored.yellow('Retriving ' + varname + ' from cache'))
             return self.cachestore[varname].value
         else:
             return None
@@ -125,15 +127,15 @@ class OctSession(object):
             try:
                 self.cachestore = h5py.File(self.cachestorename, 'w')
                 self.has_cachestore = True
-                print colored.yellow('*** Cache store created at ' + self.cachestorename)
+                print(colored.yellow('*** Cache store created at ' + self.cachestorename))
             except IOError as ioe:
                 self.has_cachestore = False
-                print colored.red('Cannot create cache store')
-                print colored.red(ioe.message)
+                print(colored.red('Cannot create cache store'))
+                print(colored.red(ioe.message))
                 pass
         
         if self.has_cachestore:
-            print colored.yellow('Saving ' + name + ' in cache')
+            print(colored.yellow('Saving ' + name + ' in cache'))
             try:
                 new_length = len(dict_caller[name])
             except TypeError:

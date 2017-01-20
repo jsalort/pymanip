@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+
 from pymanip import SavedSession
 from pymanip.legacy_session import OctSession
 import os
@@ -98,9 +100,9 @@ class ManipCollection(Manip):
                     name = self.basename + '_' + str(key)
                 MI = SavedSession(name)
             except IOError as e:
-                print 'Unable to read file "' + str(e.filename) + "'."
-                print 'Errno = ' + str(e.errno)
-                print 'Message: ' + str(e.message)
+                print('Unable to read file "' + str(e.filename) + "'.")
+                print('Errno = ' + str(e.errno))
+                print('Message: ' + str(e.message))
                 raise IndexError
             return MI
 
