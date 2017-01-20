@@ -37,6 +37,7 @@ except ImportError:
     import itertools
     def ColorGenerator():
         return itertools.cycle(['b', 'r', 'g', 'k', 'm', 'c'])
+import pymanip.mytime as mytime
 
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
@@ -239,15 +240,7 @@ class BaseSession(object):
             print(colored.red('Session is not opened'))
 
     def sleep(self, duration):
-        debut = time.time()
-        while (time.time() - debut) < duration:
-            sys.stdout.write( ("Sleeping for " + str(-int(time.time()-debut-duration)) + " s                                   \r").encode('utf-8') )
-            sys.stdout.flush()
-            #time.sleep(1.0)
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                plt.pause(1.0)
-        sys.stdout.write("\n")
+        mytime.sleep(duration)
 
 class SavedSession(BaseSession):
     def __init__(self, session_name, cache_override=False, cache_location='.', verbose=True):
