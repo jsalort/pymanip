@@ -38,6 +38,6 @@ def scanGpib(board):
                     if (ud > 0):
                         gpib.write(ud, "*CLS;*IDN?")
                         description = gpib.read(ud, 256)
-                        print(description.strip())
+                        print(description.strip().decode('ascii'))
                 except:
                     pass

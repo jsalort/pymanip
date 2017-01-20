@@ -27,7 +27,7 @@ class DAQDevice(object):
             bufsize = 1024
             buf = ctypes.create_string_buffer(bufsize)
             DAQmxGetSystemInfoAttribute(DAQmx_Sys_DevNames, ctypes.byref(buf), bufsize)
-            return [DAQDevice(s.strip()) for s in buf.value.split(b',')]
+            return [DAQDevice(s.strip().decode('ascii')) for s in buf.value.split(b',')]
         except ImportError:
             print('Cannot list connected devices.')
             return None
@@ -93,14 +93,14 @@ class DAQDevice(object):
         bufsize = 1024
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevProductType(self.device_name, buf, bufsize)
-        return buf.value
+        return buf.value.decode('ascii')
 
     @property
     def product_num(self):
         from PyDAQmx import DAQmxGetDevProductNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevProductNum(self.device_name, ctypes.byref(num))
-        return num.value
+        return num.value.decode('ascii')
 
     @property
     def ai_chans(self):
@@ -108,7 +108,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevAIPhysicalChans(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]
         if chans == ['']:
             chans = []
         return chans
@@ -119,7 +119,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevAOPhysicalChans(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]
         if chans == ['']:
             chans = []
         return chans
@@ -130,7 +130,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDILines(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -141,7 +141,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDIPorts(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -152,7 +152,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDOLines(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -163,7 +163,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDOPorts(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -192,28 +192,28 @@ class DAQDevice(object):
         from PyDAQmx import DAQmxGetDevPCIBusNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPCIBusNum(self.device_name, ctypes.byref(num))
-        return num.value
+        return num.value.decode('ascii')
 
     @property
     def pci_devnum(self):
         from PyDAQmx import DAQmxGetDevPCIDevNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPCIDevNum(self.device_name, ctypes.byref(num))
-        return num.value
+        return num.value.decode('ascii')
 
     @property
     def pxi_chassisnum(self):
         from PyDAQmx import DAQmxGetDevPXIChassisNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPXIChassisNum(self.device_name, ctypes.byref(num))
-        return num.value
+        return num.value.decode('ascii')
 
     @property
     def pxi_slotnum(self):
         from PyDAQmx import DAQmxGetDevPXISlotNum
         num = ctypes.c_uint32(0)
         DAQmxGetDevPXISlotNum(self.device_name, ctypes.byref(num))
-        return num.value
+        return num.value.decode('ascii')
 
     @property
     def location(self):
@@ -227,7 +227,7 @@ class DAQDevice(object):
             except DAQError:
                 # Si le chassis n'est pas identifié alors DAQmx ne peut pas
                 # renvoyer les informations, et une exception est levée
-                desc = 'PXI'
+                desc = 'PXI (unidentified)'
                 pass
         else:
             desc = bus
