@@ -9,6 +9,7 @@ from niScope import Scope
 from platform import platform
 import time
 import pymanip.mytime as MI
+from collections import Iterable
 
 try:
     from clint.textui import colored
@@ -48,7 +49,10 @@ def read_analog(scope_name, channelList="0", volt_range=10.0,
     # Make sure scalars have the correct type, as it will otherwise
     # fail to convert to the corresponding Vi types
     samples_per_chan = int(samples_per_chan)
-    volt_range = float(volt_range)
+    if isinstance(volt_range, Iterable):
+        volt_range = [float(v) for v in volt_range]
+    else:
+        volt_range = float(volt_range)
     sample_rate = float(sample_rate)
     channelList = str(channelList)
     numChannels = len(channelList.split(","))
@@ -56,22 +60,36 @@ def read_analog(scope_name, channelList="0", volt_range=10.0,
     scope = Scope(scope_name)
     print('Scope:', scope_name)
     scope.ConfigureHorizontalTiming(sampleRate=sample_rate, numPts=samples_per_chan)
-    scope.ConfigureVertical(channelList=channelList, voltageRange=volt_range)
+    scope.NumRecords = 1
+    if isinstance(volt_range, float):
+        scope.ConfigureVertical(channelList=channelList, voltageRange=volt_range)
+    else:
+        for chan,v in zip(channelList.split(","), volt_range):
+            print('Scope: setting chan {:s} voltage range to {:}.'.format(chan,v))
+            scope.ConfigureVertical(channelList=chan, voltageRange=v)
     scope.ConfigureTrigger('Immediate')
-    print_horodateur(samples_per_chan, sample_rate)
     sampling = scope.ActualSamplingRate
+    length = scope.ActualRecordLength
+    print_horodateur(length, sampling)
     if sampling != sample_rate:
         print(colored.red('Warning: sampling frequency changed to {:} Hz.'.format(sampling)))
-    vRange = scope.ActualVoltageRange
-    if vRange != volt_range:
-        print(colored.red('Warning: actual voltage range is {:} V.'.format(vRange)))
-
+    if length != samples_per_chan:
+        print(colored.red('Warning: record length changed to {:d} points.'.format(length)))
+    if numChannels == 1:
+        vRange = scope.ActualVoltageRange('')
+        if vRange != volt_range:
+            print(colored.red('Warning: actual voltage range is {:} V.'.format(vRange)))
+    else:
+        for chan, v in zip(channelList.split(","), volt_range):
+            vv = scope.ActualVoltageRange(chan)
+            if vv != v:
+                print(colored.red('Warning: actual range for channel {:s} is {:} V.'.format(chan, vv)))
     scope.InitiateAcquisition()
     duration = samples_per_chan/sampling
     MI.sleep(duration)
     data = scope.Fetch(channelList, timeout=duration/10)
-    length = scope.ActualRecordLength
-    print('Scope: {:d} samples read.'.format(length))
+    (l,c) = data.shape 
+    print('Scope: {:d} samples read.'.format(l))
     scope.close()
 
     return tuple(data[:,i] for i in range(numChannels))
