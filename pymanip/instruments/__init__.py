@@ -14,7 +14,7 @@ import fluidlab.instruments as instruments
 import pymanip
 
 if hasattr(pymanip, "pymanip_import_verbose"):
-    verbose_import = __builtin__.pymanip_import_verbose
+    verbose_import = pymanip.pymanip_import_verbose
 else:
     verbose_import = False
     
