@@ -215,7 +215,7 @@ class BaseSession(object):
                 xlab = 't [h]'
             #print(olddebut, oldfin, newdebut, newfin)
 
-            if isinstance(varlist, str) or isinstance(varlist, unicode):
+            if isinstance(varlist, six.string_types):
                 lab = varlist
                 col = (0,0,1)
                 if newdebut != None:
@@ -323,7 +323,7 @@ class SavedSession(BaseSession):
             name = args[0]
         else:
             name = [a for a in args]
-        if isinstance(name, str) or isinstance(name, unicode):
+        if isinstance(name, six.string_types):
             return (name in self.cachedvars)
         else:
             return all([(n in self.cachedvars) for n in name])
@@ -354,7 +354,7 @@ class SavedSession(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if (not isinstance(name, str)) and (not isinstance(name, unicode)):
+        if (not isinstance(name, six.string_types)):
             for var in name:
                 self.cache(var, dict_caller)
             return
@@ -531,7 +531,7 @@ class Session(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if isinstance(parameter_name, str) or isinstance(parameter_name, unicode):
+        if isinstance(parameter_name, six.string_types):
             value = dict_caller[parameter_name]
             self.parameters[parameter_name] = value
         else:
@@ -616,7 +616,7 @@ class Session(BaseSession):
             email_header = email_header + 'Content-Transfer-Encoding: quoted-printable\n'
         email_header = email_header + 'User-Agent: pymanip\n'
         email_header = email_header + 'To: '
-        if isinstance(self.email_to_addrs, str) or isinstance(self.email_to_addrs, unicode):
+        if isinstance(self.email_to_addrs, six.string_types):
             email_header = email_header + self.email_to_addrs + '\n'
         elif isinstance(self.email_to_addrs, tuple):
             for addr in self.email_to_addrs[:-1]:
