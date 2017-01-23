@@ -41,7 +41,7 @@ class Manip(object):
             value = self.session_name
         elif name == 'nickname':
             value = self.nickname
-        elif self.properties.has_key(name):
+        elif name in self.properties:
             value = self.properties[name]
         else:
             if self.MI.has_log(name):
