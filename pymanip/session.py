@@ -534,6 +534,9 @@ class Session(BaseSession):
         if isinstance(parameter_name, six.string_types):
             value = dict_caller[parameter_name]
             self.parameters[parameter_name] = value
+        elif isinstance(parameter_name, dict):
+            for k,v in parameter_name.items():
+                self.parameters[k] = v
         else:
             for var in parameter_name:
                 value = dict_caller[var]
