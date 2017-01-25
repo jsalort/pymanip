@@ -8,7 +8,7 @@ def readme():
         return f.read()
 
 setup(name='pymanip',
-      version='0.2',
+      version='0.3b0',
       description='Python framework for experiments',
       long_description=readme(),
       url='https://github.com/jsalort/pymanip',
