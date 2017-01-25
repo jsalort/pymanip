@@ -4,14 +4,14 @@
 from setuptools import setup
 
 def readme():
-    with open('README.rst') as f:
+    with open('README.md') as f:
         return f.read()
 
 setup(name='pymanip',
       version='0.1',
       description='Python framework for experiments',
       long_description=readme(),
-      url='http://www.juliensalort.org/git/?p=pymanip.git',
+      url='https://github.com/jsalort/pymanip',
       author='Julien Salort',
       author_email='julien.salort@ens-lyon.fr',
       license='CeCILL-B',
