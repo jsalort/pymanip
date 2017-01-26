@@ -7,11 +7,16 @@ read_OctMI_session(sessionName, verbose=True)
 
 """
 
-from __future__ import print_function
-from struct import pack, unpack
+from __future__ import unicode_literals, print_function, division
+
+from struct import pack, unpack, error
 import numpy as np
 from time import strftime, localtime
 from clint.textui import colored
+import six
+
+if six.PY3:
+    from functools import reduce
 
 class OctaveReaderError(NameError):
     """ OctaveReader error """
@@ -34,7 +39,7 @@ def read_header(f, verbose):
 
     """
     
-    magic_number = str(f.read(10))
+    magic_number = f.read(10).decode('ascii')
     if verbose:
         print('magic number =', magic_number)
     if magic_number != 'Octave-1-L':
@@ -212,7 +217,7 @@ def read_string_var(f, verbose):
         fortran_vec = unpack('c'*num_elems,f.read(num_elems))
         var = np.array(fortran_vec).reshape(dv, order='F')
         if mdims == 2 and (dv[0] == 1 or dv[1] == 1):
-            var = var.flatten().tostring()
+            var = var.flatten().tostring().decode('ascii')
         if verbose:
             print('     string:', var)
     else:
@@ -221,7 +226,7 @@ def read_string_var(f, verbose):
             if length == 0:
                 raise OctaveReaderError('StringFormatError')
             fortran_vec = f.read(length)
-            var[i] = str(fortran_vec)
+            var[i] = fortran_vec.decode('ascii')
     return var
 
 def read_cell_var(f, verbose):
@@ -308,11 +313,11 @@ def read_var(f, verbose):
     """
     
     name_length = unpack('i', f.read(4))[0]
-    name  = str(f.read(name_length))
+    name  = f.read(name_length).decode('ascii')
     if verbose:
         print('* Variable "' + name + '":')
     doc_length = unpack('i', f.read(4))[0]
-    doc = str(f.read(doc_length))
+    doc = f.read(doc_length).decode('ascii')
     if verbose:
         print('        doc:', doc)
     global_flag = ord(f.read(1))
@@ -335,7 +340,7 @@ def read_var(f, verbose):
         data_type = 'string'
     elif data_type == 255:
         data_type_length = unpack('i', f.read(4))[0]
-        data_type = str(f.read(data_type_length))
+        data_type = f.read(data_type_length).decode('ascii')
     else:
         raise OctaveReaderError('UnknownDataType')
     if verbose:
@@ -362,9 +367,8 @@ def read_var(f, verbose):
     
 def read_octave_binary(path, verbose=False):
     """ Reads an Octave binary file. Returns a dictionnary containing all the variables. """
-    
     data = dict()
-    with open(path, 'r') as f:
+    with open(path, 'rb') as f:
         float_format = read_header(f, verbose)
         done = False
         while not done:
@@ -374,9 +378,8 @@ def read_octave_binary(path, verbose=False):
             except OctaveReaderError as oe:
                 done = True
                 raise
-            except:
+            except error:
                 done = True
-                pass
                 
     return data
 
@@ -392,7 +395,7 @@ def read_OctMI_session(sessionName, verbose=True, veryVerbose=False):
         keyname = varname + '_array'
         Variables[varname] = MI_session[keyname]
     time_fmt = "%A %e %B %Y - %H:%M:%S"
-    if MI_session.has_key('t_array'):
+    if 't_array' in MI_session:
         Variables['t'] = MI_session['t_array']
         try:
             Nelem = len(Variables['t'])
