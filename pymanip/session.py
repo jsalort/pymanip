@@ -409,9 +409,15 @@ class SavedSession(BaseSession):
                         self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
                         self.cachestore[name][:] = dict_caller[name]
          
-    def __del__(self):
-        if hasattr(self, 'has_cachestore') and self.has_cachestore:
-            self.cachestore.close()
+#    def __del__(self):
+#        print('This is SavedSession __del__ (' + str(self) + ')')
+#        if hasattr(self, 'has_cachestore') and self.has_cachestore:
+#            print('We have cachestore')
+#            self.cachestore.close()
+#            self.has_cachestore = False
+#        else:
+#            print('We have no cachestore')
+#        print('SavedSession __del__ has finished.')
 
     def __enter__(self):
         return self

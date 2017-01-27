@@ -116,7 +116,7 @@ class ManipCollection(Manip):
         self.current_acq = 1
         return self
 
-    def next(self):
+    def __next__(self):
         c = self.current_acq
         self.current_acq = c+1
         if c > self.num:
