@@ -506,15 +506,18 @@ class Session(BaseSession):
             self.logfile.write(texte)
         self.logfile.flush()
 
-    def log_addline(self):
-        stack = inspect.stack()
-        try:
-            dict_caller = stack[1][0].f_locals
-        finally:
-            del stack
+    def log_addline(self, timestamp=None, dict_caller=None):
+        if not dict_caller:
+            stack = inspect.stack()
+            try:
+                dict_caller = stack[1][0].f_locals
+            finally:
+                del stack
         newsize = self.dset_time.len()+1
         self.dset_time.resize( (newsize,) )
-        self.dset_time[newsize-1] = time.time()
+        if not timestamp:
+            timestamp = time.time()
+        self.dset_time[newsize-1] = timestamp
         self.datfile.write("%f" % self.dset_time[newsize-1])
         for varname in self.grp_variables.keys():
             d = self.grp_variables[varname]
