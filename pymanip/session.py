@@ -9,6 +9,7 @@ Useful classes are Session and SavedSession.
 from __future__ import unicode_literals, print_function
 
 import os, sys
+import codecs
 import six
 import h5py
 import numpy as np
@@ -40,6 +41,15 @@ except ImportError:
 import pymanip.mytime as mytime
 
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
+
+# Ensure stdout and stderr are UTF-8
+# Otherwise print may fail if non-ascii character
+if six.PY3:
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
+else:
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr)
 
 def NameGenerator(prefix=None, postfix=None):
     acquisition_clock = datetime.now()
