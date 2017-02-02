@@ -664,7 +664,7 @@ class Session(BaseSession):
                 plt.savefig(f_png)
                 f_png.close()
                 with open(fname, 'rb') as image_file:
-                    encoded_figure = base64.b64encode(image_file.read())
+                    encoded_figure = base64.b64encode(image_file.read()).decode('ascii')
                 os.remove(fname)
                 # Add image/png MIME part
                 body = body + '--' + mime_boundary + '\n'
