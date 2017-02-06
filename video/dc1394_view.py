@@ -3,15 +3,14 @@
 This file comes from pydc1394 examples.
 Written by jordens.
 Tested on Linux.
+git clone https://github.com/jordens/pydc1394
 
 """
-
 import time
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
 from pydc1394 import Camera
-
 
 class CameraPlot:
     def __init__(self, camera):
@@ -28,13 +27,21 @@ class CameraPlot:
         self.win.setCentralWidget(self.img)
 
     def init_camera(self):
-        print("Vendor:", self.camera.vendor)
-        print("Model:", self.camera.model)
+        print("Vendor:", self.camera.vendor.decode('ascii'))
+        print("Model:", self.camera.model.decode('ascii'))
         print("GUID:", self.camera.guid)
         print("Mode:", self.camera.mode)
         print("Framerate: ", self.camera.rate)
-        print("Available modes", [mode.name for mode in self.camera.modes])
-        print("Available features", self.camera.features)
+        print("""\
+        Available modes
+        ===============""")
+        for mode in self.camera.modes:
+            print(mode.name)
+        print("""\
+        Available features
+        ==================""")
+        for key, val in self.camera.features.items():
+            print(key, ':', val)
         #modes = self.camera.modes
         #self.camera.mode = modes[0]
        
