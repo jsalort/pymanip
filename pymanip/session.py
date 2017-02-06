@@ -39,7 +39,12 @@ except ImportError:
     def ColorGenerator():
         return itertools.cycle(['b', 'r', 'g', 'k', 'm', 'c'])
 import pymanip.mytime as mytime
-
+try:
+    from pathlib import Path
+    has_pathlib = True
+except ImportError:
+    has_pathlib = False
+    
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
 # Ensure stdout and stderr are UTF-8
@@ -437,6 +442,9 @@ class SavedSession(BaseSession):
         
 class Session(BaseSession):
     def __init__(self, session_name, variable_list=[], allow_override_datasets=False):
+        if has_pathlib:
+            if isinstance(session_name, Path):
+                session_name = session_name.as_posix()
         super(Session, self).__init__(session_name)
         self.datname = session_name + '.dat'
         self.logname = session_name + '.log'
