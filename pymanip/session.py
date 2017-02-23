@@ -710,10 +710,11 @@ class Session(BaseSession):
 
         else:
             try:
+                email_content = email_header.encode('utf-8') + b'\n' + quopri.encodestring(self.email_body.encode('utf-8'))
                 error_list = smtp.sendmail(
                         self.email_from_addr,
                         self.email_to_addrs,
-                        email_header + '\n' + quopri.encodestring(self.email_body))
+                        email_content)
                 if len(error_list) == 0:
                     success = True
             except smtplib.SMTPHeloError:
