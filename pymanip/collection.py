@@ -82,12 +82,11 @@ class Manip(object):
 class ManipCollection(Manip):
     def __init__(self, basename, nickname=None, **kwargs):
         self.basename = basename
-        if 'num' in kwargs:
-            self.num = kwargs['num']
-        else:
-            self.num = 1
+        self.num = kwargs.pop('num', 1)
+        self.verbose = kwargs.pop('verbose', True)
 
-        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, **kwargs)
+        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, 
+                                              verbose=self.verbose, **kwargs)
         
     def __getitem__(self, key):
         if isinstance(key, six.string_types):
@@ -98,7 +97,7 @@ class ManipCollection(Manip):
                     name = os.path.join(self.directory, self.basename + '_' + str(key))
                 else:
                     name = self.basename + '_' + str(key)
-                MI = SavedSession(name)
+                MI = SavedSession(name, verbose=self.verbose)
             except IOError as e:
                 print('Unable to read file "' + str(e.filename) + "'.")
                 print('Errno = ' + str(e.errno))
