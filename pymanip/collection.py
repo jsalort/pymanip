@@ -51,12 +51,15 @@ class Manip(object):
             elif self.MI.has_parameter(name):
                 value = self.MI.parameter(name)
             else:
-                value = None
+                raise KeyError('Key not found {:s}'.format(name))
                 
         return value
 
     def __getitem__(self, key):
         return self.get(key)
+
+    def describe(self):
+        self.MI.describe()
 
     @property
     def MI(self):
