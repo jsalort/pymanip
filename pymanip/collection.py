@@ -115,11 +115,16 @@ class ManipCollection(Manip):
         return self[1]
 
     def items_from(self, start):
-        self.current_acq = start
+        # __iter__ est appelé dans tous les cas
+        self.custom_start = start
         return self
 
     def __iter__(self):
-        self.current_acq = 1
+        if hasattr(self, 'custom_start'):
+            self.current_acq = self.custom_start
+            delattr(self, 'custom_start')
+        else:
+            self.current_acq = 1
         return self
 
     def __next__(self):
