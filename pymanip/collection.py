@@ -114,6 +114,10 @@ class ManipCollection(Manip):
             return self[self.current_acq]
         return self[1]
 
+    def items_from(self, start):
+        self.current_acq = start
+        return self
+
     def __iter__(self):
         self.current_acq = 1
         return self
