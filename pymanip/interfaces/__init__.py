@@ -10,6 +10,11 @@ if platform.system() == 'Linux':
     except ImportError:
         print('Warning: Linux-GPIB Python bindings not found')
         pass
+    try:
+        from fluidlab.instruments.interfaces.linuxusbtmc import LinuxUSBTMCInterface
+    except ImportError:
+        print('Warning: Linux USBTMC bindings not found.')
+        pass
 
 try:
     from fluidlab.instruments.interfaces.visa import PyvisaInterface
