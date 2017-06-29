@@ -267,6 +267,7 @@ class SavedSession(BaseSession):
         self.store = h5py.File(self.storename, 'r')
         self.dset_time = self.store["time"]
         self.grp_variables = self.store["variables"]
+        self.verbose = verbose
         try:
             self.parameters = self.store.attrs
             self.parameters_defined = True
@@ -346,7 +347,8 @@ class SavedSession(BaseSession):
 
     def cachedvalue(self, varname):
         if self.has_cachestore:
-            print(colored.yellow('Retriving ' + varname + ' from cache'))
+            if self.verbose:
+                print(colored.yellow('Retrieving ' + varname + ' from cache'))
             content = self.cachestore[varname]
             if hasattr(content, "value"): 
                 return content.value
