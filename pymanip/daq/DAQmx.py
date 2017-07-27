@@ -10,6 +10,7 @@ except ImportError:
  
 import ctypes
 import fluidlab.instruments.daq.daqmx as daqmx
+from fluidlab.instruments.daq.daqmx import write_analog
 import six
 
 class DAQDevice(object):
@@ -323,8 +324,8 @@ def read_analog(resource_names, terminal_config, volt_min=None, volt_max=None,
     return data
 
 
-def write_analog(resource_names, sample_rate, signals, blocking=True):
-    return daqmx.write_analog(resource_names, sample_rate, signals, blocking)
+#def write_analog(resource_names, sample_rate, signals, blocking=True):
+#    return daqmx.write_analog(resource_names, sample_rate, signals, blocking)
 
 def write_analog_end_task(task, timeout=0.):
     daqmx.write_analog_end_task(task, timeout)
