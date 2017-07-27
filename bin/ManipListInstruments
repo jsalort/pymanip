@@ -6,8 +6,8 @@ This program lists the names of supported instruments in fluidlab and pymanip.
 
 """
 
-import __builtin__
-__builtin__.pymanip_import_verbose = True
+import pymanip
+pymanip.pymanip_import_verbose = True
 
 def main():    
     import pymanip.instruments

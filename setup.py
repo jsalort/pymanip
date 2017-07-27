@@ -1,23 +1,22 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+#from distutils.core import setup
 from setuptools import setup
 
 def readme():
-    with open('README.rst') as f:
+    with open('README.md') as f:
         return f.read()
 
 setup(name='pymanip',
-      version='0.1',
+      version='0.3b0',
       description='Python framework for experiments',
       long_description=readme(),
-      url='http://www.juliensalort.org/git/?p=pymanip.git',
+      url='https://github.com/jsalort/pymanip',
       author='Julien Salort',
       author_email='julien.salort@ens-lyon.fr',
       license='CeCILL-B',
       packages=['pymanip'],
       install_requires=[
-        'h5py', #'clint', 'fluidlab', 'fluiddyn',
-      ],
-      include_package_data=True,
-      zip_safe=False)
+        'h5py', 'clint', 'fluidlab (>=0.0.3)', 'fluiddyn',
+      ])

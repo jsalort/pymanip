@@ -13,6 +13,24 @@ from dateutil.tz import tzutc, tzlocal
 import datetime
 from time import time
 import numpy as np
+import sys
+import matplotlib.pyplot as plt
+import warnings
+import six
+
+def sleep(duration):
+    debut = time()
+    while (time() - debut) < duration:
+        if six.PY2:
+            sys.stdout.write( ("Sleeping for " + str(-int(time()-debut-duration)) + " s                                   \r").encode('utf-8') )
+        else:
+            sys.stdout.write( ("Sleeping for " + str(-int(time()-debut-duration)) + " s                                   \r"))
+        sys.stdout.flush()
+        #time.sleep(1.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            plt.pause(1.0)
+    sys.stdout.write("\n")
 
 def datestr2epoch(string):
     """
@@ -69,6 +87,14 @@ def epoch2datestr(epoch, tz=None):
         tz = tzutc()
     date = datetime.datetime.fromtimestamp(epoch, tz=tz)
     return date.isoformat()
+
+tic_starts = []
+
+def tic():
+    tic_starts.append(time())
+
+def toc():
+    print("Elapsed time {:.2f} seconds.".format(time() - tic_starts[-1]))
 
 
 if __name__ == '__main__':

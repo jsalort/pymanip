@@ -4,10 +4,18 @@
 from __future__ import unicode_literals, print_function, division
 import sys, os
 
-from PyQt4 import QtGui, QtCore, uic
-
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+try:
+    from PyQt4 import QtGui, QtCore, uic
+    from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+    qt_version = 4
+except ImportError:
+    from PyQt5 import QtCore, uic
+    from PyQt5 import QtWidgets as QtGui
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+    qt_version = 5
+    
 from matplotlib.figure import Figure
 
 import numpy as np
@@ -39,14 +47,29 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
 
         # User settings
         self.settings = QtCore.QSettings('pymanip', 'ManipDAQ')
-        range_val, success = self.settings.value('range', defaultValue=10.0).toDouble()
-        self.range_ui.setText("{:.2f} V".format(range_val))
-        sampleRate_val, success = self.settings.value('sampleRate', defaultValue=1e3).toDouble()
-        self.sampleRate_ui.setText("{:.2f} Hz".format(sampleRate_val))
-        samplesPerChan_val, success = self.settings.value('samplesPerChan', defaultValue=10000).toInt()
-        self.samplesPerChan_ui.setText("{:d}".format(samplesPerChan_val))
-        continuous_val = self.settings.value('continuous', defaultValue=False).toBool()
-        self.continuous_ui.setCheckState(continuous_val)
+        if qt_version == 4:
+            range_val, success = self.settings.value('range', defaultValue=10.0).toDouble()
+        else:
+            range_val = self.settings.value('range', defaultValue=10.0)
+        self.range_ui.setText("{:.2f} V".format(float(range_val)))
+        
+        if qt_version == 4:
+            sampleRate_val, success = self.settings.value('sampleRate', defaultValue=1e3).toDouble()
+        else:
+            sampleRate_val = self.settings.value('sampleRate', defaultValue=1e3)
+        self.sampleRate_ui.setText("{:.2f} Hz".format(float(sampleRate_val)))
+        
+        if qt_version == 4:
+            samplesPerChan_val, success = self.settings.value('samplesPerChan', defaultValue=10000).toInt()
+        else:
+            samplesPerChan_val = self.settings.value('samplesPerChan', defaultValue=10000)
+        self.samplesPerChan_ui.setText("{:d}".format(int(samplesPerChan_val)))
+        
+        if qt_version == 4:
+            continuous_val = self.settings.value('continuous', defaultValue=False).toBool()
+        else:
+            continuous_val = self.settings.value('continuous', defaultValue=False)
+        self.continuous_ui.setCheckState(bool(continuous_val))
         self.continuous_changed()
 
         # Create matplotlib canvas
@@ -71,7 +94,10 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         # Populate Terminal config list
         terminal_config_list = ('RSE', 'NRSE', 'Diff', 'PseudoDiff') 
         self.terminal_config_ui.addItems(terminal_config_list)
-        terminal_config_val = self.settings.value('terminal_config', defaultValue='Diff').toString()
+        if qt_version == 4:
+            terminal_config_val = self.settings.value('terminal_config', defaultValue='Diff').toString()
+        else:
+            terminal_config_val = self.settings.value('terminal_config', defaultValue='Diff')
         for index, val in enumerate(terminal_config_list):
             if val == terminal_config_val:
                 break
@@ -82,7 +108,10 @@ class DaqWindow(QtGui.QMainWindow, DaqUi):
         # Populate Coupling list
         coupling_list = ('DC', 'AC')
         self.coupling_ui.addItems(coupling_list)
-        coupling_val = self.settings.value('coupling', defaultValue='DC').toString()
+        if qt_version == 4:
+            coupling_val = self.settings.value('coupling', defaultValue='DC').toString()
+        else:
+            coupling_val = self.settings.value('coupling', defaultValue='DC')
         for index, val in enumerate(coupling_list):
             if val == coupling_val:
                 break

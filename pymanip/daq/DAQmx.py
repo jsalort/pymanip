@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function, unicode_literals, division
+
 import numpy as np
 try:
     from clint.textui import colored
@@ -26,9 +28,9 @@ class DAQDevice(object):
             bufsize = 1024
             buf = ctypes.create_string_buffer(bufsize)
             DAQmxGetSystemInfoAttribute(DAQmx_Sys_DevNames, ctypes.byref(buf), bufsize)
-            return [DAQDevice(s.strip()) for s in buf.value.split(',')]
+            return [DAQDevice(s.strip().decode('ascii')) for s in buf.value.split(b',')]
         except ImportError:
-            print 'Cannot list connected devices.'
+            print('Cannot list connected devices.')
             return None
             pass
 
@@ -92,7 +94,7 @@ class DAQDevice(object):
         bufsize = 1024
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevProductType(self.device_name, buf, bufsize)
-        return buf.value
+        return buf.value.decode('ascii')
 
     @property
     def product_num(self):
@@ -107,7 +109,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevAIPhysicalChans(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]
         if chans == ['']:
             chans = []
         return chans
@@ -118,7 +120,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevAOPhysicalChans(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]
         if chans == ['']:
             chans = []
         return chans
@@ -129,7 +131,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDILines(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -140,7 +142,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDIPorts(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -151,7 +153,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDOLines(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -162,7 +164,7 @@ class DAQDevice(object):
         bufsize = 2048
         buf = ctypes.create_string_buffer(bufsize)
         DAQmxGetDevDOPorts(self.device_name, buf, bufsize)
-        chans = [s.strip() for s in buf.value.split(',')]                            
+        chans = [s.strip().decode('ascii') for s in buf.value.split(b',')]                            
         if chans == ['']:
             chans = []
         return chans
@@ -226,7 +228,7 @@ class DAQDevice(object):
             except DAQError:
                 # Si le chassis n'est pas identifié alors DAQmx ne peut pas
                 # renvoyer les informations, et une exception est levée
-                desc = 'PXI'
+                desc = 'PXI (unidentified)'
                 pass
         else:
             desc = bus
@@ -234,9 +236,9 @@ class DAQDevice(object):
 
 def print_connected_devices():
     for device in DAQDevice.list_connected_devices():
-        print '**', device.device_name, '(' + device.product_type + ') on', device.location, '**'
-        print 'Analog input  :', device.ai_chans
-        print 'Analog output :', device.ao_chans
+        print('**', device.device_name, '(' + device.product_type + ') on', device.location, '**')
+        print('Analog input  :', device.ai_chans)
+        print('Analog output :', device.ao_chans)
 
 # Ici read_analog est verbose=True par défaut contrairement à fluidlab
 # et on ajoute une fonction "autoset" si volt_min, volt_max sont None
@@ -271,11 +273,10 @@ def read_analog(resource_names, terminal_config, volt_min=None, volt_max=None,
     else:
         num_channels = len(resource_names)
         resource_names = [str(r) for r in resource_names]
-    
 
     # If no range is provided, take a 5s sample
     if volt_min is None or volt_max is None:
-        print 'Sampling 5s data to determine channel range'
+        print('Sampling 5s data to determine channel range')
         if num_channels == 1:
             volt_min = -10.0
             volt_max = 10.0
@@ -297,7 +298,7 @@ def read_analog(resource_names, terminal_config, volt_min=None, volt_max=None,
                 volt_range = np.max(np.abs(data[chan]))*1.25
                 volt_min[chan] = -volt_range
                 volt_max[chan] = volt_range
-                print 'Channel', chan, 'min max:', np.min(data[chan]), np.max(data[chan])
+                print('Channel', chan, 'min max:', np.min(data[chan]), np.max(data[chan]))
 
     # Run fluidlab daqmx.read_analog with verbose=True by default
     data = daqmx.read_analog(resource_names, terminal_config, volt_min, volt_max,

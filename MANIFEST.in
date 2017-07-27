@@ -1,1 +1,6 @@
-include README.rst
+include *.txt
+include README.md
+recursive-include matlab *.m
+recursive-include bin Manip*
+include bin/DAQ.ui
+include prepare_readme.py

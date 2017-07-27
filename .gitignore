@@ -2,6 +2,8 @@
 *.pyc
 *.o
 *.swp
+MANIFEST
+__pycache__
 
 # Metadata
 .DS_Store

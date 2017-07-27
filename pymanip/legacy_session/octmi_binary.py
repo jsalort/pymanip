@@ -7,11 +7,16 @@ read_OctMI_session(sessionName, verbose=True)
 
 """
 
+from __future__ import unicode_literals, print_function, division
 
-from struct import pack, unpack
+from struct import pack, unpack, error
 import numpy as np
 from time import strftime, localtime
 from clint.textui import colored
+import six
+
+if six.PY3:
+    from functools import reduce
 
 class OctaveReaderError(NameError):
     """ OctaveReader error """
@@ -34,14 +39,14 @@ def read_header(f, verbose):
 
     """
     
-    magic_number = str(f.read(10))
+    magic_number = f.read(10).decode('ascii')
     if verbose:
-        print 'magic number =', magic_number
+        print('magic number =', magic_number)
     if magic_number != 'Octave-1-L':
         raise OctaveReaderError('UnknownFileFormat')
     float_format = ord(f.read(1))
     if verbose:
-        print 'float format =', float_format
+        print('float format =', float_format)
     return float_format
 
 def read_scalar_var(f, verbose):
@@ -57,7 +62,7 @@ def read_scalar_var(f, verbose):
         raise OctaveReaderError('ScalarFormatError')
     dtmp = unpack('d', f.read(8))[0]
     if verbose:
-        print '      value:', dtmp
+        print('      value:', dtmp)
 
     return dtmp
 
@@ -71,24 +76,24 @@ def read_matrix_var(f, verbose):
 
     mdims = unpack('i', f.read(4))[0]
     if verbose:
-        print "      mdims:", mdims
+        print("      mdims:", mdims)
     if mdims == 0:
         raise OctaveReaderError('MatrixFormatError')
     if mdims < 0:
         mdims = -mdims
         dv = unpack('i'*mdims, f.read(4*mdims))
         if verbose:
-            print "         dv:", dv
+            print("         dv:", dv)
         tmp = ord(f.read(1))
         if tmp == 0:
             raise OctaveReaderError('MatrixFormatError')
         num_elems = reduce(lambda x, y: x*y, dv)
         if verbose:
-            print '  num_elems:', num_elems
+            print('  num_elems:', num_elems)
         fortran_vec = unpack('d'*num_elems, f.read(8*num_elems))
         var = np.array(fortran_vec).reshape(dv, order='F')
         if verbose:
-            print "     matrix:", var.shape
+            print("     matrix:", var.shape)
         if mdims == 2 and dv[0] == 1:
             var = var.flatten()
     else:
@@ -100,11 +105,11 @@ def read_matrix_var(f, verbose):
         dv = (nr, nc)
         num_elems = nr*nc
         if verbose:
-            print '  num_elems:', num_elems
+            print('  num_elems:', num_elems)
         fortran_vec = unpack('d'*num_elems, f.read(8*num_elems))
         var = np.array(fortran_vec).reshape(dv, order='F')
         if verbose:
-            print "     matrix:", var.shape
+            print("     matrix:", var.shape)
 
     return var
 
@@ -121,7 +126,7 @@ def read_complex_matrix_var(f, verbose):
         mdims = -mdims
         dv = unpack('i'*mdims, f.read(4*mdims))
         if verbose:
-            print "         dv:", dv
+            print("         dv:", dv)
         if (mdims == 1):
             mdims = 2
             dv = [1, dv[0]]
@@ -130,13 +135,13 @@ def read_complex_matrix_var(f, verbose):
             raise OctaveReaderError('MatrixFormatError')
         num_elems = reduce(lambda x, y: x*y, dv)
         if verbose:
-            print '  num_elems:', num_elems
+            print('  num_elems:', num_elems)
         num_doubles = 2*num_elems
         fortran_vec = unpack('d'*num_doubles, f.read(8*num_doubles))
         fortran_vec_complex = [fortran_vec[i]+fortran_vec[i+1]*1j for i in xrange(0,num_doubles,2)]
         var = np.array(fortran_vec_complex).reshape(dv, order='F')
         if verbose:
-            print "     matrix:", var.shape
+            print("     matrix:", var.shape)
         if mdims == 2 and dv[0] == 1:
             var = var.flatten()
     else:
@@ -149,12 +154,12 @@ def read_complex_matrix_var(f, verbose):
         num_elems = nr*nc
         num_doubles = 2*num_elems
         if verbose:
-            print '  num_elems:', num_elems
+            print('  num_elems:', num_elems)
         fortran_vec = unpack('d'*num_elems, f.read(8*num_doubles))
         fortran_vec_complex = [fortran_vec[i]+fortran_vec[i+1]*1j for i in xrange(0,num_doubles,2)]
         var = np.array(fortran_vec_complex).reshape(dv, order='F')
         if verbose:
-            print "     matrix:", var.shape
+            print("     matrix:", var.shape)
     return var
 
 def read_scalar_struct_var(f, verbose):
@@ -168,7 +173,7 @@ def read_scalar_struct_var(f, verbose):
 
     length = unpack('i', f.read(4))[0]
     if verbose:
-        print "     length:", length
+        print("     length:", length)
     if length == 0:
         raise OctaveReaderError('ScalarStructFormatError')
     if length < 0:
@@ -176,7 +181,7 @@ def read_scalar_struct_var(f, verbose):
         mdims = -length
         dv = unpack('i'*mdims, f.read(4*mdims))
         if verbose:
-            print "         dv:", dv
+            print("         dv:", dv)
         length = unpack('i', f.read(4))[0]
     else:
         dv = (1, 1)
@@ -198,30 +203,30 @@ def read_string_var(f, verbose):
 
     elements = unpack('i', f.read(4))[0]
     if verbose:
-        print '   elements:', elements
+        print('   elements:', elements)
     if elements == 0:
         raise OctaveReaderError('StringFormatError')
     if elements < 0:
         mdims = -elements
         dv = unpack('i'*mdims, f.read(4*mdims))
         if verbose:
-            print "         dv:", dv
+            print("         dv:", dv)
         num_elems = reduce(lambda x, y: x*y, dv)
         if verbose:
-            print '  num_elems:', num_elems
+            print('  num_elems:', num_elems)
         fortran_vec = unpack('c'*num_elems,f.read(num_elems))
         var = np.array(fortran_vec).reshape(dv, order='F')
         if mdims == 2 and (dv[0] == 1 or dv[1] == 1):
-            var = var.flatten().tostring()
+            var = var.flatten().tostring().decode('ascii')
         if verbose:
-            print '     string:', var
+            print('     string:', var)
     else:
         for i in range(elements):
             length = unpack('i', f.read(4))[0]
             if length == 0:
                 raise OctaveReaderError('StringFormatError')
             fortran_vec = f.read(length)
-            var[i] = str(fortran_vec)
+            var[i] = fortran_vec.decode('ascii')
     return var
 
 def read_cell_var(f, verbose):
@@ -236,12 +241,12 @@ def read_cell_var(f, verbose):
     if mdims >= 0:
         raise OctaveReaderError('CellFormatError')
     if verbose:
-        print '      mdims:', mdims
+        print('      mdims:', mdims)
     mdims = -mdims
     if mdims > 0:
         dv = unpack('i'*mdims, f.read(4*mdims))
         if verbose:
-            print "         dv:", dv
+            print("         dv:", dv)
         num_elems = reduce(lambda x, y: x*y, dv)
     else:
         num_elems = 0
@@ -308,16 +313,16 @@ def read_var(f, verbose):
     """
     
     name_length = unpack('i', f.read(4))[0]
-    name  = str(f.read(name_length))
+    name  = f.read(name_length).decode('ascii')
     if verbose:
-        print '* Variable "' + name + '":'
+        print('* Variable "' + name + '":')
     doc_length = unpack('i', f.read(4))[0]
-    doc = str(f.read(doc_length))
+    doc = f.read(doc_length).decode('ascii')
     if verbose:
-        print '        doc:', doc
+        print('        doc:', doc)
     global_flag = ord(f.read(1))
     if verbose:
-        print '     global:', (global_flag == 1)
+        print('     global:', (global_flag == 1))
     data_type = ord(f.read(1))
     if data_type == 1:
         data_type = 'scalar'
@@ -335,11 +340,11 @@ def read_var(f, verbose):
         data_type = 'string'
     elif data_type == 255:
         data_type_length = unpack('i', f.read(4))[0]
-        data_type = str(f.read(data_type_length))
+        data_type = f.read(data_type_length).decode('ascii')
     else:
         raise OctaveReaderError('UnknownDataType')
     if verbose:
-        print '  data_type:', data_type
+        print('  data_type:', data_type)
     if data_type == 'scalar':
         var = read_scalar_var(f, verbose)
     elif data_type == 'matrix':
@@ -362,9 +367,8 @@ def read_var(f, verbose):
     
 def read_octave_binary(path, verbose=False):
     """ Reads an Octave binary file. Returns a dictionnary containing all the variables. """
-    
     data = dict()
-    with open(path, 'r') as f:
+    with open(path, 'rb') as f:
         float_format = read_header(f, verbose)
         done = False
         while not done:
@@ -374,9 +378,8 @@ def read_octave_binary(path, verbose=False):
             except OctaveReaderError as oe:
                 done = True
                 raise
-            except:
+            except error:
                 done = True
-                pass
                 
     return data
 
@@ -384,7 +387,7 @@ def read_octave_binary(path, verbose=False):
 def read_OctMI_session(sessionName, verbose=True, veryVerbose=False):
     filename = sessionName + '_MIstate.octave'
     if verbose:
-        print "Loading saved MI session from file `" + filename + "'"
+        print("Loading saved MI session from file `" + filename + "'")
     MI_session = read_octave_binary(filename, veryVerbose)['MI_session']
     Variables = dict()
     Variables['startTime'] = MI_session['startTime']
@@ -392,7 +395,7 @@ def read_OctMI_session(sessionName, verbose=True, veryVerbose=False):
         keyname = varname + '_array'
         Variables[varname] = MI_session[keyname]
     time_fmt = "%A %e %B %Y - %H:%M:%S"
-    if MI_session.has_key('t_array'):
+    if 't_array' in MI_session:
         Variables['t'] = MI_session['t_array']
         try:
             Nelem = len(Variables['t'])
@@ -410,12 +413,12 @@ def read_OctMI_session(sessionName, verbose=True, veryVerbose=False):
             lt_end = lt_start
     if verbose:
         string = strftime(time_fmt, lt_start)
-        print colored.blue("** Start date: " + string)
+        print(colored.blue("** Start date: " + string))
         if Nelem > 0:
             string = strftime(time_fmt, lt_end)
-            print colored.blue("**   End date: " + string)
+            print(colored.blue("**   End date: " + string))
         else:
-            print colored.red("No logged variables")
+            print(colored.red("No logged variables"))
 
     return Variables
     

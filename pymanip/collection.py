@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+
 from pymanip import SavedSession
 from pymanip.legacy_session import OctSession
 import os
@@ -39,7 +41,7 @@ class Manip(object):
             value = self.session_name
         elif name == 'nickname':
             value = self.nickname
-        elif self.properties.has_key(name):
+        elif name in self.properties:
             value = self.properties[name]
         else:
             if self.MI.has_log(name):
@@ -49,12 +51,15 @@ class Manip(object):
             elif self.MI.has_parameter(name):
                 value = self.MI.parameter(name)
             else:
-                value = None
+                raise KeyError('Key not found {:s}'.format(name))
                 
         return value
 
     def __getitem__(self, key):
         return self.get(key)
+
+    def describe(self):
+        self.MI.describe()
 
     @property
     def MI(self):
@@ -80,12 +85,11 @@ class Manip(object):
 class ManipCollection(Manip):
     def __init__(self, basename, nickname=None, **kwargs):
         self.basename = basename
-        if 'num' in kwargs:
-            self.num = kwargs['num']
-        else:
-            self.num = 1
+        self.num = kwargs.pop('num', 1)
+        self.verbose = kwargs.pop('verbose', True)
 
-        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, **kwargs)
+        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, 
+                                              verbose=self.verbose, **kwargs)
         
     def __getitem__(self, key):
         if isinstance(key, six.string_types):
@@ -96,11 +100,11 @@ class ManipCollection(Manip):
                     name = os.path.join(self.directory, self.basename + '_' + str(key))
                 else:
                     name = self.basename + '_' + str(key)
-                MI = SavedSession(name)
+                MI = SavedSession(name, verbose=self.verbose)
             except IOError as e:
-                print 'Unable to read file "' + str(e.filename) + "'."
-                print 'Errno = ' + str(e.errno)
-                print 'Message: ' + str(e.message)
+                print('Unable to read file "' + str(e.filename) + "'.")
+                print('Errno = ' + str(e.errno))
+                print('Message: ' + str(e.message))
                 raise IndexError
             return MI
 
@@ -110,11 +114,20 @@ class ManipCollection(Manip):
             return self[self.current_acq]
         return self[1]
 
-    def __iter__(self):
-        self.current_acq = 1
+    def items_from(self, start):
+        # __iter__ est appelé dans tous les cas
+        self.custom_start = start
         return self
 
-    def next(self):
+    def __iter__(self):
+        if hasattr(self, 'custom_start'):
+            self.current_acq = self.custom_start
+            delattr(self, 'custom_start')
+        else:
+            self.current_acq = 1
+        return self
+
+    def __next__(self):
         c = self.current_acq
         self.current_acq = c+1
         if c > self.num:
