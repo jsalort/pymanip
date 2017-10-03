@@ -76,7 +76,7 @@ def read_analog(scope_name, channelList="0", volt_range=10.0,
     if length != samples_per_chan:
         print(colored.red('Warning: record length changed to {:d} points.'.format(length)))
     if numChannels == 1:
-        vRange = scope.ActualVoltageRange('')
+        vRange = scope.ActualVoltageRange(channelList)
         if vRange != volt_range:
             print(colored.red('Warning: actual voltage range is {:} V.'.format(vRange)))
     else:
