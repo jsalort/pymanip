@@ -573,12 +573,22 @@ class Session(BaseSession):
                 self.parameters[var] = value
 
     def save_parameters(self, parameter_list):
-        stack = inspect.stack()
-        try:
-            dict_caller = stack[1][0].f_locals
-        finally:
-            del stack
-        self.save_parameter(parameter_list, dict_caller)
+        """
+        save_parameters( parameter_list )
+        or
+        save_parameters( parameter_dict)
+        """
+
+        if isinstance(parameter_list, dict):
+            for k,v in parameter_list.items():
+                self.parameters[k] = v
+        else:
+            stack = inspect.stack()
+            try:
+                dict_caller = stack[1][0].f_locals
+            finally:
+                del stack
+            self.save_parameter(parameter_list, dict_caller)
 
     def save_dataset(self, data_name, dict_caller=None):
         if dict_caller is None:
