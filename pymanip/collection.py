@@ -55,6 +55,9 @@ class Manip(object):
                 
         return value
 
+    def dataset(self, name):
+        return self.MI.dataset(name)
+
     def __getitem__(self, key):
         return self.get(key)
 
