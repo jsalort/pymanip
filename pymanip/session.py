@@ -261,6 +261,13 @@ class BaseSession(object):
     def sleep(self, duration):
         mytime.sleep(duration)
 
+    def __enter__(self):
+        self.exited = False
+        return self
+
+    def __exit__(self, type, value, cb):
+        self.exited = True
+
 class SavedSession(BaseSession):
     def __init__(self, session_name, cache_override=False, cache_location='.', verbose=True):
         super(SavedSession, self).__init__(session_name)
@@ -437,11 +444,6 @@ class SavedSession(BaseSession):
 #            print('We have no cachestore')
 #        print('SavedSession __del__ has finished.')
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, cb):
-        self.exited = True
         
 class Session(BaseSession):
     def __init__(self, session_name, variable_list=[], allow_override_datasets=False):
@@ -764,6 +766,7 @@ class Session(BaseSession):
     def Stop(self):
         if self.email_started:
             self.stop_email()
+            print('MI: email stopped.')
         if self.opened:
             self.store.close()
             self.datfile.close()
@@ -777,6 +780,17 @@ class Session(BaseSession):
             self.logfile.flush()
             self.logfile.close()
             self.opened = False
+            print('MI: Successfully ended.')
+
+    def __exit__(self, t, v, cb):
+        self.Stop()
+        super(Session, self).__exit__(t,v,cb)
 
     def __del__(self):
-        self.Stop()
+        if hasattr(self, 'exited'):
+            # let __enter__/__exit__ call self.Stop()
+            pass
+        else:
+            # not inside a with statement, calling Stop when
+            # object is being deleted
+            self.Stop()
