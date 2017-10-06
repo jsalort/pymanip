@@ -87,7 +87,7 @@ def read_analog(scope_name, channelList="0", volt_range=10.0,
     scope.InitiateAcquisition()
     duration = samples_per_chan/sampling
     MI.sleep(duration)
-    data = scope.Fetch(channelList, timeout=duration/10)
+    data = scope.Fetch(channelList, timeout=duration)
     (l,c) = data.shape 
     print('Scope: {:d} samples read.'.format(l))
     scope.close()
