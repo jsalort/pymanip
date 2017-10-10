@@ -49,24 +49,29 @@ def read_analog(scope_name, channelList="0", volt_range=10.0,
     # Make sure scalars have the correct type, as it will otherwise
     # fail to convert to the corresponding Vi types
     samples_per_chan = int(samples_per_chan)
+    sample_rate = float(sample_rate)
+    channelList = str(channelList)
+    numChannels = len(channelList.split(","))
     if isinstance(volt_range, Iterable):
         volt_range = [float(v) for v in volt_range]
     else:
         volt_range = float(volt_range)
-    sample_rate = float(sample_rate)
-    channelList = str(channelList)
-    numChannels = len(channelList.split(","))
+        if numChannels > 1:
+            volt_range = [volt_range]*numChannels
 
     scope = Scope(scope_name)
     print('Scope:', scope_name)
     scope.ConfigureHorizontalTiming(sampleRate=sample_rate, numPts=samples_per_chan)
     scope.NumRecords = 1
-    if isinstance(volt_range, float):
+    if numChannels == 1:
         scope.ConfigureVertical(channelList=channelList, voltageRange=volt_range)
     else:
         for chan,v in zip(channelList.split(","), volt_range):
             print('Scope: setting chan {:s} voltage range to {:}.'.format(chan,v))
             scope.ConfigureVertical(channelList=chan, voltageRange=v)
+            actualRange = scope.ActualVoltageRange(chan)
+            if actualRange != volt_range:
+                print('Scope: actual range for chan {:s} is {:}'.format(chan, actualRange))
     scope.ConfigureTrigger('Immediate')
     sampling = scope.ActualSamplingRate
     length = scope.ActualRecordLength
