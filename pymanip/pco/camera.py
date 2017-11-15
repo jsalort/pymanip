@@ -6,9 +6,12 @@ based on the low-level pco.pixelfly module.
 """
 
 import sys
+import ctypes
+
 import numpy as np
-import pymanip.pco.pixelfly as pf
 import matplotlib.pyplot as plt
+
+import pymanip.pco.pixelfly as pf
 
 class PCO_Camera:
 
@@ -59,8 +62,8 @@ class PCO_Camera:
 		XResAct, YResAct, XResMax, YResMax = pf.PCO_GetSizes(self.handle)
 		
 		# Allocate buffer
-		bufSizeInBytes = XResAct*YResAct*pf.ctypes.sizeof(pf.ctypes.wintypes.WORD)
-		bufPtr = pf.ctypes.POINTER(pf.ctypes.wintypes.WORD)()
+		bufSizeInBytes = XResAct*YResAct*ctypes.sizeof(ctypes.wintypes.WORD)
+		bufPtr = ctypes.POINTER(ctypes.wintypes.WORD)()
 		bufNr, event = pf.PCO_AllocateBuffer(self.handle, -1, bufSizeInBytes, bufPtr)
 		
 		# Get Image
