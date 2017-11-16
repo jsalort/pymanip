@@ -674,6 +674,19 @@ def PCO_GetInfoString(handle):
     PCO_manage_error(ret_code)
     return p.raw.decode('ascii')
 
+def PCO_GetCameraName(handle):
+    """
+    This function retrieves the name of the camera.
+    """
+    
+    f = pixelfly_dll.PCO_GetCameraName
+    f.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.wintypes.WORD)
+    f.restype = ctypes.c_int
+    cameraName = ctypes.create_string_buffer(41)
+    ret_code = f(handle, cameraName, 41)
+    PCO_manage_error(ret_code)
+    return cameraName.raw.decode('ascii')
+    
 def PCO_GetGeneral(handle):
     """
     Request all info contained in the following

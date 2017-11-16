@@ -12,7 +12,6 @@ import datetime
 import win32event
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 from pymanip.video import MetadataArray, Camera
 import pymanip.video.pco.pixelfly as pf
@@ -114,11 +113,9 @@ class PCO_Camera(Camera):
         pf.PCO_CloseCamera(self.handle)
         self.handle = None
         print('Connection to camera closed.')
-    
-    def __enter__(self):
-        return self
         
     def __exit__(self, type_, value, cb):
+        super(PCO_Camera, self).__exit__(type_, value, cb)
         self.close()
     
     # Query states
@@ -126,6 +123,20 @@ class PCO_Camera(Camera):
         warn, err, status = pf.PCO_GetCameraHealthStatus(self.handle)
         return warn, err, status
     
+    # Properties
+    @property
+    def resolution(self):
+        return self.camera_description.maximum_resolution_std
+    
+    @property
+    def name(self):
+        #if hasattr(self, '_name'):
+        #    return self._name
+        # PCO_GetCameraName is not supported by pco.1600
+        #self._name = pf.PCO_GetCameraName(self.handle)
+        #return self._name
+        return 'PCO Camera'
+        
     # Image acquisition
     def acquisition_oneshot(self):
         """
@@ -209,17 +220,20 @@ class PCO_Camera(Camera):
 
     
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
+    #import matplotlib.pyplot as plt
     #with PCO_Camera() as cam:
     #    array = cam.acquisition_oneshot()
     #plt.imshow(array, origin='lower')
     #plt.colorbar()
+    
+    #with PCO_Camera() as cam:
+    #    for ii, im in enumerate(cam.acquisition(50)):
+    #        plt.clf()
+    #        plt.imshow(im, origin='lower')
+    #        dt_str = im.metadata['timestamp'].strftime('%A %d %B %Y - %X')
+    #        plt.title('img {:} - {:}'.format(im.metadata['counter'], dt_str))
+    #        plt.colorbar()
+    #        plt.pause(0.1)
+    #plt.show()
     with PCO_Camera() as cam:
-        for ii, im in enumerate(cam.acquisition(50)):
-            plt.clf()
-            plt.imshow(im, origin='lower')
-            dt_str = im.metadata['timestamp'].strftime('%A %d %B %Y - %X')
-            plt.title('img {:} - {:}'.format(im.metadata['counter'], dt_str))
-            plt.colorbar()
-            plt.pause(0.1)
-    plt.show()
+        cam.preview()
