@@ -742,7 +742,7 @@ def PCO_GetBufferStatus(handle, sBufNr):
     statusDrv = ctypes.wintypes.DWORD()
     ret_code = f(handle, sBufNr, ctypes.byref(statusDLL), ctypes.byref(statusDrv))
     PCO_manage_error(ret_code)
-    return statusDLL, statusDrv
+    return statusDLL.value, statusDrv.value
 
 def PCO_ArmCamera(handle):
     """
@@ -760,7 +760,22 @@ def PCO_ArmCamera(handle):
     f.restype = ctypes.c_int
     ret_code = f(handle)
     PCO_manage_error(ret_code)
-        
+
+def PCO_GetRecordingState(handle):
+    """
+    Returns the current Recording state of the camera:
+        - 0x0000: camera is stopped, recording state [stop]
+        - 0x0001: camera is running, recording state [run]
+    """
+    
+    f = pixelfly_dll.PCO_GetRecordingState
+    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.WORD))
+    f.restype = ctypes.c_int
+    state = ctypes.wintypes.WORD()
+    ret_code = f(handle, ctypes.byref(state))
+    PCO_manage_error(ret_code)
+    return state.value
+    
 def PCO_SetRecordingState(handle, state):
     """
     Sets the current recording status and waits till
@@ -843,7 +858,7 @@ def PCO_AddBufferEx(handle, dw1stImage, dwLastImage, sBufNr, wXRes, wYRes, wBitP
                   ctypes.wintypes.WORD, ctypes.wintypes.WORD,
                   ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
-    ret_code = f(handle, sw1stImage, dwLastImage, sBufNr, wXRes, wYRes, wBitPerPixel)
+    ret_code = f(handle, dw1stImage, dwLastImage, sBufNr, wXRes, wYRes, wBitPerPixel)
     PCO_manage_error(ret_code)
     
 def PCO_CancelImages(handle):
