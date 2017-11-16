@@ -6,7 +6,7 @@ PCO PixelFly Wrapper
 
 import ctypes
 from enum import IntEnum
-from typing import Tuple
+from typing import Tuple, Iterable
 import datetime
 
 # Open DLL
@@ -533,13 +533,13 @@ class PCO_Image(ctypes.Structure):
         self.strColorSet.__init__()
 
 def bcd_byte_to_str(input):
-    if len(input) > 1:
+    if isinstance(input, Iterable) and len(input) > 1:
         raise ValueError('Exactly one byte is expected')
     input_a = (int(input) & 0xF0) >> 4
     input_b = (int(input) & 0x0F)
     return "{:d}{:d}".format(input_a, input_b)
     
-def bcd_to_int(input):
+def bcd_to_int(input, endianess='little'):
     """
     Decimal-encoded value
     
@@ -556,7 +556,13 @@ def bcd_to_int(input):
         8         | 1000
         9         | 1001
     """
-    return int("".join([bcd_byte_to_str(b) for b in reversed(input)]))
+    if isinstance(input, Iterable):
+        if endianess == 'little':
+            return int("".join([bcd_byte_to_str(b) for b in reversed(input)]))
+        else:
+            return int("".join([bcd_byte_to_str(b) for b in input]))
+    else:
+        return int(bcd_byte_to_str(input))
     
 class PCO_METADATA(ctypes.Structure):
     _fields_ = [('wSize', ctypes.wintypes.WORD),
@@ -944,6 +950,8 @@ def PCO_GetImageStruct(handle):
 
 def PCO_GetMetaData(handle, bufNr):
     """
+    Cameras: pco.dimax and pco.edge
+    
     Query additionnal image information, which the camera has attached to
     the transferred image, if Meta Data mode is enabled.
     """
@@ -960,6 +968,8 @@ def PCO_GetMetaData(handle, bufNr):
 
 def PCO_SetMetaDataMode(handle, MetaDataMode):
     """
+    Cameras: pco.dimax and pco.edge
+    
     Sets the mode for Meta Data and returns information about size and version
     of the Meta Data block.
     When Meta Data mode is set to [on], a Meta Data block with additional information
@@ -997,6 +1007,26 @@ def PCO_GetMetaDataMode(handle):
                  ctypes.byref(MetaDataVersion))
     PCO_manage_error(ret_code)
     return MetaDataMode.value, MetaDataSize.value, MetaDataVersion.value
+    
+def PCO_SetTimestampMode(handle, mode):
+    """
+    Sets the timestamp mode of the camera:
+        0x0000: [off]
+        0x0001: [binary]
+            BCD coded timestamp in the first 14 pixels
+        0x0002: [binary+ASCII]
+            BCD coded timestamp in the first 14 pixels + ASCII text
+        0x0003: [ASCII]
+            ASCII text only (see camera descriptor for availability)
+    """
+    
+    if mode not in (0x0000, 0x0001, 0x0002, 0x0003):
+        raise ValueError('Bad mode value')
+    f = pixelfly_dll.PCO_SetTimestampMode
+    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.restype = ctypes.c_int
+    ret_code = f(handle, mode)
+    PCO_manage_error(ret_code)
     
 def PCO_AddBufferEx(handle, dw1stImage, dwLastImage, sBufNr, wXRes, wYRes, wBitPerPixel):
     """

@@ -8,13 +8,45 @@ based on the low-level pco.pixelfly module.
 import sys
 import itertools
 import ctypes
+import datetime
 import win32event
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-import pymanip.pco.pixelfly as pf
+from pymanip.video import MetadataArray, Camera
+import pymanip.video.pco.pixelfly as pf
 
+def PCO_get_binary_timestamp(image):
+    """
+    Reads the BCD coded timestamp in the first 14 pixels of an image
+    
+    Format:
+    Pixel  1: Image counter (MSB) 00..99
+    Pixel  2: Image counter       00..99
+    Pixel  3: Image counter       00..99
+    Pixel  4: Image counter (LSB) 00..99
+    Pixel  5: Year (MSB)          20
+    Pixel  6: Year (LSB)          03..99
+    Pixel  7: Month               01..12
+    Pixel  8: Day                 01..31
+    Pixel  9: Hour                00..23
+    Pixel 10: Minutes             00..59
+    Pixel 11: Seconds             00..59
+    Pixel 12: µs * 10000          00..99
+    Pixel 13: µs * 100            00..99
+    Pixel 14: µs                  00..90
+    """
+    counter = pf.bcd_to_int(image[:4], endianess='big')
+    year = pf.bcd_to_int(image[4:6], endianess='big')
+    month = pf.bcd_to_int(image[6])
+    day = pf.bcd_to_int(image[7])
+    hour = pf.bcd_to_int(image[8])
+    minutes = pf.bcd_to_int(image[9])
+    seconds = pf.bcd_to_int(image[10])
+    microseconds = pf.bcd_to_int(image[11:], endianess='big')
+    return counter, datetime.datetime(year, month, day, hour, minutes, seconds, microseconds)
+    
 class PCO_Buffer:
 
     def __init__(self, cam_handle, XResAct, YResAct):
@@ -42,10 +74,10 @@ class PCO_Buffer:
     def as_array(self):
         return np.ctypeslib.as_array(self.bufPtr, shape=(self.YResAct, self.XResAct))
     
-class PCO_Camera:
+class PCO_Camera(Camera):
 
     # Open/Close camera
-    def __init__(self, board=0):
+    def __init__(self, board=0, metadata_mode=False, timestamp_mode=True):
         """
         pco.sdk_manual page 10:
         First step is to PCO_OpenCamera
@@ -64,9 +96,19 @@ class PCO_Camera:
             #print(str(self.camera_description))
             print('Status bits :', status)
         pf.PCO_SetBitAlignment(self.handle, sys.byteorder == 'little')
-        MetaDataSize, MetaDataVersion = pf.PCO_SetMetaDataMode(self.handle, True)
-        self.MetaDataSize = MetaDataSize
-        self.MetaDataVersion = MetaDataVersion
+        self.metadata_mode = metadata_mode
+        self.timestamp_mode = timestamp_mode
+        if timestamp_mode:
+            # Timestamp is supported by all cameras but the information
+            # is written on the first 14 pixels of the transfered image
+            pf.PCO_SetTimestampMode(self.handle, 0x0001) # binary mode (BCD coded in the first 14 px)
+        else:
+            pf.PCO_SetTimestampMode(self.handle, 0x0000)
+        if metadata_mode:
+            # MetaData is supported on pco.dimax and pco.edge only
+            MetaDataSize, MetaDataVersion = pf.PCO_SetMetaDataMode(self.handle, True)
+            self.MetaDataSize = MetaDataSize
+            self.MetaDataVersion = MetaDataVersion
     
     def close(self):
         pf.PCO_CloseCamera(self.handle)
@@ -148,7 +190,14 @@ class PCO_Camera:
                             statusDLL, statusDrv = pf.PCO_GetBufferStatus(self.handle, buffer.bufNr)
                             if statusDrv != 0:
                                 raise RuntimeError('buffer {:} error status {:}'.format(buffer.bufNr, statusDrv))
-                            yield buffer.as_array()
+                            if self.metadata_mode:
+                                metadata = pf.PCO_GetMetaData(self.handle, buffer.bufNr)
+                                yield MetadataArray(buffer.as_array(), metadata=metadata)
+                            elif self.timestamp_mode:
+                                counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
+                                yield MetadataArray(buffer.as_array(), metadata={'counter': counter, 'timestamp': dt})
+                            else:
+                                yield buffer.as_array()
                             count += 1
                             pf.PCO_AddBufferEx(self.handle, 0, 0, buffer.bufNr, XResAct, YResAct, 16)
                         else:
@@ -156,7 +205,9 @@ class PCO_Camera:
             finally:
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
-            
+
+
+    
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     #with PCO_Camera() as cam:
@@ -167,7 +218,8 @@ if __name__ == '__main__':
         for ii, im in enumerate(cam.acquisition(50)):
             plt.clf()
             plt.imshow(im, origin='lower')
-            plt.title('img {:}'.format(ii))
+            dt_str = im.metadata['timestamp'].strftime('%A %d %B %Y - %X')
+            plt.title('img {:} - {:}'.format(im.metadata['counter'], dt_str))
             plt.colorbar()
             plt.pause(0.1)
     plt.show()
