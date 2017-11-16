@@ -54,4 +54,9 @@ MI.save_parameters( ('N', 'fs') )
 MI.Stop()
 ```
 
+Typical camera acquisition usage
+--------------------------------
 
+```python
+from pymanip.video.pco import PCO_Camera
+```
