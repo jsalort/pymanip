@@ -7,6 +7,7 @@ PCO PixelFly Wrapper
 import ctypes
 from enum import IntEnum
 from typing import Tuple
+import datetime
 
 # Open DLL
 pixelfly_dllpath = r"C:\Program Files\Digital Camera Toolbox\Camware4\SC2_Cam.dll"
@@ -531,6 +532,101 @@ class PCO_Image(ctypes.Structure):
             self.ZZstrDummySeg[i].__init__()
         self.strColorSet.__init__()
 
+def bcd_byte_to_str(input):
+    if len(input) > 1:
+        raise ValueError('Exactly one byte is expected')
+    input_a = (int(input) & 0xF0) >> 4
+    input_b = (int(input) & 0x0F)
+    return "{:d}{:d}".format(input_a, input_b)
+    
+def bcd_to_int(input):
+    """
+    Decimal-encoded value
+    
+    Decimal digit | Bits
+    --------------+------
+        0         | 0000
+        1         | 0001
+        2         | 0010
+        3         | 0011
+        4         | 0100
+        5         | 0101
+        6         | 0110
+        7         | 0111
+        8         | 1000
+        9         | 1001
+    """
+    return int("".join([bcd_byte_to_str(b) for b in reversed(input)]))
+    
+class PCO_METADATA(ctypes.Structure):
+    _fields_ = [('wSize', ctypes.wintypes.WORD),
+                ('wVersion', ctypes.wintypes.WORD),
+                ('bIMAGE_COUNTER_BCD', ctypes.wintypes.BYTE*4),
+                ('bIMAGE_TIME_US_BCD', ctypes.wintypes.BYTE*3),
+                ('bIMAGE_TIME_SEC_BCD', ctypes.wintypes.BYTE),
+                ('bIMAGE_TIME_MIN_BCD', ctypes.wintypes.BYTE),
+                ('bIMAGE_TIME_HOUR_BCD', ctypes.wintypes.BYTE),
+                ('bIMAGE_TIME_DAY_BCD', ctypes.wintypes.BYTE),
+                ('bIMAGE_TIME_MON_BCD', ctypes.wintypes.BYTE),
+                ('bIMAGE_TIME_YEAR_BCD', ctypes.wintypes.BYTE),
+                ('bIMAGE_TIME_STATUS', ctypes.wintypes.BYTE),
+                ('wEXPOSURE_TIME_BASE', ctypes.wintypes.WORD),
+                ('dwEXPOSURE_TIME', ctypes.wintypes.DWORD),
+                ('dwFRAMERATE_MILLIHZ', ctypes.wintypes.DWORD),
+                ('sSENSOR_TEMPERATURE', ctypes.wintypes.SHORT),
+                ('wIMAGE_SIZE_X', ctypes.wintypes.WORD),
+                ('wIMAGE_SIZE_Y', ctypes.wintypes.WORD),
+                ('bBINNING_X', ctypes.wintypes.BYTE),
+                ('bBINNING_Y', ctypes.wintypes.BYTE),
+                ('dwSENSOR_READOUT_FREQUENCY', ctypes.wintypes.DWORD),
+                ('wSENSOR_CONV_FACTOR', ctypes.wintypes.WORD),
+                ('dwCAMERA_SERIAL_NO', ctypes.wintypes.DWORD),
+                ('wCAMERA_TYPE', ctypes.wintypes.WORD),
+                ('bBIT_RESOLUTION', ctypes.wintypes.BYTE),
+                ('bSYNC_STATUS', ctypes.wintypes.BYTE),
+                ('wDARK_OFFSET', ctypes.wintypes.WORD),
+                ('bTRIGGER_MODE', ctypes.wintypes.BYTE),
+                ('bDOUBLE_IMAGE_MODE', ctypes.wintypes.BYTE),
+                ('bCAMERA_SYNC_MODE', ctypes.wintypes.BYTE),
+                ('bIMAGE_TYPE', ctypes.wintypes.BYTE),
+                ('wCOLOR_PATTERN', ctypes.wintypes.WORD)]
+    
+    def __init__(self):
+        super(PCO_METADATA, self).__init__()
+        self.wSize = ctypes.sizeof(PCO_METADATA)
+    
+    @property
+    def raw_value(self):
+        return {key[1:]: getattr(self, key).value for key in self._fields_}
+    
+    @property
+    def value(self):
+        data = self.raw_value
+        IMAGE_COUNTER_BCD = data.pop('IMAGE_COUNTER_BCD')
+        IMAGE_TIME_US_BCD = data.pop('IMAGE_TIME_BCD')
+        IMAGE_TIME_SEC_BCD = data.pop('IMAGE_TIME_SEC_BCD')
+        IMAGE_TIME_MIN_BCD = data.pop('IMAGE_TIME_MIN_BCD')
+        IMAGE_TIME_HOUR_BCD = data.pop('IMAGE_TIME_HOUR_BCD')
+        IMAGE_TIME_DAY_BCD = data.pop('IMAGE_TIME_DAY_BCD')
+        IMAGE_TIME_MON_BCD = data.pop('IMAGE_TIME_MON_BCD')
+        IMAGE_TIME_YEAR_BCD = data.pop('IMAGE_TIME_YEAR_BCD')
+        
+        # IMAGE_COUNTER
+        # 0x00000001 to 0x99999999 where first byte is a
+        # least significant byte (Little Endian)
+        data['IMAGE_COUNTER'] = bcd_to_int(IMAGE_COUNTER_BCD)
+        
+        # IMAGE_DATETIME
+        data['IMAGE_DATETIME'] = datetime.datetime(bcd_to_int(IMAGE_TIME_YEAR_BCD)+2000,
+                                                   bcd_to_int(IMAGE_TIME_MON_BCD),
+                                                   bcd_to_int(IMAGE_TIME_DAY_BCD),
+                                                   bcd_to_int(IMAGE_TIME_HOUR_BCD),
+                                                   bcd_to_int(IMAGE_TIME_MIN_BCD),
+                                                   bcd_to_int(IMAGE_TIME_SEC_BCD),
+                                                   bcd_to_int(IMAGE_TIME_US_BCD))
+                                                  
+        return data
+          
 # Pixelfly API functions                    
 def PCO_OpenCamera(board=0):
     """
@@ -845,6 +941,62 @@ def PCO_GetImageStruct(handle):
     ret_code = f(handle, ctypes.byref(strImage))
     PCO_manage_error(ret_code)
     return strImage
+
+def PCO_GetMetaData(handle, bufNr):
+    """
+    Query additionnal image information, which the camera has attached to
+    the transferred image, if Meta Data mode is enabled.
+    """
+    
+    f = pixelfly_dll.PCO_GetMetaData
+    f.argtypes = (ctypes.c_int, ctypes.wintypes.SHORT,
+                  ctypes.POINTER(PCO_METADATA),
+                  ctypes.wintypes.DWORD, ctypes.wintypes.DWORD)
+    f.restype = ctypes.c_int
+    MetaData = PCO_METADATA()
+    ret_code = f(handle, bufNr, ctypes.byref(MetaData), 0, 0)
+    PCO_manage_error(ret_code)
+    return MetaData.value
+
+def PCO_SetMetaDataMode(handle, MetaDataMode):
+    """
+    Sets the mode for Meta Data and returns information about size and version
+    of the Meta Data block.
+    When Meta Data mode is set to [on], a Meta Data block with additional information
+    is added at the end of each image. The internal buffers allocated with PCO_AllocateBuffer
+    are adapted automatically.
+    """
+    
+    f = pixelfly_dll.PCO_SetMetaDataMode
+    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD,
+                  ctypes.POINTER(ctypes.wintypes.WORD),
+                  ctypes.POINTER(ctypes.wintypes.WORD))
+    f.restype = ctypes.c_int
+    MetaDataSize = ctypes.wintypes.WORD()
+    MetaDataVersion = ctypes.wintypes.WORD()
+    ret_code = f(handle, MetaDataMode, ctypes.byref(MetaDataSize), ctypes.byref(MetaDataVersion))
+    PCO_manage_error(ret_code)
+    return MetaDataSize.value, MetaDataVersion.value
+    
+def PCO_GetMetaDataMode(handle):
+    """
+    Returns the current Meta Data mode of the camera and information about size
+    and version of the Meta Data block.
+    """
+    
+    f = pixelfly_dll.PCO_GetMetaDataMode
+    f.argtypes = (ctypes.c_int,
+                  ctypes.POINTER(ctypes.wintypes.WORD),
+                  ctypes.POINTER(ctypes.wintypes.WORD),
+                  ctypes.POINTER(ctypes.wintypes.WORD))
+    f.restype = ctypes.c_int
+    MetaDataMode = ctypes.wintypes.WORD()
+    MetaDataSize = ctypes.wintypes.WORD()
+    MetaDataVersion = ctypes.wintypes.WORD()
+    ret_code = f(handle, ctypes.byref(MetaDataMode), ctypes.byref(MetaDataSize),
+                 ctypes.byref(MetaDataVersion))
+    PCO_manage_error(ret_code)
+    return MetaDataMode.value, MetaDataSize.value, MetaDataVersion.value
     
 def PCO_AddBufferEx(handle, dw1stImage, dwLastImage, sBufNr, wXRes, wYRes, wBitPerPixel):
     """

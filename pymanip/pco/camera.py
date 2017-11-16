@@ -64,6 +64,9 @@ class PCO_Camera:
             #print(str(self.camera_description))
             print('Status bits :', status)
         pf.PCO_SetBitAlignment(self.handle, sys.byteorder == 'little')
+        MetaDataSize, MetaDataVersion = pf.PCO_SetMetaDataMode(self.handle, True)
+        self.MetaDataSize = MetaDataSize
+        self.MetaDataVersion = MetaDataVersion
     
     def close(self):
         pf.PCO_CloseCamera(self.handle)
