@@ -12,6 +12,7 @@ try:
 except ModuleNotFoundError:
     has_qtgraph = False
     print('pyqtgraph is not installed.')
+from . import png
 
 class MetadataArray(np.ndarray):
     """ Array with metadata. """
@@ -30,7 +31,7 @@ class Camera:
     Subclasses must implement:
         - acquisition_oneshot method
         - acquisition generator
-        - resolution, name properties
+        - resolution, name, bitdepth properties
     """
     
     def __enter__(self):
@@ -81,10 +82,28 @@ class Camera:
         if just_started:
             QtGui.QApplication.instance().exec_()
             
-    def acquire_to_files(self, num, basename):
+    def acquire_to_files(self, num, basename, zerofill=4, dryrun=False):
         """
         Acquire num images and saves PNG to disk
         """
         
+        writer = None
+        count = []
+        dt = []
+        for ii, im in enumerate(self.acquisition(num)):
+            if not writer:
+                row_count, column_count = im.shape
+                writer = png.Writer(column_count, row_count, greyscale=True,
+                                    alpha=False, bitdepth=self.bitdepth)
+            filename = ('{:}-{:0'+str(zerofill)+'d}.png').format(basename, ii+1)
+            if not dryrun:
+                with open(filename, 'wb') as f:
+                    writer.write(f, im)
+            if hasattr(im, 'metadata'):
+                count.append(im.metadata['counter'])
+                dt.append(im.metadata['timestamp'])
+        return count, dt
+            
+            
         
         

@@ -136,6 +136,10 @@ class PCO_Camera(Camera):
         #self._name = pf.PCO_GetCameraName(self.handle)
         #return self._name
         return 'PCO Camera'
+    
+    @property
+    def bitdepth(self):
+        return 16
         
     # Image acquisition
     def acquisition_oneshot(self):
