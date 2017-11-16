@@ -1070,10 +1070,6 @@ def PCO_CancelImages(handle):
     f.restype = ctypes.c_int
     ret_code = f(handle)
     PCO_manage_error(ret_code)
-    
-
-def PCO_GetNumberOfImagesInSegment():
-    pass
 
 IMAGEPARAMETERS_READ_WHILE_RECORDING = 0x00000001
 IMAGEPARAMETERS_READ_FROM_SEGMENTS   = 0x00000002
@@ -1124,7 +1120,157 @@ def PCO_GetImageEx(handle, segment, firstImage, lastImage, bufNr,
     ret_code = f(handle, segment, firstImage, lastImage, bufNr, 
                  xRes, yRes, bitsPerPixel)
     PCO_manage_error(ret_code)
-     
+
+PCO_Timebases = {0x0000: 1e-9,
+                 0x0001: 1e-6,
+                 0x0002: 1e-3}
+                 
+def PCO_SetDelayExposureTime(handle, dwDelay, dwExposure,
+                             wTimeBaseDelay, wTimeBaseExposure):
+    """
+    This function sets the delay and exposure time and the
+    associated time base values.
+    Restrictions for the parameter values are defined in the
+    PCO_Description structure:
+        dwMinDelayDESC
+        dwMaxDelayDESC
+        dwMinDelayStepDESC
+        dwMinExposDESC
+        dwMaxExposDESC
+        dwMinExposStepDESC
+    
+    Possible values for wTimeBaseDelay and wTimeBaseExposure:
+        0x0000: ns
+        0x0001: µs
+        0x0002: ms
+    """
+    
+    f = pixelfly_dll.PCO_SetDelayExposureTime
+    f.argtypes = (ctypes.c_int,
+                  ctypes.wintypes.DWORD, ctypes.wintypes.DWORD,
+                  ctypes.wintypes.WORD, ctypes.wintypes.WORD)
+    f.restype = ctypes.c_int
+    ret_code = f(handle, dwDelay, dwExposure, wTimeBaseDelay, wTimeBaseExposure)
+    PCO_manage_error(ret_code)
+    
+def PCO_GetDelayExposureTime(handle):
+    """
+    Returns the current setting of delay and exposure time
+    """
+    
+    f = pixelfly_dll.PCO_GetDelayExposureTime
+    f.argtypes = (ctypes.c_int,
+                  ctypes.POINTER(ctypes.wintypes.DWORD),
+                  ctypes.POINTER(ctypes.wintypes.DWORD),
+                  ctypes.POINTER(ctypes.wintypes.WORD),
+                  ctypes.POINTER(ctypes.wintypes.WORD))
+    f.restype = ctypes.c_int
+    delay = ctypes.wintypes.DWORD()
+    exposure = ctypes.wintypes.DWORD()
+    timebase_delay = ctypes.wintypes.WORD()
+    timebase_exposure = ctypes.wintypes.WORD()
+    ret_code = f(handle, ctypes.byref(delay), 
+                 ctypes.byref(exposure),
+                 ctypes.byref(timebase_delay), 
+                 ctypes.byref(timebase_exposure))
+    PCO_manage_error(ret_code)
+    return delay.value, exposure.value, timebase_delay.value, timebase_exposure.value
+
+def PCO_GetTriggerMode(handle):
+    """
+    Returns the current trigger mode setting of the
+    camera
+    """
+    
+    f = pixelfly_dll.PCO_GetTriggerMode
+    f.argtypes = (ctypes.c_int,
+                  ctypes.POINTER(ctypes.wintypes.WORD))
+    f.restype = ctypes.c_int
+    triggerMode = ctypes.wintypes.WORD()
+    ret_code = f(handle, ctypes.byref(triggerMode))
+    PCO_manage_error(ret_code)
+    return triggerMode.value
+
+PCO_TriggerModeDescription = {0x0000: 'auto sequence',
+                              0x0001: 'software trigger',
+                              0x0002: 'external exposure start & software trigger',
+                              0x0003: 'external exposure control',
+                              0x0004: 'external synchronized',
+                              0x0005: 'fast external exposure control',
+                              0x0006: 'external CDS control',
+                              0x0007: 'slow external exposure control',
+                              0x0102: 'external synchronized HDSDI'}
+                              
+def PCO_SetTriggerMode(handle, mode):
+    """
+    Sets the trigger mode of the camera.
+    """
+    
+    f = pixelfly_dll.PCO_SetTriggerMode
+    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.restype = ctypes.c_int
+    ret_code = f(handle, mode)
+    PCO_manage_error(ret_code)
+
+def PCO_SetADCOperation(handle, operation):
+    """
+    Sets the ADC (analog-digital-converter) operating mode.
+    If sensor data is read out using single ADC operation,
+    linearity of image data is enhanced. Using dual ADC,
+    operation readout is faster and allows higher frame rates.
+    If dual ADC operating mode is set, horizontal ROI must be
+    adapted to symmetrical values.
+    
+    Possible values:
+        0x0001: [single ADC]
+        0x0002: [dual ADC]
+    """
+    
+    f = pixelfly_dll.PCO_SetADCOperation
+    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.restype = ctypes.c_int
+    ret_code = f(handle, operation)
+    PCO_manage_error(ret_code)
+
+def PCO_GetADCOperation(handle):
+    """
+    Returns the ADC operation mode (single / dual)
+    """
+    
+    f = pixelfly_dll.PCO_GetADCOperation
+    f.argtypes = (ctypes.c_int,
+                  ctypes.POINTER(ctypes.wintypes.WORD))
+    f.restype = ctypes.c_int
+    operation = ctypes.wintypes.WORD()
+    ret_code = f(handle, ctypes.byref(operation))
+    PCO_manage_error(ret_code)
+    return operation.value
+
+def PCO_SetPixelRate(handle, rate):
+    """
+    This functions sets the pixel rate for the sensor readout.
+    """
+    
+    f = pixelfly_dll.PCO_SetPixelRate
+    f.argtypes = (ctypes.c_int, ctypes.wintypes.DWORD)
+    f.restype = ctypes.c_int
+    ret_code = f(handle, rate)
+    PCO_manage_error(ret_code)
+    
+def PCO_GetPixelRate(handle):
+    """
+    Returns the current pixel rate of the camera in Hz.
+    The pixel rate determines the sensor readout speed.
+    """
+    
+    f = pixelfly_dll.PCO_GetPixelRate
+    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.DWORD))
+    f.restype = ctypes.c_int
+    rate = ctypes.wintypes.DWORD()
+    ret_code = f(handle, ctypes.byref(rate))
+    PCO_manage_error(ret_code)
+    return rate.value
+    
 if __name__ == '__main__':
     try:
         h = PCO_OpenCamera()

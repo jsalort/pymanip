@@ -123,6 +123,26 @@ class PCO_Camera(Camera):
         warn, err, status = pf.PCO_GetCameraHealthStatus(self.handle)
         return warn, err, status
     
+    # Set camera settings
+    def set_adc_operating_mode(self, mode):
+        """
+        Select single or dual ADC operating mode.
+        Single mode increases linearity;
+        Dual mode allows higher frame rates.
+        """
+        if mode not in (0x0001, 0x0002):
+            shortcut = {'single': 0x0001,
+                        'dual': 0x0002}
+            mode = shortcut[mode]
+        pf.PCO_SetADCOperation(self.handle, mode)
+    
+    def set_pixel_rate(self, rate):
+        """
+        Select pixel rate for sensor readout (in Hz)
+        For PCO.1600: 10 Mhz or 40 MHz
+        """
+        pf.PCO_SetPixelRate(self.handle, int(rate))
+        
     # Properties
     @property
     def resolution(self):
@@ -140,6 +160,23 @@ class PCO_Camera(Camera):
     @property
     def bitdepth(self):
         return 16
+        
+    def current_delay_exposure_time(self):
+        """
+        returns current delay and exposure time in seconds
+        """
+        
+        delay, exposure, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(self.handle)
+        return delay*pf.PCO_Timebases[tb_delay], exposure*pf.PCO_Timebases[tb_exposure]
+    
+    def current_trigger_mode_description(self):
+        return pf.PCO_TriggerModeDescription[pf.PCO_GetTriggerMode(self.handle)]
+        
+    def current_adc_operation(self):
+        return pf.PCO_ADCOperation(self.handle)
+    
+    def current_pixel_rate(self):
+        return pf.PCO_GetPixelRate(self.handle)
         
     # Image acquisition
     def acquisition_oneshot(self):
