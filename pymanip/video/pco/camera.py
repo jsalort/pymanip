@@ -45,7 +45,7 @@ def PCO_get_binary_timestamp(image):
     seconds = pf.bcd_to_int(image[10])
     microseconds = pf.bcd_to_int(image[11:], endianess='big')
     return counter, datetime.datetime(year, month, day, hour, minutes, seconds, microseconds)
-    
+
 class PCO_Buffer:
 
     def __init__(self, cam_handle, XResAct, YResAct):
@@ -73,6 +73,11 @@ class PCO_Buffer:
     def as_array(self):
         return np.ctypeslib.as_array(self.bufPtr, shape=(self.YResAct, self.XResAct))
     
+    def bytes(self):
+        nval = self.XResAct*self.YResAct
+        bufType = ctypes.wintypes.WORD*nval
+        return bytearray(bufType.from_address(ctypes.addressof(self.bufPtr.contents)))
+                    
 class PCO_Camera(Camera):
 
     # Open/Close camera
@@ -200,7 +205,7 @@ class PCO_Camera(Camera):
                 pf.PCO_CancelImages(self.handle)
         return array
     
-    def acquisition(self, num=np.inf, timeout=1000):
+    def acquisition(self, num=np.inf, timeout=1000, raw=False):
         """
         Multiple image acquisition
         returns a shared memory numpy array valid only
@@ -242,14 +247,22 @@ class PCO_Camera(Camera):
                             statusDLL, statusDrv = pf.PCO_GetBufferStatus(self.handle, buffer.bufNr)
                             if statusDrv != 0:
                                 raise RuntimeError('buffer {:} error status {:}'.format(buffer.bufNr, statusDrv))
-                            if self.metadata_mode:
-                                metadata = pf.PCO_GetMetaData(self.handle, buffer.bufNr)
-                                yield MetadataArray(buffer.as_array(), metadata=metadata)
-                            elif self.timestamp_mode:
-                                counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
-                                yield MetadataArray(buffer.as_array(), metadata={'counter': counter, 'timestamp': dt})
+                            if raw:
+                                data = {"buffer": buffer.bytes()}
+                                if self.timestamp_mode:
+                                    counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
+                                    data['counter'] = counter
+                                    data['timestamp'] = dt
+                                yield data
                             else:
-                                yield buffer.as_array()
+                                if self.metadata_mode:
+                                    metadata = pf.PCO_GetMetaData(self.handle, buffer.bufNr)
+                                    yield MetadataArray(buffer.as_array(), metadata=metadata)
+                                elif self.timestamp_mode:
+                                    counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
+                                    yield MetadataArray(buffer.as_array(), metadata={'counter': counter, 'timestamp': dt})
+                                else:
+                                    yield buffer.as_array()
                             count += 1
                             pf.PCO_AddBufferEx(self.handle, 0, 0, buffer.bufNr, XResAct, YResAct, 16)
                         else:
