@@ -8,7 +8,7 @@ This program scans for connected instruments on the specified GPIB board.
 """
 
 import sys
-from pymanip.miscellaneous import scanGpib
+from pymanip.util.gpib import scanGpib
 
 def main(board):
     scanGpib(board)

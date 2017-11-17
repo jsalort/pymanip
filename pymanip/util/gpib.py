@@ -1,8 +1,7 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 
-This module contains miscellaneous functions:
+This module contains miscellaneous GPIB functions:
 
  - scanGpib
 
