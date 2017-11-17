@@ -15,7 +15,36 @@ except ModuleNotFoundError:
     print('pyqtgraph is not installed.')
 import cv2
 import h5py
+import time
 
+def save_image(im, ii, basename, zerofill, file_format,
+               compression, compression_level):
+    if file_format == 'raw':
+        filename = ('{:}-{:0'+str(zerofill)+'d}.li16').format(basename, ii+1)
+        im.tofile(filename)
+    elif file_format == 'npy':
+        filename = ('{:}-{:0'+str(zerofill)+'d}.npy').format(basename, ii+1)
+        np.save(filename, im)
+    elif file_format == 'npy.gz':
+        filename = ('{:}-{:0'+str(zerofill)+'d}.npy.gz').format(basename, ii+1)
+        with gzip.open(filename, 'wb') as f:
+            np.save(f, im)
+    elif file_format in ('hdf', 'hdf5'):
+        filename = ('{:}-{:0'+str(zerofill)+'d}.hdf5').format(basename, ii+1)
+        with h5py.File(filename, 'w') as f:
+            f.attrs['counter'] = im.metadata['counter']
+            f.attrs['timestamp'] = im.metadata['timestamp'].timestamp()
+            # compression='gzip' trop lent pour 30 fps
+            # compression='lzf' presque bon mais un peu lent à 30 fps
+            f.create_dataset('image', data=im, compression=compression)
+    else:
+        filename = ('{:}-{:0'+str(zerofill)+'d}.{:}').format(basename, ii+1, file_format)
+        if file_format == 'png':
+            params = (cv2.IMWRITE_PNG_COMPRESSION, compression_level)
+        else:
+            params = None
+        cv2.imwrite(filename, im, params)
+               
 class MetadataArray(np.ndarray):
     """ Array with metadata. """
     
@@ -50,12 +79,25 @@ class Camera:
             self.preview_qt()
 
     def preview_cv(self):
+        minimum = None
+        maximum = None
         cv2.namedWindow("Preview")
-        for im in self.acquisition():
-            cv2.imshow("Preview", im)
-            k = cv2.waitKey(0.01)
-            if k in (0x1b, ord('s')):
-                break
+        try:
+            for im in self.acquisition():
+                if minimum is None:
+                    minimum = np.min(im)
+                    maximum = np.max(im)
+                    print('min, max:', minimum, maximum)
+                cv2.imshow("Preview", 
+                    cv2.resize(((2**16-1)//(maximum-minimum))*(im-minimum), 
+                               (800, 600)))
+                k = cv2.waitKey(1)
+                if k in (0x1b, ord('s')):
+                    break
+        except KeyboardInterrupt:
+            pass
+        finally: 
+            cv2.destroyAllWindows()
 
     def preview_qt(self, app=None):
         if app:
@@ -98,8 +140,10 @@ class Camera:
         if just_started:
             QtGui.QApplication.instance().exec_()
             
-    def acquire_to_files(self, num, basename, zerofill=4, dryrun=False, 
-                         file_format='png', compression=None, compression_level=3):
+    def acquire_to_files(self, num, basename, zerofill=4, 
+                         dryrun=False, file_format='png', 
+                         compression=None, compression_level=3,
+                         verbose=True, delay_save=False):
         """
         Acquire num images and saves to disk
 
@@ -115,6 +159,7 @@ class Camera:
                             [default: 3]
         - compression (optional) for HDF5
         - compression_level (optional) for PNG
+        - delay_save: records in RAM and save at this end
 
         returns: image_counter, frame_datetime as lists
 
@@ -122,37 +167,36 @@ class Camera:
         
         count = []
         dt = []
+        if verbose:
+            dateformat = '%A %d %B %Y - %X'
+            starttime = time.time()
+            starttime_str = time.strftime(dateformat, time.localtime(starttime))
+            print('Camera acquisition started: ' + starttime_str)
+        computation_time = 0.0
+        images = list()
         for ii, im in enumerate(self.acquisition(num)):
             if dryrun:
                 continue
-            if file_format == 'raw':
-                filename = ('{:}-{:0'+str(zerofill)+'d}.li16').format(basename, ii+1)
-                im.tofile(filename)
-            elif file_format == 'npy':
-                filename = ('{:}-{:0'+str(zerofill)+'d}.npy').format(basename, ii+1)
-                np.save(filename, im)
-            elif file_format == 'npy.gz':
-                filename = ('{:}-{:0'+str(zerofill)+'d}.npy.gz').format(basename, ii+1)
-                with gzip.open(filename, 'wb') as f:
-                    np.save(f, im)
-            elif file_format == 'hdf5':
-                filename = ('{:}-{:0'+str(zerofill)+'d}.hdf5').format(basename, ii+1)
-                with h5py.File(filename, 'w') as f:
-                    f.attrs['counter'] = im.metadata['counter']
-                    f.attrs['timestamp'] = im.metadata['timestamp'].timestamp()
-                    # compression='gzip' trop lent pour 30 fps
-                    # compression='lzf' presque bon mais un peu lent à 30 fps
-                    f.create_dataset('image', data=im, compression=compression)
+            if delay_save:
+                images.append(im.copy())
             else:
-                filename = ('{:}-{:0'+str(zerofill)+'d}.{:}').format(basename, ii+1, file_format)
-                if file_format == 'png':
-                    params = (cv2.IMWRITE_PNG_COMPRESSION, compression_level)
-                else:
-                    params = None
-                cv2.imwrite(filename, im, params)
+                start_time = time.process_time()
+                save_image(im, ii, basename, zerofill, file_format, 
+                           compression, compression_level)
+                computation_time += time.process_time()-start_time
             if hasattr(im, 'metadata'):
                 count.append(im.metadata['counter'])
                 dt.append(im.metadata['timestamp'])
+        if delay_save and not dryrun:
+            print('Acquisition complete. Saving to disk...')
+            for ii, im in enumerate(images):
+                start_time = time.process_time()
+                save_image(im, ii, basename, zerofill, file_format, 
+                           compression, compression_level)
+                computation_time += time.process_time()-start_time
+        if verbose:
+            print('Average saving time per image:', 
+                  1000*computation_time/(ii+1), 'ms')
         return count, dt
             
             

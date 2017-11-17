@@ -14,7 +14,7 @@ import win32event
 import numpy as np
 
 from pymanip.video import MetadataArray, Camera
-import pymanip.video.pco.pixelfly as pf
+from . import pixelfly as pf
 
 def PCO_get_binary_timestamp(image):
     """
