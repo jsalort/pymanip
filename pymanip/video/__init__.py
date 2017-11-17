@@ -82,6 +82,8 @@ class Camera:
             self.preview_cv()
         elif backend == 'qt':
             self.preview_qt()
+        else:
+            raise RuntimeError('Unknown backend "' + backend + '"')
 
     def preview_cv(self):
         minimum = None

@@ -8,6 +8,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
+from pymanip.util.video import preview_pco
 try:
     from pymanip.daq import DAQmx
     has_daq = True
@@ -72,6 +73,19 @@ parser_gpib.add_argument('boardNumber',
             help="GPIB board to scan for connected instruments", 
             metavar="board_number", type=int, default=0, nargs='?')
 
+# Create parser for "video"
+parser_video = subparsers.add_parser("video",
+                                     help="Display video preview for specified camera")
+parser_video.add_argument('camera_type',
+                          help='Camera type: PCO, AVT, DC1394',
+                          metavar="camera_type")
+parser_video.add_argument('-b', '--board',
+                          help='Camera board address',
+                          metavar='board', default=0, type=int, nargs=1)
+parser_video.add_argument('-t', '--toolkit',
+                          help='Graphical toolkit to use: cv or qt',
+                          metavar='toolkit', default='cv', type=str, nargs=1)
+                          
 # Parse arguments
 args = parser.parse_args()
 
@@ -92,5 +106,14 @@ elif args.command == 'rebuild_hdf':
     rebuild_from_dat(Path(args.input_file), args.output_name)
 elif args.command == 'scan_gpib':
     scanGpib(int(args.boardNumber))
+elif args.command == 'video':
+    if isinstance(args.toolkit, list):
+        tk = args.toolkit[0]
+    else:
+        tk = args.toolkit
+    if args.camera_type.upper() == 'PCO':
+        preview_pco(args.board, tk)
+    else:
+        print('Unknown camera type: ', args.camera_type)
 else:
     print("Unknown command `{:}'.")
