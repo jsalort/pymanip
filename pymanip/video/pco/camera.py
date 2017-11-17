@@ -147,7 +147,18 @@ class PCO_Camera(Camera):
         For PCO.1600: 10 Mhz or 40 MHz
         """
         pf.PCO_SetPixelRate(self.handle, int(rate))
-        
+    
+    def set_trigger_mode(self, mode):
+        if mode in pf.PCO_TriggerModeDescription:
+            pf.PCO_SetTriggerMode(self.handle, mode)
+        else:
+            for key, val in pf.PCO_TriggerModeDescription.items():
+                if val == mode:
+                    break
+            else:
+                raise ValueError('Unknown trigger mode : ' + str(mode))
+            pf.PCO_SetTriggerMode(self.handle, key)
+                
     # Properties
     @property
     def resolution(self):

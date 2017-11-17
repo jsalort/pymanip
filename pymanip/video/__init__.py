@@ -1,6 +1,10 @@
 """
 
-Module for camera and video recording
+Module for camera and video recording:
+
+Depends on :
+    - opencv2 (conda install --channel conda-forge opencv)
+    - hdf5, pyqtgraph, progressbar2 (normal conda channel)
 
 """
 
@@ -16,6 +20,7 @@ except ModuleNotFoundError:
 import cv2
 import h5py
 import time
+from progressbar import ProgressBar
 
 def save_image(im, ii, basename, zerofill, file_format,
                compression, compression_level):
@@ -143,7 +148,8 @@ class Camera:
     def acquire_to_files(self, num, basename, zerofill=4, 
                          dryrun=False, file_format='png', 
                          compression=None, compression_level=3,
-                         verbose=True, delay_save=False):
+                         verbose=True, delay_save=False,
+                         progressbar=True):
         """
         Acquire num images and saves to disk
 
@@ -172,6 +178,8 @@ class Camera:
             starttime = time.time()
             starttime_str = time.strftime(dateformat, time.localtime(starttime))
             print('Camera acquisition started: ' + starttime_str)
+        if progressbar:
+            bar = ProgressBar(max_value=num)
         computation_time = 0.0
         images = list()
         for ii, im in enumerate(self.acquisition(num)):
@@ -187,13 +195,23 @@ class Camera:
             if hasattr(im, 'metadata'):
                 count.append(im.metadata['counter'])
                 dt.append(im.metadata['timestamp'])
+            if progressbar:
+                bar.update(ii+1)
+        if progressbar:
+            print("")
         if delay_save and not dryrun:
             print('Acquisition complete. Saving to disk...')
+            if progressbar:
+                bar = ProgressBar(max_value=num)
             for ii, im in enumerate(images):
                 start_time = time.process_time()
                 save_image(im, ii, basename, zerofill, file_format, 
                            compression, compression_level)
                 computation_time += time.process_time()-start_time
+                if progressbar:
+                    bar.update(ii+1)
+        if progressbar:
+            print("")
         if verbose:
             print('Average saving time per image:', 
                   1000*computation_time/(ii+1), 'ms')
