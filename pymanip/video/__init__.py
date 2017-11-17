@@ -89,10 +89,11 @@ class Camera:
         cv2.namedWindow("Preview")
         try:
             for im in self.acquisition():
-                if minimum is None:
+                #if minimum is None:
+                if True:
                     minimum = np.min(im)
                     maximum = np.max(im)
-                    print('min, max:', minimum, maximum)
+                    #print('min, max:', minimum, maximum)
                 cv2.imshow("Preview", 
                     cv2.resize(((2**16-1)//(maximum-minimum))*(im-minimum), 
                                (800, 600)))
