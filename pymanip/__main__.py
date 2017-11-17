@@ -85,6 +85,12 @@ parser_video.add_argument('-b', '--board',
 parser_video.add_argument('-t', '--toolkit',
                           help='Graphical toolkit to use: cv or qt',
                           metavar='toolkit', default='cv', type=str, nargs=1)
+parser_video.add_argument('-s', '--slice',
+                          help='Slice image x0, x1, y0, y1 in pixels',
+                          metavar='slice', default=[], type=int, nargs=4)
+parser_video.add_argument('-z', '--zoom',
+                          help='Zoom factor',
+                          metavar='zoom', default=0.5, type=float, nargs=1)
                           
 # Parse arguments
 args = parser.parse_args()
@@ -111,8 +117,16 @@ elif args.command == 'video':
         tk = args.toolkit[0]
     else:
         tk = args.toolkit
+    if len(args.slice) < 4:
+        slice = None
+    else:
+        slice = args.slice
+    if isinstance(args.zoom, list):
+        zoom = args.zoom[0]
+    else:
+        zoom = args.zoom
     if args.camera_type.upper() == 'PCO':
-        preview_pco(args.board, tk)
+        preview_pco(args.board, tk, slice, zoom)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:

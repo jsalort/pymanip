@@ -8,6 +8,7 @@ Depends on :
 
 """
 
+import os
 #import gzip
 import numpy as np
 try:
@@ -77,15 +78,15 @@ class Camera:
         if hasattr(self, 'preview_generator'):
             self.preview_generator = None
             
-    def preview(self, backend='cv'):
+    def preview(self, backend='cv', slice=None, zoom=0.5):
         if backend == 'cv':
-            self.preview_cv()
+            self.preview_cv(slice, zoom)
         elif backend == 'qt':
-            self.preview_qt()
+            self.preview_qt(slice, zoom)
         else:
             raise RuntimeError('Unknown backend "' + backend + '"')
 
-    def preview_cv(self):
+    def preview_cv(self, slice, zoom):
         minimum = None
         maximum = None
         cv2.namedWindow("Preview")
@@ -96,9 +97,13 @@ class Camera:
                     minimum = np.min(im)
                     maximum = np.max(im)
                     #print('min, max:', minimum, maximum)
+                if slice:
+                    img = ((2**16-1)//(maximum-minimum))*(im[slice[0]:slice[1],slice[2]:slice[3]]-minimum)
+                else:
+                    img = ((2**16-1)//(maximum-minimum))*(im-minimum)
+                l, c = img.shape
                 cv2.imshow("Preview", 
-                    cv2.resize(((2**16-1)//(maximum-minimum))*(im-minimum), 
-                               (800, 600)))
+                    cv2.resize(img, (int(l*zoom), int(c*zoom))))
                 k = cv2.waitKey(1)
                 if k in (0x1b, ord('s')):
                     break
@@ -107,7 +112,7 @@ class Camera:
         finally: 
             cv2.destroyAllWindows()
 
-    def preview_qt(self, app=None):
+    def preview_qt(self, slice, zoom, app=None):
         if app:
             self.app = app
             just_started = False
@@ -143,7 +148,7 @@ class Camera:
             self.image_view.autoLevels()
                                  
         # set timer for refreshing in 10 ms
-        QtCore.QTimer.singleShot(10, self.preview_qt)
+        QtCore.QTimer.singleShot(10, lambda: self.preview_qt(slice, zoom))
         
         if just_started:
             QtGui.QApplication.instance().exec_()
@@ -174,6 +179,9 @@ class Camera:
 
         """
         
+        dirname = os.path.dirname(basename)
+        if len(dirname):
+            os.makedirs(dirname)
         count = []
         dt = []
         if verbose:

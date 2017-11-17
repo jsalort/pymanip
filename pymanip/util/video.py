@@ -10,10 +10,10 @@ try:
 except ModuleNotFoundError:
     has_pco = False
 
-def preview_pco(board=0, backend='cv'):
+def preview_pco(board=0, backend='cv', slice=None, zoom=0.5):
     if not has_pco:
         print('PCO bindings are not available.')
     else:
         with PCO_Camera(board) as cam:
             cam.set_trigger_mode('auto sequence')
-            cam.preview(backend)
+            cam.preview(backend, slice, zoom)
