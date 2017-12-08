@@ -219,7 +219,7 @@ class PCO_Camera(Camera):
     def acquisition(self, num=np.inf, timeout=1000, raw=False):
         """
         Multiple image acquisition
-        returns a shared memory numpy array valid only
+        yields a shared memory numpy array valid only
         before generator object cleanup.
         """
         
