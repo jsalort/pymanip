@@ -6,7 +6,7 @@ class AVT_Camera(Camera):
     # Class attributes
     system = None
     vimba = None
-    active_cameras = []
+    active_cameras = set()
     
     @classmethod
     def get_camera_list(cls):
@@ -25,12 +25,12 @@ class AVT_Camera(Camera):
         #self.info = vimba.getCameraInfo(self.cameraDesc)
         self.camera = AVT_Camera.vimba.getCamera(self.cameraDesc)
         self.camera.openCamera()
-        AVT_Camera.active_cameras.append(self)
+        AVT_Camera.active_cameras.add(self)
     
     def close(self):
         self.camera.closeCamera()
         self.camera = None
-        AVT_Camera.active_cameras.pop(self)
+        AVT_Camera.active_cameras.remove(self)
         if len(AVT_Camera.active_cameras) == 0:
             AVT_Camera.system = None
             AVT_Camera.vimba.__exit__(None, None, None)
@@ -48,6 +48,25 @@ class AVT_Camera(Camera):
         featureInfo = self.camera.getFeatureInfo(featureName)
         featDict = {field.decode('ascii') if isinstance(field, bytes) else field: getattr(featureInfo, field) for field in featureInfo.getFieldNames()}
         featDict['value'] = getattr(self.camera, featureName)
+        featDict['range'] = self.camera.getFeatureRange(featureName)
+        featDict['featureDataTypeName'] = {0: 'Unknown feature type',
+                                           1: '64 bit integer',
+                                           2: '64 bit floating point',
+                                           3: 'Enumeration feature',
+                                           4: 'String feature',
+                                           5: 'Boolean feature',
+                                           6: 'Command feature',
+                                           7: 'Raw (direct register access) feature',
+                                           8: 'Feature with no data'}[featDict['featureDataType']]
+        featDict['featureFlagsStr'] = ''
+        if featDict['featureFlags'] & 1:
+            featDict['featureFlagsStr'] += 'r' # read access
+        if featDict['featureFlags'] & 2:
+            featDict['featureFlagsStr'] += 'w' # write access
+        if featDict['featureFlags'] & 8:
+            featDict['featureFlagsStr'] += 'v' # volatile
+        if featDict['featureFlags'] & 16:
+            featDict['featureFlagsStr'] += 'm' # may change after write
         for k in featDict:
             if isinstance(featDict[k], bytes):
                 featDict[k] = featDict[k].decode('ascii')
@@ -60,6 +79,7 @@ class AVT_Camera(Camera):
         Returns an autonomous numpy array
         """
         self.camera.PixelFormat = pixelFormat.encode('ascii')
+        self.camera.AcquisitionMode = 'SingleFrame'
         self.frame = self.camera.getFrame()
         self.frame.announceFrame()
         self.camera.startCapture()
@@ -68,9 +88,8 @@ class AVT_Camera(Camera):
             self.camera.runFeatureCommand('AcquisitionStart')
             self.camera.runFeatureCommand('AcquisitionStop')
             self.frame.waitFrameCapture()
-            print(dir(self.frame))
-            print('timestamp =', self.frame.timestamp)
-            print('pixel_bytes =', self.frame.pixel_bytes)
+            # print('timestamp =', self.frame.timestamp)
+            # print('pixel_bytes =', self.frame.pixel_bytes)
             if self.frame.pixel_bytes == 1:
                 dt = np.uint8
             elif self.frame.pixel_bytes == 2:
@@ -101,10 +120,7 @@ if __name__ == '__main__':
     for l in list:
         print(l.decode('ascii'))
     
-    #with AVT_Camera(0) as cam:
-    cam = AVT_Camera(0)
-    cam.__enter__()
-    if True:
+    with AVT_Camera(0) as cam:
         # features
         for f in cam.camera_features():
             print(f)
@@ -114,7 +130,10 @@ if __name__ == '__main__':
             
         img = cam.acquisition_oneshot()
         
-        for feat in ['PixelFormat', 'SensorBits']:
+        for feat in ['PixelFormat', 'AcquisitionFrameRate', 'AcquisitionMode',
+                     'ExposureAuto', 'ExposureMode', 'ExposureTime',
+                     'IIDCMode', 'TriggerMode',
+                     'TriggerSource', 'TriggerDelay', ]:
             featDict = cam.camera_feature_info(feat)
             for k, v in featDict.items():
                 print(k, ':', v)
