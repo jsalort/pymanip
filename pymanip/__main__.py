@@ -12,7 +12,7 @@ from pymanip.util.video import preview_pco
 try:
     from pymanip.daq import DAQmx
     has_daq = True
-except ModuleNotFoundError:
+except (ModuleNotFoundError, NotImplementedError):
     has_daq = False
 
 # Create top-level parser
