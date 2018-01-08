@@ -91,6 +91,10 @@ parser_video.add_argument('-s', '--slice',
 parser_video.add_argument('-z', '--zoom',
                           help='Zoom factor',
                           metavar='zoom', default=0.5, type=float, nargs=1)
+parser_video.add_argument('-T', '--Trigger',
+                          help='Trigger mode',
+                          metavar="trigger", default=-1, type=int, nargs=1)
+                          
                           
 # Parse arguments
 args = parser.parse_args()
@@ -125,8 +129,14 @@ elif args.command == 'video':
         zoom = args.zoom[0]
     else:
         zoom = args.zoom
+    if isinstance(args.Trigger, list):
+        Trigger = args.Trigger[0]
+    else:
+        Trigger = args.Trigger
+    if Trigger == -1:
+        Trigger = None
     if args.camera_type.upper() == 'PCO':
-        preview_pco(args.board, tk, slice, zoom)
+        preview_pco(args.board, tk, slice, zoom, Trigger)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:
