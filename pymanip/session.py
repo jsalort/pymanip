@@ -433,16 +433,23 @@ class SavedSession(BaseSession):
                     else:
                         self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
                         self.cachestore[name][:] = dict_caller[name]
-         
-#    def __del__(self):
-#        print('This is SavedSession __del__ (' + str(self) + ')')
-#        if hasattr(self, 'has_cachestore') and self.has_cachestore:
-#            print('We have cachestore')
-#            self.cachestore.close()
-#            self.has_cachestore = False
-#        else:
-#            print('We have no cachestore')
-#        print('SavedSession __del__ has finished.')
+	
+    def __exit__(self, type, value, cb):
+        """ Previous versions used __del__ which is bad
+            practise because the gc triggering mechanism is
+            an implementation detail of CPython.
+            Therefore, one should either explicitly call
+            Stop() or close(), or use a context manager
+            (preferred way)
+        """
+        self.store.close()
+        self.store = None
+        self.opened = False
+        if hasattr(self, 'has_cachestore') and self.has_cachestore and self.cachestore:
+            self.cachestore.close()
+            self.has_cachestore = False
+            self.cachestore = None
+        super(SavedSession, self).__exit__(type, value, cb)
 
         
 class Session(BaseSession):
