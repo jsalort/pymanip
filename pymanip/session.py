@@ -265,7 +265,7 @@ class BaseSession(object):
         self.exited = False
         return self
 
-    def __exit__(self, type, value, cb):
+    def __exit__(self, type_, value, cb):
         self.exited = True
 
 class SavedSession(BaseSession):
