@@ -328,3 +328,6 @@ class SIFFile:
         self.f.seek(self.datastart)
         for ts in self.timestamp:
             yield ts, self.read_frame()
+
+    def __len__(self):
+        return self.timestamp.size
