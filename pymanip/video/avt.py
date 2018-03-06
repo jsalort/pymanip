@@ -26,6 +26,7 @@ class AVT_Camera(Camera):
         self.camera = AVT_Camera.vimba.getCamera(self.cameraDesc)
         self.camera.openCamera()
         AVT_Camera.active_cameras.add(self)
+        self.num = cam_num
     
     def close(self):
         self.camera.closeCamera()
@@ -106,12 +107,39 @@ class AVT_Camera(Camera):
             
         return img
         
-    def acquisition(self, num=np.inf, timeout=1000, raw=False):
+    def acquisition(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16'):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
         """
+        self.camera.PixelFormat = pixelFormat.encode('ascii')
+        self.camera.AcquisitionMode = 'Continuous'
+        self.frame = self.camera.getFrame()
+        self.frame.announceFrame()
+        self.camera.startCapture()
+        self.camera.runFeatureCommand("AcquisitionStart")
+        try:
+            count = 0
+            while count < num:
+                self.frame.queueFrameCapture()
+                self.frame.waitFrameCapture()
+                if self.frame.pixel_bytes == 1:
+                    dt = np.uint8
+                elif self.frame.pixel_bytes == 2:
+                    dt = np.uint16
+                else:
+                    raise NotImplementedError
+                yield np.ndarray(buffer=self.frame.getBufferByteData(),
+                               dtype=dt,
+                               shape=(self.frame.height, self.frame.width))
+                count += 1
+                
+        finally:
+            self.camera.runFeatureCommand("AcquisitionStop")
+            self.camera.endCapture()
+            self.camera.revokeAllFrames()
+        
         
         
         

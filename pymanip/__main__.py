@@ -8,7 +8,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
-from pymanip.util.video import preview_pco
+from pymanip.util.video import preview_pco, preview_avt
 try:
     from pymanip.daq import DAQmx
     has_daq = True
@@ -81,7 +81,7 @@ parser_video.add_argument('camera_type',
                           metavar="camera_type")
 parser_video.add_argument('-b', '--board',
                           help='Camera board address',
-                          metavar='board', default=0, type=int, nargs=1)
+                          metavar='board', default=0, type=int, nargs='+')
 parser_video.add_argument('-t', '--toolkit',
                           help='Graphical toolkit to use: cv or qt',
                           metavar='toolkit', default='cv', type=str, nargs=1)
@@ -137,6 +137,8 @@ elif args.command == 'video':
         Trigger = None
     if args.camera_type.upper() == 'PCO':
         preview_pco(args.board, tk, slice, zoom, Trigger)
+    elif args.camera_type.upper() == 'AVT':
+        preview_avt(args.board, tk, slice, zoom, Trigger)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:

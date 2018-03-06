@@ -22,6 +22,7 @@ import cv2
 import h5py
 import time
 from progressbar import ProgressBar
+import asyncio
 
 def save_image(im, ii, basename, zerofill, file_format,
                compression, compression_level):
@@ -86,10 +87,10 @@ class Camera:
         else:
             raise RuntimeError('Unknown backend "' + backend + '"')
 
-    def preview_cv(self, slice, zoom):
+    async def preview_async_cv(self, slice, zoom, name):
         minimum = None
         maximum = None
-        cv2.namedWindow("Preview")
+        cv2.namedWindow(name)
         try:
             for im in self.acquisition():
                 #if minimum is None:
@@ -102,16 +103,22 @@ class Camera:
                 else:
                     img = ((2**16-1)//(maximum-minimum))*(im-minimum)
                 l, c = img.shape
-                cv2.imshow("Preview", 
+                cv2.imshow(name, 
                     cv2.resize(img, (int(l*zoom), int(c*zoom))))
                 k = cv2.waitKey(1)
                 if k in (0x1b, ord('s')):
                     break
+                await asyncio.sleep(0.001)
         except KeyboardInterrupt:
             pass
         finally: 
             cv2.destroyAllWindows()
-
+            
+    def preview_cv(self, slice, zoom):
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.preview_async_cv(slice, zoom, name="Preview"))
+        loop.close()
+        
     def preview_qt(self, slice, zoom, app=None):
         if app:
             self.app = app
