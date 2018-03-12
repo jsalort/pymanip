@@ -16,7 +16,7 @@ class AVT_Camera(Camera):
             with Vimba() as vimba_:
                 return vimba_.getCameraIds()
         
-    def __init__(self, cam_num):
+    def __init__(self, cam_num=0):
         if not AVT_Camera.vimba:
             AVT_Camera.vimba = Vimba().__enter__()
         if not AVT_Camera.system:
@@ -27,6 +27,7 @@ class AVT_Camera(Camera):
         self.camera.openCamera()
         AVT_Camera.active_cameras.add(self)
         self.num = cam_num
+        self.name = 'AVT ' + str(cam_num)
     
     def close(self):
         self.camera.closeCamera()
