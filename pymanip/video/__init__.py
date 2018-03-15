@@ -159,12 +159,17 @@ class Camera:
         
         if just_started:
             QtGui.QApplication.instance().exec_()
-            
-    def acquire_to_files(self, num, basename, zerofill=4, 
+    
+    def acquire_to_files(self, *args, **kwargs):
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.acquire_to_files_async(*args, **kwargs))
+        loop.close()
+        
+    async def acquire_to_files_async(self, num, basename, zerofill=4, 
                          dryrun=False, file_format='png', 
                          compression=None, compression_level=3,
                          verbose=True, delay_save=False,
-                         progressbar=True):
+                         progressbar=True, initialising_cams=None):
         """
         Acquire num images and saves to disk
 
@@ -188,7 +193,10 @@ class Camera:
         
         dirname = os.path.dirname(basename)
         if len(dirname):
-            os.makedirs(dirname)
+            try:
+                os.makedirs(dirname)
+            except FileExistsError:
+                pass
         count = []
         dt = []
         if verbose:
@@ -200,7 +208,8 @@ class Camera:
             bar = ProgressBar(max_value=num)
         computation_time = 0.0
         images = list()
-        for ii, im in enumerate(self.acquisition(num)):
+        ii = 0
+        async for im in self.acquisition(num, initialising_cams=initialising_cams):
             if dryrun:
                 continue
             if delay_save:
@@ -213,8 +222,10 @@ class Camera:
             if hasattr(im, 'metadata'):
                 count.append(im.metadata['counter'])
                 dt.append(im.metadata['timestamp'])
+            ii+=1
             if progressbar:
-                bar.update(ii+1)
+                bar.update(ii)
+            await asyncio.sleep(0.001)
         if progressbar:
             print("")
         if delay_save and not dryrun:
@@ -228,11 +239,14 @@ class Camera:
                 computation_time += time.process_time()-start_time
                 if progressbar:
                     bar.update(ii+1)
+                await asyncio.sleep(0.001)
         if progressbar:
             print("")
+        dt = np.array(dt)
         if verbose:
             print('Average saving time per image:', 
                   1000*computation_time/(ii+1), 'ms')
+            print('average fps =', 1/np.mean(dt[1:]-dt[:-1]))
         return count, dt
             
             

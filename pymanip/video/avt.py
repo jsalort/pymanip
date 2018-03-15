@@ -1,6 +1,8 @@
 import numpy as np
 from pymanip.video import MetadataArray, Camera
 from pymba import Vimba
+from pymba.vimbaexception import VimbaException
+import asyncio
 
 class AVT_Camera(Camera):
     # Class attributes
@@ -108,7 +110,19 @@ class AVT_Camera(Camera):
             
         return img
         
-    def acquisition(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16'):
+    def set_trigger_mode(self, mode=False):
+        """
+        True if external trigger
+        """
+        
+        if mode:
+            self.camera.TriggerMode = 'On'
+            self.camera.TriggerSource = 'InputLines'
+        else:
+            self.camera.TriggerMode = 'Off'
+                    
+    async def acquisition(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16',
+                          framerate=None, external_trigger=False, initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
@@ -116,6 +130,12 @@ class AVT_Camera(Camera):
         """
         self.camera.PixelFormat = pixelFormat.encode('ascii')
         self.camera.AcquisitionMode = 'Continuous'
+        if framerate is not None:
+            # Not usable if HighSNRIImages>0, external triggering or IIDCPacketSizeAuto are active
+            self.camera.AcquisitionFrameRate = framerate
+        if external_trigger:
+            self.camera.TriggerMode = 'On'
+            self.camera.TriggerSource = 'InputLines'
         self.frame = self.camera.getFrame()
         self.frame.announceFrame()
         self.camera.startCapture()
@@ -124,26 +144,33 @@ class AVT_Camera(Camera):
             count = 0
             while count < num:
                 self.frame.queueFrameCapture()
-                self.frame.waitFrameCapture()
+                if count == 0 and initialising_cams is not None and self in initialising_cams:
+                    initialising_cams.remove(self)
+                errorCode = await self.frame.waitFrameCapture_async()
+                if errorCode == -12:
+                    print('')
+                    print('cam' + str(self.num) + ' timeout')
+                    break
+                elif errorCode != 0:
+                    raise VimbaException(errorCode)
                 if self.frame.pixel_bytes == 1:
                     dt = np.uint8
                 elif self.frame.pixel_bytes == 2:
                     dt = np.uint16
                 else:
                     raise NotImplementedError
-                yield np.ndarray(buffer=self.frame.getBufferByteData(),
-                               dtype=dt,
-                               shape=(self.frame.height, self.frame.width))
+                yield MetadataArray(np.ndarray(buffer=self.frame.getBufferByteData(),
+                                               dtype=dt,
+                                               shape=(self.frame.height, self.frame.width)),
+                                    metadata={'counter': count,
+                                              'timestamp': self.frame.timestamp*1e-7})
                 count += 1
                 
         finally:
             self.camera.runFeatureCommand("AcquisitionStop")
             self.camera.endCapture()
             self.camera.revokeAllFrames()
-        
-        
-        
-        
+    
 if __name__ == '__main__':
     list = AVT_Camera.get_camera_list()
     for l in list:

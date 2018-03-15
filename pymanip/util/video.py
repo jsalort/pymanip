@@ -32,10 +32,19 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
     if not has_avt:
         print('Pymba is not available.')
     else:
-        print("Press 's' to close window")
+        if backend == 'cv':
+            print("Press 's' to close window")
         if isinstance(board, list):
             with ExitStack() as stack:
                 cams = [stack.enter_context(AVT_Camera(b)) for b in board]
+                if TriggerMode:
+                    print('External trigger')
+                    for c in cams:
+                        c.set_trigger_mode(True)
+                else:
+                    print('Internal trigger')
+                    for c in cams:
+                        c.set_trigger_mode(False)
                 loop = asyncio.get_event_loop()
                 loop.run_until_complete(asyncio.gather(*[c.preview_async_cv(slice, zoom, 
                                                                             name="AVT " + str(c.num))
@@ -43,4 +52,10 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
                 loop.close()
         else:
             with AVT_Camera(board) as cam:
+                if TriggerMode:
+                    print('External trigger')
+                    cam.set_trigger_mode(True)
+                else:
+                    print('Internal trigger')
+                    cam.set_trigger_mode(False)
                 cam.preview(backend, slice, zoom)
