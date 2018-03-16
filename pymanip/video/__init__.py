@@ -23,6 +23,7 @@ import h5py
 import time
 from progressbar import ProgressBar
 import asyncio
+from pymanip.asynctools import synchronize_function
 
 def save_image(im, ii, basename, zerofill, file_format,
                compression, compression_level):
@@ -79,15 +80,15 @@ class Camera:
         if hasattr(self, 'preview_generator'):
             self.preview_generator = None
             
-    def preview(self, backend='cv', slice=None, zoom=0.5):
+    def preview(self, backend='cv', slice_=None, zoom=0.5):
         if backend == 'cv':
-            self.preview_cv(slice, zoom)
+            self.preview_cv(slice_, zoom)
         elif backend == 'qt':
-            self.preview_qt(slice, zoom)
+            self.preview_qt(slice_, zoom)
         else:
             raise RuntimeError('Unknown backend "' + backend + '"')
 
-    async def preview_async_cv(self, slice, zoom, name):
+    async def preview_async_cv(self, slice_, zoom, name):
         minimum = None
         maximum = None
         cv2.namedWindow(name)
@@ -98,8 +99,8 @@ class Camera:
                     minimum = np.min(im)
                     maximum = np.max(im)
                     #print('min, max:', minimum, maximum)
-                if slice:
-                    img = ((2**16-1)//(maximum-minimum))*(im[slice[0]:slice[1],slice[2]:slice[3]]-minimum)
+                if slice_:
+                    img = ((2**16-1)//(maximum-minimum))*(im[slice_[0]:slice_[1],slice_[2]:slice_[3]]-minimum)
                 else:
                     img = ((2**16-1)//(maximum-minimum))*(im-minimum)
                 l, c = img.shape
@@ -114,10 +115,8 @@ class Camera:
         finally: 
             cv2.destroyAllWindows()
             
-    def preview_cv(self, slice, zoom):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.preview_async_cv(slice, zoom, name="Preview"))
-        loop.close()
+    def preview_cv(self, slice_, zoom):
+        synchronize_function(self.preview_async_cv, slice_, zoom, name="Preview")
         
     def preview_qt(self, slice, zoom, app=None):
         if app:

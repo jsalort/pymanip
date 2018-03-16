@@ -1,5 +1,6 @@
 import numpy as np
 from pymanip.video import MetadataArray, Camera
+from pymanip.asynctools import synchronize_generator
 from pymba import Vimba
 from pymba.vimbaexception import VimbaException
 import asyncio
@@ -121,8 +122,13 @@ class AVT_Camera(Camera):
         else:
             self.camera.TriggerMode = 'Off'
                     
-    async def acquisition(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16',
-                          framerate=None, external_trigger=False, initialising_cams=None):
+    def acquisition(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16',
+                    framerate=None, external_trigger=False):
+        yield from synchronize_generator(self.acquisition_async, num, timeout, raw, pixelFormat,
+                                         framerate, external_trigger)
+
+    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16',
+                                framerate=None, external_trigger=False, initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
