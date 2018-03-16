@@ -116,7 +116,7 @@ class Camera:
             cv2.destroyAllWindows()
             
     def preview_cv(self, slice_, zoom):
-        synchronize_function(self.preview_async_cv, slice_, zoom, name="Preview")
+        return synchronize_function(self.preview_async_cv, slice_, zoom, name="Preview")
         
     def preview_qt(self, slice, zoom, app=None):
         if app:
@@ -160,9 +160,7 @@ class Camera:
             QtGui.QApplication.instance().exec_()
     
     def acquire_to_files(self, *args, **kwargs):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.acquire_to_files_async(*args, **kwargs))
-        loop.close()
+        return synchronize_function(self.acquire_to_files_async, *args, **kwargs)
         
     async def acquire_to_files_async(self, num, basename, zerofill=4, 
                          dryrun=False, file_format='png', 
@@ -208,7 +206,7 @@ class Camera:
         computation_time = 0.0
         images = list()
         ii = 0
-        async for im in self.acquisition(num, initialising_cams=initialising_cams):
+        async for im in self.acquisition_async(num, initialising_cams=initialising_cams):
             if dryrun:
                 continue
             if delay_save:

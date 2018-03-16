@@ -23,8 +23,9 @@ def synchronize_function(async_func, *args, **kwargs):
     """
 
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(async_func(*args, **kwargs))
+    r = loop.run_until_complete(async_func(*args, **kwargs))
     loop.close()
+    return r
 
 if __name__ == '__main__':
     
@@ -41,10 +42,12 @@ if __name__ == '__main__':
         for i in range(x):
             print(i)
             await asyncio.sleep(0.5)
+        return i
 
-    synchronize_function(f, 5)
-    synchronize_function(f, 3)
-
+    a = synchronize_function(f, 5)
+    b = synchronize_function(f, 3)
+    print(b)
+    
     def sync_spam(n):
         yield from synchronize_generator(spam, n)
 
