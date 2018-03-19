@@ -4,6 +4,7 @@ from pymanip.asynctools import synchronize_generator
 from pymba import Vimba
 from pymba.vimbaexception import VimbaException
 import asyncio
+import sys
 
 class AVT_Camera(Camera):
     # Class attributes
@@ -19,7 +20,7 @@ class AVT_Camera(Camera):
             with Vimba() as vimba_:
                 return vimba_.getCameraIds()
         
-    def __init__(self, cam_num=0):
+    def __init__(self, cam_num=0, pixelFormat='Mono16'):
         if not AVT_Camera.vimba:
             AVT_Camera.vimba = Vimba().__enter__()
         if not AVT_Camera.system:
@@ -31,7 +32,17 @@ class AVT_Camera(Camera):
         AVT_Camera.active_cameras.add(self)
         self.num = cam_num
         self.name = 'AVT ' + str(cam_num)
-    
+        self.model_name = self.camera.DeviceModelName.decode('ascii')
+        print('cam' + str(self.num) + ':', self.model_name)
+        # par défaut, on démarre en Mode 0 avec la résolution maximale à la création de
+        # l'objet
+        self.camera.pixelFormat = pixelFormat
+        self.camera.IIDCMode = 'Mode0'
+        self.camera.Width = self.camera.WidthMax
+        self.camera.Height = self.camera.HeightMax
+        print('cam' + str(self.num) + ': maximum resolution is', self.camera.Width, 'x', self.camera.Height)
+        print('cam' + str(self.num) + ': maximum framerate is', self.camera_feature_info('AcquisitionFrameRate')['range'][1])
+        
     def close(self):
         self.camera.closeCamera()
         self.camera = None
@@ -113,28 +124,36 @@ class AVT_Camera(Camera):
         
     def set_trigger_mode(self, mode=False):
         """
-        True if external trigger
+        True if external trigger. Then also sets IIDCPacketSizeAuto to 'Maximize'
         """
         
         if mode:
             self.camera.TriggerMode = 'On'
             self.camera.TriggerSource = 'InputLines'
+            self.camera.IIDCPacketSizeAuto = 'Maximize'
         else:
             self.camera.TriggerMode = 'Off'
+            
+    def set_exposure_time(self, seconds):
+        """
+        Range: from 33.0 to 67108895.0
+        """
+        self.camera.ExposureMode = 'Timed'
+        self.camera.ExposureTime = seconds*1e6
                     
-    def acquisition(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16',
+    def acquisition(self, num=np.inf, timeout=1000, raw=False,
                     framerate=None, external_trigger=False):
         yield from synchronize_generator(self.acquisition_async, num, timeout, raw, pixelFormat,
                                          framerate, external_trigger)
 
-    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False, pixelFormat='Mono16',
+    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
                                 framerate=None, external_trigger=False, initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
         """
-        self.camera.PixelFormat = pixelFormat.encode('ascii')
+        
         self.camera.AcquisitionMode = 'Continuous'
         if framerate is not None:
             # Not usable if HighSNRIImages>0, external triggering or IIDCPacketSizeAuto are active
@@ -178,28 +197,35 @@ class AVT_Camera(Camera):
             self.camera.revokeAllFrames()
     
 if __name__ == '__main__':
+    try:
+        output = open(sys.argv[1], 'w')
+    except IndexError:
+        output = sys.stdout
+    
     list = AVT_Camera.get_camera_list()
     for l in list:
-        print(l.decode('ascii'))
+        print(l.decode('ascii'), file=output)
     
     with AVT_Camera(0) as cam:
         # features
         for f in cam.camera_features():
-            print(f)
+            print(f, file=output)
 
-        print('-'*8)
+        print('-'*8, file=output)
         
             
         img = cam.acquisition_oneshot()
         
         for feat in ['PixelFormat', 'AcquisitionFrameRate', 'AcquisitionMode',
                      'ExposureAuto', 'ExposureMode', 'ExposureTime',
-                     'IIDCMode', 'TriggerMode',
-                     'TriggerSource', 'TriggerDelay', ]:
+                     'IIDCMode', 'IIDCIsoChannel', 'IIDCPacketSize', 'IIDCPacketSizeAuto',
+                     'IIDCPhyspeed', 'TriggerMode',
+                     'TriggerSource', 'TriggerDelay', 'Gain', 'GainAuto', 'GainSelector',
+                     'Width', 'WidthMax', 'Height', 'HeightMax', 'HighSNRImages']:
             featDict = cam.camera_feature_info(feat)
             for k, v in featDict.items():
-                print(k, ':', v)
-            print('-'*8)
+                print(k, ':', v, file=output)
+            print('-'*8, file=output)
         
         
     import matplotlib.pyplot as plt

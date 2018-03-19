@@ -166,7 +166,7 @@ class Camera:
                          dryrun=False, file_format='png', 
                          compression=None, compression_level=3,
                          verbose=True, delay_save=False,
-                         progressbar=True, initialising_cams=None):
+                         progressbar=True, initialising_cams=None, **kwargs):
         """
         Acquire num images and saves to disk
 
@@ -206,7 +206,7 @@ class Camera:
         computation_time = 0.0
         images = list()
         ii = 0
-        async for im in self.acquisition_async(num, initialising_cams=initialising_cams):
+        async for im in self.acquisition_async(num, initialising_cams=initialising_cams, **kwargs):
             if dryrun:
                 continue
             if delay_save:
@@ -236,7 +236,7 @@ class Camera:
                 computation_time += time.process_time()-start_time
                 if progressbar:
                     bar.update(ii+1)
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.0001)
         if progressbar:
             print("")
         dt = np.array(dt)
@@ -244,6 +244,8 @@ class Camera:
             print('Average saving time per image:', 
                   1000*computation_time/(ii+1), 'ms')
             print('average fps =', 1/np.mean(dt[1:]-dt[:-1]))
+            print('image size:', images[0].shape)
+            print('image dtype:', images[0].dtype)
         return count, dt
             
             
