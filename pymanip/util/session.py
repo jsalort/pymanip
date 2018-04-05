@@ -6,6 +6,7 @@ This module defines utility function to interact with pymanip sessions
 
 import sys
 import time
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,6 +19,8 @@ except ModuleNotFoundError:
     has_panda = False
 from pymanip.collection import Manip
 from pymanip import Session, SavedSession
+from pymanip.asyncsession import AsyncSession
+
 
 def manip_info(sessionName, quiet, line_to_print, var_to_plot):
     """
@@ -26,6 +29,26 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
 
     It can be accessed from the CLI tool ManipInfo
     """
+
+    if os.path.exists(sessionName + '.db'):
+        with AsyncSession(sessionName) as sesn:
+            print(sessionName, 'is an asynchroneous session.')
+            params = sesn.parameters()
+            if params:
+                print('Parameters')
+                print('==========')
+                for key, val in sesn.parameters().items():
+                    print(key, ':', val)
+                print()
+            logged_var = sesn.logged_variables()
+            if logged_var:
+                print('Logged variables')
+                print('================')
+                for v in sorted(logged_var):
+                    print(v)
+            else:
+                print('No logged variable')
+        return
 
     if sessionName.endswith('.hdf5'):
         N = len(sessionName)
@@ -44,11 +67,12 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
         print('-'*38)
         for varname in varlist:
             valtab = MI.log(varname)
-            if isinstance(valtab, (float, int) ):
+            if isinstance(valtab, (float, int)):
                 # might occur if only one line
                 print(format_str.format(varname, MI.log(varname)))
             else:
-                print(format_str.format(varname, MI.log(varname)[line_to_print]))
+                print(format_str.format(varname,
+                                        MI.log(varname)[line_to_print]))
     elif not quiet:
         MI.describe()
     if var_to_plot is not None:
@@ -70,6 +94,7 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
         else:
             print('Variable', var_to_plot, 'does not exist!')
             sys.exit(1)
+
 
 def check_hdf(acqName, variable_to_plot):
     """
@@ -97,7 +122,7 @@ def check_hdf(acqName, variable_to_plot):
 
     varlist = ['Time']
     varlist += MI.log_variable_list()
-    
+
     # First line
     print('Printing first line.')
     format_str = '{:>15} | {:>20} | {:>20}'
@@ -107,7 +132,7 @@ def check_hdf(acqName, variable_to_plot):
         data_hdf = MI.log(varname)[0]
         data_dat = data[varname].values[0]
         print(format_str.format(varname, data_hdf, data_dat))
-        
+
     # Comparaison
     length_warning_done = False
     for varname in varlist:
@@ -128,7 +153,8 @@ def check_hdf(acqName, variable_to_plot):
         if bb.any():
             print('Data differs for variable ' + varname)
             index = np.min(bb.argmax())
-            print('On line', index, ': HDF=', var_hdf[index], 'DAT=', var_dat[index])
+            print('On line', index, ': HDF=', var_hdf[index],
+                  'DAT=', var_dat[index])
         else:
             print('Identical data for variable ' + varname)
 
@@ -152,6 +178,7 @@ def check_hdf(acqName, variable_to_plot):
 
         plt.show()
 
+
 def rebuild_from_dat(inputDatfile, outputSessionName):
     """
     Rebuilds a pymanip HDF5 file from the ASCII dat file.
@@ -161,11 +188,11 @@ def rebuild_from_dat(inputDatfile, outputSessionName):
         print('Pandas is not available.')
     else:
         with inputDatfile.open() as in_f:
-            data = pd.read_csv(in_f, sep=' ')        
+            data = pd.read_csv(in_f, sep=' ')
             liste_var = list(data.keys())
             liste_var.remove('Time')
             MI = Session(outputSessionName, liste_var)
             for line in data.iterrows():
-                MI.log_addline(timestamp=line[1].Time, 
+                MI.log_addline(timestamp=line[1].Time,
                                dict_caller=dict(line[1]))
             MI.Stop()
