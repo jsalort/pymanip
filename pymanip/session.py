@@ -147,6 +147,9 @@ class BaseSession(object):
     def dataset(self, name):
         if self.grp_datasets_defined:
             return self.grp_datasets[name].value
+            
+    def dataset_names(self):
+        return self.grp_datasets.keys()
 
     def has_parameter(self, name):
         if self.parameters_defined:
