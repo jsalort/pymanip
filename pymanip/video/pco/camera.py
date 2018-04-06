@@ -12,6 +12,8 @@ import datetime
 import win32event
 
 import numpy as np
+import asyncio
+from pymanip.asynctools import synchronize_generator
 
 from pymanip.video import MetadataArray, Camera
 from . import pixelfly as pf
@@ -217,12 +219,17 @@ class PCO_Camera(Camera):
         return array
     
     def acquisition(self, num=np.inf, timeout=1000, raw=False):
+        yield from synchronize_generator(self.acquisition_async,num, timeout, raw)
+		
+    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False, initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
         """
         
+        loop = asyncio.get_event_loop()
+		
         # Arm camera
         if pf.PCO_GetRecordingState(self.handle):
             pf.PCO_SetRecordingState(self.handle, False)
@@ -247,12 +254,17 @@ class PCO_Camera(Camera):
                 count = 0
                 buffer_ring = itertools.cycle(buffers)
                 while count < num:
-                    waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
-                                                                 0, timeout)
+                    #waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
+                    #                                             0, timeout)
+                    waitstat = await loop.run_in_executor(None, 
+                                                          win32event.WaitForMultipleObjects,
+                                                          [buffer.event_handle for buffer in buffers], 0, timeout)											 
                     if waitstat == win32event.WAIT_TIMEOUT:
                         raise RuntimeError('Timeout')
                     for ii, buffer in zip(range(4), buffer_ring):
-                        waitstat = win32event.WaitForSingleObject(buffer.event_handle, 0)
+                        waitstat = await loop.run_in_executor(None,
+														      win32event.WaitForSingleObject,
+															  buffer.event_handle, 0)
                         if waitstat == win32event.WAIT_OBJECT_0:
                             win32event.ResetEvent(buffer.event_handle)
                             statusDLL, statusDrv = pf.PCO_GetBufferStatus(self.handle, buffer.bufNr)

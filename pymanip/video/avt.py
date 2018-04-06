@@ -36,12 +36,12 @@ class AVT_Camera(Camera):
         print('cam' + str(self.num) + ':', self.model_name)
         # par défaut, on démarre en Mode 0 avec la résolution maximale à la création de
         # l'objet
-        self.camera.pixelFormat = pixelFormat
         self.camera.IIDCMode = 'Mode0'
         self.camera.Width = self.camera.WidthMax
         self.camera.Height = self.camera.HeightMax
         print('cam' + str(self.num) + ': maximum resolution is', self.camera.Width, 'x', self.camera.Height)
         print('cam' + str(self.num) + ': maximum framerate is', self.camera_feature_info('AcquisitionFrameRate')['range'][1])
+        self.camera.PixelFormat = pixelFormat.encode('ascii')
         
     def close(self):
         self.camera.closeCamera()
@@ -89,12 +89,12 @@ class AVT_Camera(Camera):
         return featDict
         
     # Image acquisition
-    def acquisition_oneshot(self, pixelFormat='Mono16'):
+    def acquisition_oneshot(self):
         """
         Simple one shot image grabbing.
         Returns an autonomous numpy array
         """
-        self.camera.PixelFormat = pixelFormat.encode('ascii')
+        
         self.camera.AcquisitionMode = 'SingleFrame'
         self.frame = self.camera.getFrame()
         self.frame.announceFrame()
@@ -143,7 +143,7 @@ class AVT_Camera(Camera):
                     
     def acquisition(self, num=np.inf, timeout=1000, raw=False,
                     framerate=None, external_trigger=False):
-        yield from synchronize_generator(self.acquisition_async, num, timeout, raw, pixelFormat,
+        yield from synchronize_generator(self.acquisition_async, num, timeout, raw,
                                          framerate, external_trigger)
 
     async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
@@ -219,9 +219,10 @@ if __name__ == '__main__':
         for feat in ['PixelFormat', 'AcquisitionFrameRate', 'AcquisitionMode',
                      'ExposureAuto', 'ExposureMode', 'ExposureTime',
                      'IIDCMode', 'IIDCIsoChannel', 'IIDCPacketSize', 'IIDCPacketSizeAuto',
-                     'IIDCPhyspeed', 'TriggerMode',
-                     'TriggerSource', 'TriggerDelay', 'Gain', 'GainAuto', 'GainSelector',
-                     'Width', 'WidthMax', 'Height', 'HeightMax', 'HighSNRImages']:
+                     #'IIDCPhyspeed', 'TriggerMode',
+                     #'TriggerSource', 'TriggerDelay', 'Gain', 'GainAuto', 'GainSelector',
+                     #'Width', 'WidthMax', 'Height', 'HeightMax', 'HighSNRImages'
+                     ]:
             featDict = cam.camera_feature_info(feat)
             for k, v in featDict.items():
                 print(k, ':', v, file=output)

@@ -34,6 +34,8 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
     else:
         if backend == 'cv':
             print("Press 's' to close window")
+        if isinstance(board, list) and len(board) == 1:
+            board = board[0]
         if isinstance(board, list):
             with ExitStack() as stack:
                 cams = [stack.enter_context(AVT_Camera(b)) for b in board]

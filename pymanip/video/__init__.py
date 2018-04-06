@@ -93,16 +93,17 @@ class Camera:
         maximum = None
         cv2.namedWindow(name)
         try:
-            for im in self.acquisition():
+            async for im in self.acquisition_async():
                 #if minimum is None:
                 if True:
                     minimum = np.min(im)
                     maximum = np.max(im)
                     #print('min, max:', minimum, maximum)
+                maxint = np.iinfo(im.dtype).max
                 if slice_:
-                    img = ((2**16-1)//(maximum-minimum))*(im[slice_[0]:slice_[1],slice_[2]:slice_[3]]-minimum)
+                    img = (maxint//(maximum-minimum))*(im[slice_[0]:slice_[1],slice_[2]:slice_[3]]-minimum)
                 else:
-                    img = ((2**16-1)//(maximum-minimum))*(im-minimum)
+                    img = (maxint//(maximum-minimum))*(im-minimum)
                 l, c = img.shape
                 cv2.imshow(name, 
                     cv2.resize(img, (int(l*zoom), int(c*zoom))))
@@ -209,6 +210,8 @@ class Camera:
         async for im in self.acquisition_async(num, initialising_cams=initialising_cams, **kwargs):
             if dryrun:
                 continue
+            if ii == 0:
+                print(im.dtype)
             if delay_save:
                 images.append(im.copy())
             else:
@@ -218,7 +221,7 @@ class Camera:
                 computation_time += time.process_time()-start_time
             if hasattr(im, 'metadata'):
                 count.append(im.metadata['counter'])
-                dt.append(im.metadata['timestamp'])
+                dt.append(im.metadata['timestamp'].timestamp())
             ii+=1
             if progressbar:
                 bar.update(ii)
