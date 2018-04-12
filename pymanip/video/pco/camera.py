@@ -160,7 +160,42 @@ class PCO_Camera(Camera):
             else:
                 raise ValueError('Unknown trigger mode : ' + str(mode))
             pf.PCO_SetTriggerMode(self.handle, key)
-                
+    
+    def set_delay_exposuretime(self, delay=None, exposuretime=None):
+        """
+        delay and exposuretime in seconds
+        """
+        if delay is None or exposuretime is None:
+            delay_current, exposure_current, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(self.handle)
+        if delay is None:
+            delay = delay_current
+        else:
+            delay = delay*1000
+            tb_delay = 0x0002
+            if delay < 1.0:
+                delay = delay*1000
+                tb_delay = 0x0001
+                if delay < 1.0:
+                    delay = delay*1000
+                    tb_delay = 0x0000
+        if exposuretime is None:
+            exposuretime = exposure_current
+        else:
+            exposuretime = exposuretime*1000
+            tb_exposure = 0x0002
+            if exposuretime < 1.0:
+                exposuretime = exposuretime*1000
+                tb_exposure = 0x0001
+                if exposuretime < 1.0:
+                    exposuretime = exposuretime*1000
+                    tb_exposure = 0x0000
+        units = {0x0000: 'ns',
+                 0x0001: 'µs',
+                 0x0002: 'ms'}
+        print('Setting delay to', int(delay), units[tb_delay])
+        print('Setting exposure time to', int(exposuretime), units[tb_exposure])
+        pf.PCO_SetDelayExposureTime(self.handle, int(delay), int(exposuretime), tb_delay, tb_exposure)
+        
     # Properties
     @property
     def resolution(self):

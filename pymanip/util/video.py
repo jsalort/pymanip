@@ -17,7 +17,7 @@ except ModuleNotFoundError:
 from contextlib import ExitStack
 import asyncio
 
-def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
+def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=20):
     if not has_pco:
         print('PCO bindings are not available.')
     else:
@@ -26,6 +26,7 @@ def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
                 cam.set_trigger_mode(TriggerMode)
             else:
                 cam.set_trigger_mode('auto sequence')
+            cam.set_delay_exposuretime(exposuretime=exposure_ms/1000)
             cam.preview(backend, slice, zoom)
 
 def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
