@@ -12,6 +12,8 @@ import datetime
 import win32event
 
 import numpy as np
+import asyncio
+from pymanip.asynctools import synchronize_generator
 
 from pymanip.video import MetadataArray, Camera
 from . import pixelfly as pf
@@ -158,7 +160,42 @@ class PCO_Camera(Camera):
             else:
                 raise ValueError('Unknown trigger mode : ' + str(mode))
             pf.PCO_SetTriggerMode(self.handle, key)
-                
+    
+    def set_delay_exposuretime(self, delay=None, exposuretime=None):
+        """
+        delay and exposuretime in seconds
+        """
+        if delay is None or exposuretime is None:
+            delay_current, exposure_current, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(self.handle)
+        if delay is None:
+            delay = delay_current
+        else:
+            delay = delay*1000
+            tb_delay = 0x0002
+            if delay < 1.0:
+                delay = delay*1000
+                tb_delay = 0x0001
+                if delay < 1.0:
+                    delay = delay*1000
+                    tb_delay = 0x0000
+        if exposuretime is None:
+            exposuretime = exposure_current
+        else:
+            exposuretime = exposuretime*1000
+            tb_exposure = 0x0002
+            if exposuretime < 1.0:
+                exposuretime = exposuretime*1000
+                tb_exposure = 0x0001
+                if exposuretime < 1.0:
+                    exposuretime = exposuretime*1000
+                    tb_exposure = 0x0000
+        units = {0x0000: 'ns',
+                 0x0001: 'µs',
+                 0x0002: 'ms'}
+        print('Setting delay to', int(delay), units[tb_delay])
+        print('Setting exposure time to', int(exposuretime), units[tb_exposure])
+        pf.PCO_SetDelayExposureTime(self.handle, int(delay), int(exposuretime), tb_delay, tb_exposure)
+        
     # Properties
     @property
     def resolution(self):
@@ -217,12 +254,17 @@ class PCO_Camera(Camera):
         return array
     
     def acquisition(self, num=np.inf, timeout=1000, raw=False):
+        yield from synchronize_generator(self.acquisition_async,num, timeout, raw)
+		
+    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False, initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
         """
         
+        loop = asyncio.get_event_loop()
+		
         # Arm camera
         if pf.PCO_GetRecordingState(self.handle):
             pf.PCO_SetRecordingState(self.handle, False)
@@ -247,12 +289,17 @@ class PCO_Camera(Camera):
                 count = 0
                 buffer_ring = itertools.cycle(buffers)
                 while count < num:
-                    waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
-                                                                 0, timeout)
+                    #waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
+                    #                                             0, timeout)
+                    waitstat = await loop.run_in_executor(None, 
+                                                          win32event.WaitForMultipleObjects,
+                                                          [buffer.event_handle for buffer in buffers], 0, timeout)											 
                     if waitstat == win32event.WAIT_TIMEOUT:
                         raise RuntimeError('Timeout')
                     for ii, buffer in zip(range(4), buffer_ring):
-                        waitstat = win32event.WaitForSingleObject(buffer.event_handle, 0)
+                        waitstat = await loop.run_in_executor(None,
+														      win32event.WaitForSingleObject,
+															  buffer.event_handle, 0)
                         if waitstat == win32event.WAIT_OBJECT_0:
                             win32event.ResetEvent(buffer.event_handle)
                             statusDLL, statusDrv = pf.PCO_GetBufferStatus(self.handle, buffer.bufNr)

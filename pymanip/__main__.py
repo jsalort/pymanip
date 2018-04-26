@@ -94,6 +94,9 @@ parser_video.add_argument('-z', '--zoom',
 parser_video.add_argument('-T', '--Trigger',
                           help='Trigger mode',
                           metavar="trigger", default=-1, type=int, nargs=1)
+parser_video.add_argument('-e', '--exposure',
+                          help='Exposure time (ms)',
+                          metavar='exposure_ms', default=20, type=float, nargs=1)
                           
                           
 # Parse arguments
@@ -135,8 +138,12 @@ elif args.command == 'video':
         Trigger = args.Trigger
     if Trigger == -1:
         Trigger = None
+    if isinstance(args.exposure, list):
+        exposure_ms = args.exposure[0]
+    else:
+        exposure_ms = args.exposure
     if args.camera_type.upper() == 'PCO':
-        preview_pco(args.board, tk, slice, zoom, Trigger)
+        preview_pco(args.board, tk, slice, zoom, Trigger, exposure_ms)
     elif args.camera_type.upper() == 'AVT':
         preview_avt(args.board, tk, slice, zoom, Trigger)
     else:
