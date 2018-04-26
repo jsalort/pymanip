@@ -5,6 +5,7 @@ PCO PixelFly Wrapper
 """
 
 import ctypes
+import ctypes.wintypes
 from enum import IntEnum
 from typing import Tuple, Iterable
 import datetime
@@ -1272,6 +1273,7 @@ def PCO_GetPixelRate(handle):
     return rate.value
     
 if __name__ == '__main__':
+    from pymanip.video.pco import PCO_Exception
     try:
         h = PCO_OpenCamera()
         info = PCO_GetInfoString(h)
