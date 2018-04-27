@@ -1273,7 +1273,6 @@ def PCO_GetPixelRate(handle):
     return rate.value
     
 if __name__ == '__main__':
-    from pymanip.video.pco import PCO_Exception
     try:
         h = PCO_OpenCamera()
         info = PCO_GetInfoString(h)
@@ -1282,8 +1281,8 @@ if __name__ == '__main__':
         print(general)
         sensor = PCO_GetSensorStruct(h)
         print(sensor)
-    except PCO_Exception as pe:
-        print('Error: "', pe.GetErrorText(), '"')
+    except PCO_Error as pe:
+        print('Error: "', pe.args[0], '"')
     finally:
         PCO_CloseCamera(h)
         print('Camera closed')
