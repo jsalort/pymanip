@@ -221,7 +221,12 @@ class Camera:
                 computation_time += time.process_time()-start_time
             if hasattr(im, 'metadata'):
                 count.append(im.metadata['counter'])
-                dt.append(im.metadata['timestamp'].timestamp())
+                ts = im.metadata['timestamp']
+                try:
+                    ts = ts.timestamp()
+                except AttributeError:
+                    pass
+                dt.append(ts)
             ii+=1
             if progressbar:
                 bar.update(ii)
