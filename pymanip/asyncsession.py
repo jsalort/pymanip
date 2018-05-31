@@ -184,7 +184,7 @@ class AsyncSession:
                         xlim = ax.get_xlim()
                         ylim = ax.get_ylim()
                         if xlim[1] < x[-1]:
-                            ax.set_xlim((0,x[-1]))
+                            ax.set_xlim((x[0],x[-1]))
                         if ylim[1] < np.max(y) or ylim[0] > np.min(y):
                             ylim = (min((ylim[0],np.min(y))),
                                     max((ylim[1],np.max(y))))
