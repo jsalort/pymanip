@@ -237,7 +237,7 @@ class AsyncSession:
         sys.stdout.write("\n")
 
     async def server_main_page(self, request):
-        print('Got request for server main page')
+        print(request.remote, request.method, request.rel_url)
         data = self.logged_last_values()
         return web.Response(text=str(data))
 
@@ -253,7 +253,8 @@ class AsyncSession:
         # web server
         app = web.Application(loop=loop)
         app.router.add_routes([web.get('/', self.server_main_page)])
-        webserver = loop.create_server(app.make_handler(), '127.0.0.1', 6913)
+        webserver = loop.create_server(app.make_handler(), 
+                                       host=None, port=6913)
 
         loop.run_until_complete(asyncio.gather(webserver, *tasks))
 
