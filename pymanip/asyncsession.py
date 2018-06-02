@@ -9,6 +9,7 @@ import signal
 import functools
 import time
 import sys
+import os.path
 
 import sqlite3
 from datetime import datetime
@@ -19,6 +20,8 @@ import matplotlib.pyplot as plt
 import asyncio
 import aiohttp
 from aiohttp import web
+import aiohttp_jinja2
+import jinja2
 
 __all__ = ['AsyncSession']
 
@@ -237,9 +240,11 @@ class AsyncSession:
         sys.stdout.write("\n")
 
     async def server_main_page(self, request):
-        print(request.remote, request.method, request.rel_url)
-        data = self.logged_last_values()
-        return web.Response(text=str(data))
+        context = self.logged_last_values()
+        response = aiohttp_jinja2.render_template('main.html',
+                                                  request,
+                                                  context)
+        return response
 
     def run(self, *tasks):
         loop = asyncio.get_event_loop()
@@ -252,6 +257,10 @@ class AsyncSession:
 
         # web server
         app = web.Application(loop=loop)
+        template_dir = os.path.join(os.path.dirname(__file__),
+                                    'web')
+        aiohttp_jinja2.setup(app,
+                             loader=jinja2.FileSystemLoader(template_dir))
         app.router.add_routes([web.get('/', self.server_main_page)])
         webserver = loop.create_server(app.make_handler(), 
                                        host=None, port=6913)
