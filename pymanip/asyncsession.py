@@ -23,6 +23,11 @@ from aiohttp import web
 import aiohttp_jinja2
 import jinja2
 
+try:
+    import PyQt5.QtCore
+except ModuleNotFoundError:
+    pass
+
 __all__ = ['AsyncSession']
 
 
@@ -133,10 +138,13 @@ class AsyncSession:
     def parameter(self, name):
         with self.conn as conn:
             c = conn.cursor()
-            c.execute('SELECT * FROM parameters WHERE name=?;', name)
+            c.execute("""
+                      SELECT value FROM parameters 
+                      WHERE name='{:}';
+                      """.format(name))
             data = c.fetchone()
             if data:
-                return data['value']
+                return data[0]
         return None
 
     def has_parameter(self, name):
@@ -152,7 +160,10 @@ class AsyncSession:
     def __getitem__(self, key):
         with self.conn as conn:
             c = conn.cursor()
-            c.execute('SELECT timestamp, value FROM log WHERE name=?;', key)
+            c.execute("""
+                      SELECT timestamp, value FROM log 
+                      WHERE name='{:}';
+                      """.format(key))
             data = c.fetchall()
         t = np.array([d[0] for d in data])
         v = np.array([d[1] for d in data])
@@ -161,9 +172,20 @@ class AsyncSession:
     async def plot(self, varnames, maxvalues=1000):
         if isinstance(varnames, str):
             varnames = (varnames,)
+        param_key_window = '_window_' + '_'.join(varnames)
+        param_key_figsize = '_figsize_' + '_'.join(varnames)
         last_update = {k: 0 for k in varnames}
+        saved_geom = self.parameter(param_key_window)
+        if saved_geom:
+            saved_geom = eval(saved_geom)
+        saved_figsize = self.parameter(param_key_figsize)
+        if saved_figsize:
+            saved_figsize = eval(saved_figsize)
         plt.ion()
-        fig = plt.figure()
+        fig = plt.figure(figsize=saved_figsize)
+        mngr = fig.canvas.manager
+        if saved_geom:
+            mngr.window.setGeometry(saved_geom)
         ax = fig.add_subplot(111)
         initial_timestamps = dict()
         line_objects = dict()
@@ -204,12 +226,19 @@ class AsyncSession:
                         p, = ax.plot(x,y, 'o-', label=name)
                         line_objects[name] = p
                         ax.set_xlabel('t [h]')
+                        ax.set_xlim((x[0],x[-1]))
                     last_update[name] = ts[-1]
-            ax.legend()
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                plt.pause(0.0001)
+                ax.legend()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    plt.pause(0.0001)
             await asyncio.sleep(1)
+        
+        # Saving figure positions
+        geom = mngr.window.geometry()
+        figsize = tuple(fig.get_size_inches())
+        self.save_parameter(**{param_key_window: str(geom),
+                               param_key_figsize: str(figsize)})
 
     #def plot(self, name, num=1):
     #    ts, vs = self[name]
@@ -222,22 +251,24 @@ class AsyncSession:
     #        warnings.simplefilter("ignore")
     #        plt.pause(0.0001)
 
-    def ask_exit(self):
+    def ask_exit(self, *args, **kwargs):
         self.running = False
         print(' Signal caught... stopping...')
 
     async def sleep(self, duration, verbose=True):
         start = time.monotonic()
         while self.running and time.monotonic()-start < duration:
-            print("Sleeping for " +\
-                  str(-int(time.monotonic()-start-duration)) +\
-                  " s" + " "*8, end='\r')
-            sys.stdout.flush()
+            if verbose:
+                print("Sleeping for " +\
+                      str(-int(time.monotonic()-start-duration)) +\
+                      " s" + " "*8, end='\r')
+                sys.stdout.flush()
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 plt.pause(1.0)
             await asyncio.sleep(0.2)
-        sys.stdout.write("\n")
+        if verbose:
+            sys.stdout.write("\n")
 
     async def server_main_page(self, request):
         context = self.logged_last_values()
@@ -246,14 +277,22 @@ class AsyncSession:
                                                   context)
         return response
 
+    async def mytask(self, corofunc):
+        while self.running:
+            await corofunc(self)
+            
     def run(self, *tasks):
         loop = asyncio.get_event_loop()
 
         # signal handling
         self.running = True
-        for signame in ('SIGINT', 'SIGTERM'):
-            loop.add_signal_handler(getattr(signal, signame),
-                                    self.ask_exit)
+        if sys.platform == 'win32':
+            # loop.add_signal_handler raises NotImplementedError
+            signal.signal(signal.SIGINT, self.ask_exit)
+        else:
+            for signame in ('SIGINT', 'SIGTERM'):
+                loop.add_signal_handler(getattr(signal, signame),
+                                        self.ask_exit)
 
         # web server
         app = web.Application(loop=loop)
@@ -265,7 +304,17 @@ class AsyncSession:
         webserver = loop.create_server(app.make_handler(), 
                                        host=None, port=6913)
 
-        loop.run_until_complete(asyncio.gather(webserver, *tasks))
+        # if any of the tasks submitted are coroutinefunctions instead of
+        # coroutines, then assume they take only one argument (self)
+        tasks_final = list()
+        for t in tasks:
+            if asyncio.iscoroutinefunction(t):
+                tasks_final.append(self.mytask(t))
+            elif asyncio.iscoroutine(t):
+                tasks_final.append(t)
+            else:
+                raise TypeError('Coroutine or Coroutinefunction is expected')
+        loop.run_until_complete(asyncio.gather(webserver, *tasks_final))
 
         
 
