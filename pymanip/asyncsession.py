@@ -169,7 +169,7 @@ class AsyncSession:
         v = np.array([d[1] for d in data])
         return t, v
 
-    async def plot(self, varnames, maxvalues=1000):
+    async def plot(self, varnames, maxvalues=1000, yscale=None):
         if isinstance(varnames, str):
             varnames = (varnames,)
         param_key_window = '_window_' + '_'.join(varnames)
@@ -227,11 +227,13 @@ class AsyncSession:
                         line_objects[name] = p
                         ax.set_xlabel('t [h]')
                         ax.set_xlim((x[0],x[-1]))
+                        if yscale:
+                            ax.set_yscale(yscale)
                     last_update[name] = ts[-1]
-                ax.legend()
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    plt.pause(0.0001)
+                    ax.legend()
+                #with warnings.catch_warnings():
+                #    warnings.simplefilter("ignore")
+                #    plt.pause(0.0001)
             await asyncio.sleep(1)
         
         # Saving figure positions
@@ -263,10 +265,13 @@ class AsyncSession:
                       str(-int(time.monotonic()-start-duration)) +\
                       " s" + " "*8, end='\r')
                 sys.stdout.flush()
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                plt.pause(1.0)
-            await asyncio.sleep(0.2)
+            if verbose:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    plt.pause(0.7)
+                await asyncio.sleep(0.3)
+            else:
+                await asyncio.sleep(1.0)
         if verbose:
             sys.stdout.write("\n")
 
