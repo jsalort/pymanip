@@ -6,7 +6,6 @@ monitoring, where each variable can be logged with its own timestamp.
 """
 
 import signal
-import functools
 import time
 import sys
 import os.path
@@ -18,7 +17,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import asyncio
-import aiohttp
 from aiohttp import web
 import aiohttp_jinja2
 import jinja2
@@ -33,10 +31,13 @@ __all__ = ['AsyncSession']
 
 class AsyncSession:
 
-    def __init__(self, session_name, variable_list=None):
+    def __init__(self, session_name=None, variable_list=None):
         if variable_list is None:
             variable_list = []
-        self.conn = sqlite3.connect(session_name + '.db')
+        if session_name is None:
+            self.conn = sqlite3.connect(':memory:')
+        else:
+            self.conn = sqlite3.connect(session_name + '.db')
         with self.conn as c:
             tables = list(c.execute("SELECT name FROM sqlite_master;"))
             if not tables:
@@ -80,7 +81,7 @@ class AsyncSession:
             c = conn.cursor()
             c.execute('SELECT name FROM log_names;')
             data = c.fetchall()
-        names = set([d[0] for d in c.fetchall()])
+        names = set([d[0] for d in data])
         result = dict()
         for name in names:
             result[name] = self.__getitem__(name)
@@ -112,7 +113,7 @@ class AsyncSession:
         t = np.array([d[0] for d in data])
         v = np.array([d[1] for d in data])
         return t, v
-        
+
     def save_parameter(self, **kwargs):
         with self.conn as conn:
             c = conn.cursor()
@@ -139,7 +140,7 @@ class AsyncSession:
         with self.conn as conn:
             c = conn.cursor()
             c.execute("""
-                      SELECT value FROM parameters 
+                      SELECT value FROM parameters
                       WHERE name='{:}';
                       """.format(name))
             data = c.fetchone()
@@ -161,7 +162,7 @@ class AsyncSession:
         with self.conn as conn:
             c = conn.cursor()
             c.execute("""
-                      SELECT timestamp, value FROM log 
+                      SELECT timestamp, value FROM log
                       WHERE name='{:}';
                       """.format(key))
             data = c.fetchall()
@@ -199,8 +200,8 @@ class AsyncSession:
                         #print('updating plot')
                         ts0 = initial_timestamps[name]
                         p = line_objects[name]
-                        x = np.hstack((p.get_xdata(),(ts-ts0)/3600))
-                        y = np.hstack((p.get_ydata(),vs))
+                        x = np.hstack((p.get_xdata(), (ts-ts0)/3600))
+                        y = np.hstack((p.get_ydata(), vs))
                         if x.size > maxvalues:
                             x = x[-maxvalues:]
                             y = y[-maxvalues:]
@@ -209,10 +210,10 @@ class AsyncSession:
                         xlim = ax.get_xlim()
                         ylim = ax.get_ylim()
                         if xlim[1] < x[-1]:
-                            ax.set_xlim((x[0],x[-1]))
+                            ax.set_xlim((x[0], x[-1]))
                         if ylim[1] < np.max(y) or ylim[0] > np.min(y):
-                            ylim = (min((ylim[0],np.min(y))),
-                                    max((ylim[1],np.max(y))))
+                            ylim = (min((ylim[0], np.min(y))),
+                                    max((ylim[1], np.max(y))))
                             ax.set_ylim(ylim)
                     else:
                         #print('initial plot')
@@ -223,10 +224,10 @@ class AsyncSession:
                         if x.size > maxvalues:
                             x = x[-maxvalues:]
                             y = y[-maxvalues:]
-                        p, = ax.plot(x,y, 'o-', label=name)
+                        p, = ax.plot(x, y, 'o-', label=name)
                         line_objects[name] = p
                         ax.set_xlabel('t [h]')
-                        ax.set_xlim((x[0],x[-1]))
+                        ax.set_xlim((x[0], x[-1]))
                         if yscale:
                             ax.set_yscale(yscale)
                     last_update[name] = ts[-1]
@@ -235,7 +236,7 @@ class AsyncSession:
                 #    warnings.simplefilter("ignore")
                 #    plt.pause(0.0001)
             await asyncio.sleep(1)
-        
+
         # Saving figure positions
         geom = mngr.window.geometry()
         figsize = tuple(fig.get_size_inches())
@@ -261,8 +262,8 @@ class AsyncSession:
         start = time.monotonic()
         while self.running and time.monotonic()-start < duration:
             if verbose:
-                print("Sleeping for " +\
-                      str(-int(time.monotonic()-start-duration)) +\
+                print("Sleeping for " +
+                      str(-int(time.monotonic()-start-duration)) +
                       " s" + " "*8, end='\r')
                 sys.stdout.flush()
             if verbose:
@@ -285,7 +286,7 @@ class AsyncSession:
     async def mytask(self, corofunc):
         while self.running:
             await corofunc(self)
-            
+
     def run(self, *tasks):
         loop = asyncio.get_event_loop()
 
@@ -306,7 +307,7 @@ class AsyncSession:
         aiohttp_jinja2.setup(app,
                              loader=jinja2.FileSystemLoader(template_dir))
         app.router.add_routes([web.get('/', self.server_main_page)])
-        webserver = loop.create_server(app.make_handler(), 
+        webserver = loop.create_server(app.make_handler(),
                                        host=None, port=6913)
 
         # if any of the tasks submitted are coroutinefunctions instead of
@@ -320,8 +321,6 @@ class AsyncSession:
             else:
                 raise TypeError('Coroutine or Coroutinefunction is expected')
         loop.run_until_complete(asyncio.gather(webserver, *tasks_final))
-
-        
 
 
 if __name__ == '__main__':
