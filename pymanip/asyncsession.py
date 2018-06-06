@@ -110,8 +110,8 @@ class AsyncSession:
                          ORDER BY timestamp ASC;
                       """.format(name, timestamp))
             data = c.fetchall()
-        t = np.array([d[0] for d in data])
-        v = np.array([d[1] for d in data])
+        t = np.array([d[0] for d in data if d[1] is not None])
+        v = np.array([d[1] for d in data if d[1] is not None])
         return t, v
 
     def save_parameter(self, **kwargs):
