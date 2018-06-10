@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 from pymanip.collection import Manip
 from pymanip import Session, SavedSession
 from pymanip.asyncsession import AsyncSession
+from pymanip.mytime import dateformat
 
 
 def manip_info(sessionName, quiet, line_to_print, var_to_plot):
@@ -33,21 +34,37 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
     if os.path.exists(sessionName + '.db'):
         with AsyncSession(sessionName) as sesn:
             version = sesn.get_version()
-            print(sessionName, 'is an asynchroneous session (version {:}).'.format(version))
-            params = sesn.parameters()
+            print(sessionName,
+                  'is an asynchroneous session (version {:}).'.format(version))
+            first_values = sesn.logged_first_values()
+            last_values = sesn.logged_last_values()
+
+            try:
+                first_ts = min([t_v[0] for name, t_v in first_values.items()])
+                last_ts = max([t_v[0] for name, t_v in last_values.items()])
+                start_string = time.strftime(dateformat,
+                                             time.localtime(first_ts))
+                end_string = time.strftime(dateformat,
+                                           time.localtime(last_ts))
+                print(colored.blue('*** Start date: ' + start_string))
+                print(colored.blue('***   End date: ' + end_string))
+            except ValueError:
+                print(colored.red('No logged variables'))
+
+            params = {key: val for key, val in sesn.parameters().items()
+                      if not key.startswith('_')}
             if params:
                 print('Parameters')
                 print('==========')
                 for key, val in sesn.parameters().items():
-                    if not key.startswith('_'):
-                        print(key, ':', val)
+                    print(key, ':', val)
                 print()
-            logged_var = sesn.logged_variables()
-            if logged_var:
+
+            if first_values:
                 print('Logged variables')
                 print('================')
-                for v in sorted(logged_var):
-                    print(v)
+                for name, t_v in last_values.items():
+                    print(name, '(', t_v[1], ')')
             else:
                 print('No logged variable')
         return

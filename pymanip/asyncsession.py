@@ -103,6 +103,21 @@ class AsyncSession:
             result[name] = self.__getitem__(name)
         return result
 
+    def logged_first_values(self):
+        with self.conn as conn:
+            c = conn.cursor()
+            c.execute('SELECT name FROM log_names;')
+            names = set([d[0] for d in c.fetchall()])
+            result = dict()
+            for name in names:
+                c.execute("""SELECT timestamp, value FROM log
+                             WHERE name='{:}'
+                             ORDER BY timestamp ASC
+                             LIMIT 1;
+                          """.format(name))
+                result[name] = c.fetchone()
+        return result
+
     def logged_last_values(self):
         with self.conn as conn:
             c = conn.cursor()

@@ -8,17 +8,20 @@ Useful classes are Session and SavedSession.
 
 from __future__ import unicode_literals, print_function
 
-import os, sys
+import os
 import six
-import h5py
 import numpy as np
 import time
 import inspect
 import matplotlib.pyplot as plt
 import warnings
-import smtplib, base64, quopri
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    import h5py
+import smtplib
+import base64
+import quopri
 import tempfile
-from platform import platform
 try:
     from clint.textui import colored
 except ImportError:
@@ -43,7 +46,8 @@ try:
     has_pathlib = True
 except ImportError:
     has_pathlib = False
-    
+from pymanip.mytime import dateformat
+
 __all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
 
 ## I am commenting out this because it should be in the caller's script
@@ -95,10 +99,6 @@ class BaseSession(object):
             
         self.session_name = session_name
         self.storename = session_name + '.hdf5'
-        if platform().startswith('Windows'):
-            self.dateformat = '%A %d %B %Y - %X (%z)'
-        else:
-            self.dateformat = '%A %e %B %Y - %H:%M:%S (UTC%z)'
         self.session_opening_time = time.time()
         self.opened = False
         self.parameters_defined = False
@@ -131,7 +131,7 @@ class BaseSession(object):
                     if isinstance(value, np.ndarray) and len(value) == 1:
                         value = value[0]
                     if name == 'email_lastSent':
-                        theDateStr = time.strftime(self.dateformat, time.localtime(value))
+                        theDateStr = time.strftime(dateformat, time.localtime(value))
                         if six.PY2:
                             theDateStr = theDateStr.decode('utf-8')
                         print(' ' + name + ' = ' + theDateStr )
@@ -297,20 +297,20 @@ class SavedSession(BaseSession):
         if total_size > 0:
             start_t = self.dset_time[0]
             end_t = self.dset_time[total_size-1]
-            start_string = time.strftime(self.dateformat, time.localtime(start_t))
+            start_string = time.strftime(dateformat, time.localtime(start_t))
             if six.PY2:
                 start_string = start_string.decode('utf-8')
-            end_string = time.strftime(self.dateformat, time.localtime(end_t))
+            end_string = time.strftime(dateformat, time.localtime(end_t))
             if six.PY2:
                 end_string = end_string.decode('utf-8')
             if verbose:
                 print(colored.blue('*** Start date: ' + start_string))
-                print(colored.blue('***  End date: ' + end_string))
+                print(colored.blue('***   End date: ' + end_string))
         elif not self.grp_datasets_defined:
             if verbose:
                 print(colored.red('No logged variables'))
         if self.grp_datasets_defined:
-            timestamp_string = time.strftime(self.dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
+            timestamp_string = time.strftime(dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
             if six.PY2:
                 timestamp_string = timestamp_string.decode('utf-8')
             if verbose:
@@ -467,7 +467,7 @@ class Session(BaseSession):
         self.logfile = open(self.logname, 'a')
         self.allow_override_datasets = allow_override_datasets
 
-        date_string = time.strftime(self.dateformat, time.localtime(self.session_opening_time))
+        date_string = time.strftime(dateformat, time.localtime(self.session_opening_time))
         if six.PY2:
             # en PY3 strftime renvoie directement une str
             # en PY2, il faut decode pour convertir en unicode
@@ -502,7 +502,7 @@ class Session(BaseSession):
             print(colored.blue(boldface("Session reloaded from file ") + self.storename))
             if original_size > 0:
                 last_t = self.dset_time[original_size-1]
-                date_string = time.strftime(self.dateformat, time.localtime(last_t))
+                date_string = time.strftime(dateformat, time.localtime(last_t))
                 if six.PY2:
                     date_string = date_string.decode('utf-8')
                 print(boldface("Last point recorded:") + " " + date_string)
@@ -639,7 +639,7 @@ class Session(BaseSession):
         self.email_port = port
         self.email_from_addr = from_addr
         self.email_to_addrs = to_addrs
-        date_string = time.strftime(self.dateformat, time.localtime(time.time()))
+        date_string = time.strftime(dateformat, time.localtime(time.time()))
         if six.PY2:
             date_string = date_string.decode('utf-8')
         if subject != None:
@@ -760,7 +760,7 @@ class Session(BaseSession):
         self.email_figlist = []
         if success:
             self.parameters['email_lastSent'] = time.time()
-            date_string = time.strftime(self.dateformat, time.localtime(self.parameters['email_lastSent']))
+            date_string = time.strftime(dateformat, time.localtime(self.parameters['email_lastSent']))
             if six.PY2:
                 date_string = date_string.decode('utf-8')
             print(date_string + ': Email successfully sent.')
@@ -780,7 +780,7 @@ class Session(BaseSession):
         if self.opened:
             self.store.close()
             self.datfile.close()
-            date_string = time.strftime(self.dateformat, time.localtime(time.time()))
+            date_string = time.strftime(dateformat, time.localtime(time.time()))
             if six.PY2:
                 date_string = date_string.decode('utf-8')
                 self.logfile.write( ("Session closed on " + date_string).encode('utf-8') )
