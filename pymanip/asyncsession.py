@@ -76,12 +76,16 @@ class AsyncSession:
                 c.execute('INSERT INTO log VALUES (?,?,?);',
                           (datetime.now().timestamp(), key, val))
 
-    def logged_data(self):
+    def logged_variables(self):
         with self.conn as conn:
             c = conn.cursor()
             c.execute('SELECT name FROM log_names;')
             data = c.fetchall()
         names = set([d[0] for d in data])
+        return names
+
+    def logged_data(self):
+        names = self.logged_variables()
         result = dict()
         for name in names:
             result[name] = self.__getitem__(name)

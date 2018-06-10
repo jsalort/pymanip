@@ -38,7 +38,8 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
                 print('Parameters')
                 print('==========')
                 for key, val in sesn.parameters().items():
-                    print(key, ':', val)
+                    if not key.startswith('_'):
+                        print(key, ':', val)
                 print()
             logged_var = sesn.logged_variables()
             if logged_var:
