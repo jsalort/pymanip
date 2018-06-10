@@ -32,7 +32,8 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
 
     if os.path.exists(sessionName + '.db'):
         with AsyncSession(sessionName) as sesn:
-            print(sessionName, 'is an asynchroneous session.')
+            version = sesn.get_version()
+            print(sessionName, 'is an asynchroneous session (version {:}).'.format(version))
             params = sesn.parameters()
             if params:
                 print('Parameters')

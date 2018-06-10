@@ -30,6 +30,7 @@ __all__ = ['AsyncSession']
 
 
 class AsyncSession:
+    database_version = 1
 
     def __init__(self, session_name=None, variable_list=None):
         if variable_list is None:
@@ -56,12 +57,23 @@ class AsyncSession:
                         name TEXT,
                         value REAL);
                     """)
+                c.execute("""
+                    INSERT INTO parameters
+                    (name, value)
+                    VALUES (?,?);
+                    """, ('_database_version', AsyncSession.database_version))
 
     def __enter__(self):
         return self
 
     def __exit__(self, type_, value, cb):
         self.conn.close()
+
+    def get_version(self):
+        version = self.parameter('_database_version')
+        if version is None:
+            version = 1
+        return version
 
     def add_entry(self, **kwargs):
         with self.conn as c:
