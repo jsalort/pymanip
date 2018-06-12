@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>{{ title }}</title>
+        <meta charset="utf-8">
+    </head>
+
+    <body>
+
+    <main role="main">
+        <h1> {{ title }} </h1>
+
+        <h2> Last recorded values </h2>
+        <table style="width:100%;">
+            <tr>
+                <th style="text-align: left;">Name</th>
+                <th style="text-align: left;">Value</th>
+                <th style="text-align: left;">Timestamp</th>
+            </tr>
+            {% for name, v in last_values.items() %}
+            <tr>
+                <td>{{ name }}</td>
+                <td>{{ v[1] }}</td>
+                <td>{{ v[2] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <h2> Figures </h2>
+
+        {% for fignum in fignums %}
+        <p><img src="cid:part1.{{ fignum }}" 
+                alt="Figure {{ fignum }}"
+                style="width: 50%;" /></p>
+        {% endfor %}
+    </main>
+
+    </body>
+</html>

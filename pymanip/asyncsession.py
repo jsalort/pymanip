@@ -20,11 +20,18 @@ import asyncio
 from aiohttp import web
 import aiohttp_jinja2
 import jinja2
+import quopri
+import base64
+import tempfile
+import smtplib
+from email.message import EmailMessage
 
 try:
     import PyQt5.QtCore
 except ModuleNotFoundError:
     pass
+
+from pymanip.mytime import dateformat
 
 __all__ = ['AsyncSession']
 
@@ -35,6 +42,7 @@ class AsyncSession:
     def __init__(self, session_name=None, variable_list=None):
         if variable_list is None:
             variable_list = []
+        self.session_name = session_name
         if session_name is None:
             self.conn = sqlite3.connect(':memory:')
         else:
@@ -62,6 +70,9 @@ class AsyncSession:
                     (name, value)
                     VALUES (?,?);
                     """, ('_database_version', AsyncSession.database_version))
+        self.figure_list = []
+        self.template_dir = os.path.join(os.path.dirname(__file__), 'web')
+        self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
 
     def __enter__(self):
         return self
@@ -201,6 +212,77 @@ class AsyncSession:
         v = np.array([d[1] for d in data])
         return t, v
 
+    async def send_email(self, from_addr, to_addrs, host, port=25,
+                         subject=None, delay_hours=6,
+                         initial_delay_hours=None):
+        """
+        Asynchronous task which sends an email every delay_hours hours.
+        """
+
+        if subject is None:
+            if self.session_name is None:
+                subject = "Pymanip session"
+            else:
+                subject = self.session_name
+
+        if initial_delay_hours is None:
+            initial_delay_hours = delay_hours/2
+
+        if initial_delay_hours > 0:
+            await self.sleep(initial_delay_hours*3600, verbose=False)
+
+        jinja2_env = jinja2.Environment(loader=self.jinja2_loader,
+                                        autoescape=jinja2.select_autoescape(['html']))
+        template = jinja2_env.get_template("email.html")
+
+        while self.running:
+
+            # Generate HTML content
+            last_values = self.logged_last_values()
+            for name in last_values:
+                timestamp, value = last_values[name]
+                last_values[name] = (timestamp, value,
+                                     time.strftime(dateformat,
+                                                   time.localtime(timestamp)))
+            message_html = template.render(title=subject,
+                                           fignums=range(len(self.figure_list)),
+                                           last_values=last_values)
+
+            # Create Email message
+            msg = EmailMessage()
+            msg['Subject'] = subject
+            msg['From'] = from_addr
+            msg['To'] = to_addrs
+            msg.set_content("This is a MIME message")
+            msg.add_alternative(message_html, subtype='html')
+
+            # Add figure images
+            for fignum, fig in enumerate(self.figure_list):
+                fd, fname = tempfile.mkstemp(suffix=".png")
+                with os.fdopen(fd, 'wb') as f_png:
+                    fig.savefig(f_png)
+                with open(fname, 'rb') as image_file:
+                    figure_data = image_file.read()
+                os.remove(fname)
+                msg.get_payload()[1].add_related(figure_data,
+                                                 maintype='image', subtype='png',
+                                                 cid='part1.{:d}'.format(fignum))
+
+            with smtplib.SMTP(host, port) as smtp:
+                try:
+                    smtp.send_message(msg)
+                    print("Email sent!")
+                except smtplib.SMTPHeloError:
+                    print('SMTP Helo Error')
+                except smtplib.SMTPRecipientsRefused:
+                    print('Some recipients have been rejected by SMTP server')
+                except smtplib.SMTPSenderRefused:
+                    print('SMTP server refused sender ' + self.email_from_addr)
+                except smtplib.SMTPDataError:
+                    print('SMTP Data Error')
+
+            await self.sleep(delay_hours*3600, verbose=False)
+
     async def plot(self, varnames, maxvalues=1000, yscale=None):
         if isinstance(varnames, str):
             varnames = (varnames,)
@@ -221,6 +303,7 @@ class AsyncSession:
         ax = fig.add_subplot(111)
         initial_timestamps = dict()
         line_objects = dict()
+        self.figure_list.append(fig)
         while self.running:
             data = {k: self.logged_data_fromtimestamp(k, last_update[k])
                     for k in varnames}
@@ -238,9 +321,8 @@ class AsyncSession:
                             y = y[-maxvalues:]
                         p.set_xdata(x)
                         p.set_ydata(y)
-                        xlim = ax.get_xlim()
                         ylim = ax.get_ylim()
-                        if xlim[1] < x[-1]:
+                        if x[0] != x[-1]:
                             ax.set_xlim((x[0], x[-1]))
                         if ylim[1] < np.max(y) or ylim[0] > np.min(y):
                             ylim = (min((ylim[0], np.min(y))),
@@ -258,7 +340,8 @@ class AsyncSession:
                         p, = ax.plot(x, y, 'o-', label=name)
                         line_objects[name] = p
                         ax.set_xlabel('t [h]')
-                        ax.set_xlim((x[0], x[-1]))
+                        if x[0] != x[-1]:
+                            ax.set_xlim((x[0], x[-1]))
                         if yscale:
                             ax.set_yscale(yscale)
                     last_update[name] = ts[-1]
@@ -269,21 +352,13 @@ class AsyncSession:
             await asyncio.sleep(1)
 
         # Saving figure positions
-        geom = mngr.window.geometry()
-        figsize = tuple(fig.get_size_inches())
-        self.save_parameter(**{param_key_window: str(geom),
-                               param_key_figsize: str(figsize)})
-
-    #def plot(self, name, num=1):
-    #    ts, vs = self[name]
-    #    plt.figure(num)
-    #    plt.clf()
-    #    plt.ion()
-    #    plt.plot(ts-ts[0], vs, label=name)
-    #    plt.legend(loc='upper left')
-    #    with warnings.catch_warnings():
-    #        warnings.simplefilter("ignore")
-    #        plt.pause(0.0001)
+        try:
+            geom = mngr.window.geometry()
+            figsize = tuple(fig.get_size_inches())
+            self.save_parameter(**{param_key_window: str(geom),
+                                   param_key_figsize: str(figsize)})
+        except AttributeError:
+            pass
 
     def ask_exit(self, *args, **kwargs):
         self.running = False
@@ -297,7 +372,6 @@ class AsyncSession:
                       str(-int(time.monotonic()-start-duration)) +
                       " s" + " "*8, end='\r')
                 sys.stdout.flush()
-            if verbose:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     plt.pause(0.7)
@@ -333,10 +407,7 @@ class AsyncSession:
 
         # web server
         app = web.Application(loop=loop)
-        template_dir = os.path.join(os.path.dirname(__file__),
-                                    'web')
-        aiohttp_jinja2.setup(app,
-                             loader=jinja2.FileSystemLoader(template_dir))
+        aiohttp_jinja2.setup(app, loader=self.jinja2_loader)
         app.router.add_routes([web.get('/', self.server_main_page)])
         webserver = loop.create_server(app.make_handler(),
                                        host=None, port=6913)
