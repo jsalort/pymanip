@@ -12,7 +12,6 @@ import os.path
 
 import sqlite3
 from datetime import datetime
-import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -20,8 +19,6 @@ import asyncio
 from aiohttp import web
 import aiohttp_jinja2
 import jinja2
-import quopri
-import base64
 import tempfile
 import smtplib
 from email.message import EmailMessage
@@ -344,11 +341,9 @@ class AsyncSession:
                             ax.set_xlim((x[0], x[-1]))
                         if yscale:
                             ax.set_yscale(yscale)
+                        ax.legend()
+                        fig.show()
                     last_update[name] = ts[-1]
-                    ax.legend()
-                #with warnings.catch_warnings():
-                #    warnings.simplefilter("ignore")
-                #    plt.pause(0.0001)
             await asyncio.sleep(1)
 
         # Saving figure positions
@@ -359,6 +354,12 @@ class AsyncSession:
                                    param_key_figsize: str(figsize)})
         except AttributeError:
             pass
+
+    async def figure_gui_update(self):
+        while self.running:
+            for fig in self.figure_list:
+                fig.canvas.start_event_loop(0.7/len(self.figure_list))
+                await asyncio.sleep(0.3/len(self.figure_list))
 
     def ask_exit(self, *args, **kwargs):
         self.running = False
@@ -372,12 +373,7 @@ class AsyncSession:
                       str(-int(time.monotonic()-start-duration)) +
                       " s" + " "*8, end='\r')
                 sys.stdout.flush()
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    plt.pause(0.7)
-                await asyncio.sleep(0.3)
-            else:
-                await asyncio.sleep(1.0)
+            await asyncio.sleep(0.5)
         if verbose:
             sys.stdout.write("\n")
 
@@ -422,7 +418,9 @@ class AsyncSession:
                 tasks_final.append(t)
             else:
                 raise TypeError('Coroutine or Coroutinefunction is expected')
-        loop.run_until_complete(asyncio.gather(webserver, *tasks_final))
+        loop.run_until_complete(asyncio.gather(webserver,
+                                               self.figure_gui_update(),
+                                               *tasks_final))
 
 
 if __name__ == '__main__':
