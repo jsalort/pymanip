@@ -1,4 +1,51 @@
 {% extends "layout.html" %}
 {% block content %}
-Hello world.
+    <h2> Last recorded values </h2>
+    <table style="width:100%;"
+           id="last_values_table">
+        <tr>
+            <th style="text-align: left;">Name</th>
+            <th style="text-align: left;">Value</th>
+            <th style="text-align: left;">Timestamp</th>
+        </tr>
+    </table>
+{% endblock %}
+{% block footer %}
+<script>
+function update_point() {
+    var table = document.getElementById("last_values_table");
+    var req = new XMLHttpRequest();
+    req.open("GET", "/api/logged_last_values");
+    req.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            data = JSON.parse(req.responseText);
+            var rows = table.rows;
+            var ii = rows.length;
+            while (--ii) {
+                rows[ii].parentNode.removeChild(rows[ii]);
+            }
+            for (var i = 0; i < data.length; i++) {
+                var newRow = table.insertRow();
+                // newRow.onclick = function(vid) {
+                //    return function() {
+                //        toto(pid);
+                //    };
+                //}(data[i]['id']);
+                nameCell = newRow.insertCell();
+                valueCell = newRow.insertCell();
+                timeCell = newRow.insertCell();
+                nameCell.innerHTML = "<a href=\"/plot/" + data[i]['name'] + "\" target=\"_blank\">" + data[i]['name'] + "</a>";
+                valueCell.innerHTML = data[i]['value'];
+                timeCell.innerHTML = data[i]['datestr'];
+            }
+            setTimeout(update_point, 1000);
+        }
+    };
+    req.send();
+}
+
+window.onload = function() {
+    update_point();
+};
+</script>
 {% endblock %}

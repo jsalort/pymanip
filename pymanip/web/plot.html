@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% block content %}
+<canvas id="myChart" width="400" height="300"></canvas>
+{% endblock %}
+{% block footer %}
+<script src="/static/Chart.bundle.js"></script>
+<script>
+var ctx = document.getElementById("myChart").getContext("2d");
+var myChart = new Chart(ctx, {
+    type: 'line',
+    data: {datasets: [{
+            label: '{{ name }}',
+            data: []}]},
+    options: {
+        scales: {
+            xAxes: [{
+                type: 'linear',
+                position: 'bottom',
+                scaleLabel: {
+                    display: true,
+                    labelString: 't [h]'
+                    }
+            }]
+        },
+        animation: false
+    }
+});
+
+var first_ts = 0;
+var last_ts = 0;
+
+function update_chart() {
+    var req = new XMLHttpRequest();
+    req.open("POST", "/api/data_from_ts");
+    req.setRequestHeader("Content-Type", "application/json");
+    req.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            data = JSON.parse(req.responseText);
+            if (first_ts == 0) {
+                first_ts = data[0][0];
+            }
+            if (data.length > 0) {
+                for (var i = 0; i < data.length; i++) {
+                    myChart.data.datasets[0].data.push(
+                            {x: (data[i][0]-first_ts)/3600,
+                             y: data[i][1]})
+                }
+                myChart.update();
+                last_ts = data[data.length-1][0];
+            }
+            setTimeout(update_chart, 1000);
+        }
+    };
+    req.send(JSON.stringify({last_ts: last_ts,
+                             name: '{{ name }}'}));
+}
+
+window.onload = function() {
+    update_chart();
+};
+
+</script>
+{% endblock %}

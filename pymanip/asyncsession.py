@@ -69,6 +69,7 @@ class AsyncSession:
                     """, ('_database_version', AsyncSession.database_version))
         self.figure_list = []
         self.template_dir = os.path.join(os.path.dirname(__file__), 'web')
+        self.static_dir = os.path.join(os.path.dirname(__file__), 'web_static')
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
 
     def __enter__(self):
@@ -84,6 +85,7 @@ class AsyncSession:
         return version
 
     def add_entry(self, **kwargs):
+        ts = datetime.now().timestamp()
         with self.conn as c:
             cursor = c.cursor()
             cursor.execute('SELECT name FROM log_names;')
@@ -94,7 +96,7 @@ class AsyncSession:
                               (key,))
                     names.add(key)
                 c.execute('INSERT INTO log VALUES (?,?,?);',
-                          (datetime.now().timestamp(), key, val))
+                          (ts, key, val))
 
     def logged_variables(self):
         with self.conn as conn:
@@ -357,9 +359,13 @@ class AsyncSession:
 
     async def figure_gui_update(self):
         while self.running:
-            for fig in self.figure_list:
-                fig.canvas.start_event_loop(0.7/len(self.figure_list))
-                await asyncio.sleep(0.3/len(self.figure_list))
+            if self.figure_list:
+                for fig in self.figure_list:
+                    fig.canvas.start_event_loop(0.7/len(self.figure_list))
+                    await asyncio.sleep(0.3/len(self.figure_list))
+                await asyncio.sleep(0.05)
+            else:
+                await asyncio.sleep(1.0)
 
     def ask_exit(self, *args, **kwargs):
         self.running = False
@@ -378,15 +384,46 @@ class AsyncSession:
             sys.stdout.write("\n")
 
     async def server_main_page(self, request):
-        context = self.logged_last_values()
+        print('[', datetime.now(), request.remote, request.rel_url, ']')
+        if self.session_name:
+            context = {'title': self.session_name}
+        else:
+            context = {'title': 'pymanip'}
         response = aiohttp_jinja2.render_template('main.html',
                                                   request,
                                                   context)
         return response
 
+    async def server_logged_last_values(self, request):
+        #print('[', datetime.now(), request.remote, request.rel_url, ']')
+        data = [{'name': name,
+                 'value': v[1],
+                 'datestr': time.strftime(dateformat, time.localtime(v[0]))}
+                for name, v in self.logged_last_values().items()]
+        return web.json_response(data)
+
+    async def server_plot_page(self, request):
+        print('[', datetime.now(), request.remote, request.rel_url, ']')
+        context = {'name': request.match_info['name']}
+        response = aiohttp_jinja2.render_template('plot.html',
+                                                  request,
+                                                  context)
+        return response
+
+    async def server_data_from_ts(self, request):
+        data_in = await request.json()
+        last_ts = data_in['last_ts']
+        name = data_in['name']
+        timestamps, values = self.logged_data_fromtimestamp(name, last_ts)
+        data_out = list(zip(timestamps, values))
+        #print('from', last_ts, data_out)
+        return web.json_response(data_out)
+
     async def mytask(self, corofunc):
+        print('Starting task')
         while self.running:
             await corofunc(self)
+        print('Task finished')
 
     def run(self, *tasks):
         loop = asyncio.get_event_loop()
@@ -404,7 +441,12 @@ class AsyncSession:
         # web server
         app = web.Application(loop=loop)
         aiohttp_jinja2.setup(app, loader=self.jinja2_loader)
-        app.router.add_routes([web.get('/', self.server_main_page)])
+        app.router.add_routes([web.get('/', self.server_main_page),
+                               web.get('/api/logged_last_values', self.server_logged_last_values),
+                               web.get('/plot/{name}', self.server_plot_page),
+                               web.static('/static', self.static_dir),
+                               web.post('/api/data_from_ts', self.server_data_from_ts)])
+
         webserver = loop.create_server(app.make_handler(),
                                        host=None, port=6913)
 
@@ -418,6 +460,7 @@ class AsyncSession:
                 tasks_final.append(t)
             else:
                 raise TypeError('Coroutine or Coroutinefunction is expected')
+        print('Starting event loop')
         loop.run_until_complete(asyncio.gather(webserver,
                                                self.figure_gui_update(),
                                                *tasks_final))
