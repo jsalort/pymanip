@@ -9,6 +9,7 @@ import signal
 import time
 import sys
 import os.path
+import pickle
 
 import sqlite3
 from datetime import datetime
@@ -34,7 +35,7 @@ __all__ = ['AsyncSession']
 
 
 class AsyncSession:
-    database_version = 1
+    database_version = 2
 
     def __init__(self, session_name=None, variable_list=None):
         if variable_list is None:
@@ -56,6 +57,16 @@ class AsyncSession:
                     timestamp INT,
                     name TEXT,
                     value REAL);
+                    """)
+                c.execute("""
+                    CREATE TABLE dataset_names (
+                    name TEXT);
+                    """)
+                c.execute("""
+                    CREATE TABLE dataset (
+                    timestamp INT,
+                    name TEXT,
+                    data BLOB);
                     """)
                 c.execute("""
                     CREATE TABLE parameters (
@@ -97,6 +108,20 @@ class AsyncSession:
                     names.add(key)
                 c.execute('INSERT INTO log VALUES (?,?,?);',
                           (ts, key, val))
+
+    def add_dataset(self, **kwargs):
+        ts = datetime.now().timestamp()
+        with self.conn as c:
+            cursor = c.cursor()
+            cursor.execute('SELECT name FROM dataset_names;')
+            names = set([d[0] for d in cursor.fetchall()])
+            for key, val in kwargs.items():
+                if key not in names:
+                    c.execute('INSERT INTO dataset_names VALUES (?);',
+                              (key,))
+                    names.add(key)
+                c.execute('INSERT INTO dataset VALUES (?,?,?);',
+                          (ts, key, pickle.dumps(val, protocol=4)))
 
     def logged_variables(self):
         with self.conn as conn:
@@ -154,6 +179,26 @@ class AsyncSession:
         t = np.array([d[0] for d in data if d[1] is not None])
         v = np.array([d[1] for d in data if d[1] is not None])
         return t, v
+
+    def dataset_names(self):
+        with self.conn as conn:
+            c = conn.cursor()
+            c.execute("SELECT name from dataset_names;")
+            data = c.fetchall()
+        return set([d[0] for d in data])
+
+    def datasets(self, name):
+        with self.conn as conn:
+            c = conn.cursor()
+            it = c.execute("""SELECT timestamp, data FROM dataset
+                              WHERE name='{:}'
+                              ORDER BY timestamp ASC;
+                           """.format(name))
+            for row in it:
+                yield row[0], pickle.loads(row[1])
+
+    def dataset_last_data(self, name):
+        return next(self.datasets(name))
 
     def save_parameter(self, **kwargs):
         with self.conn as conn:
