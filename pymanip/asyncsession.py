@@ -259,6 +259,7 @@ class AsyncSession:
             for fignum, fig in enumerate(self.figure_list):
                 fd, fname = tempfile.mkstemp(suffix=".png")
                 with os.fdopen(fd, 'wb') as f_png:
+                    fig.canvas.draw_idle()
                     fig.savefig(f_png)
                 with open(fname, 'rb') as image_file:
                     figure_data = image_file.read()
