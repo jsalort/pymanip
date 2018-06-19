@@ -10,11 +10,13 @@ import time
 import sys
 import os.path
 import pickle
+import warnings
 
 import sqlite3
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.cbook import mplDeprecation as MatplotlibDeprecationWarning
 
 import asyncio
 from aiohttp import web
@@ -404,14 +406,16 @@ class AsyncSession:
             pass
 
     async def figure_gui_update(self):
-        while self.running:
-            if self.figure_list:
-                for fig in self.figure_list:
-                    fig.canvas.start_event_loop(0.7/len(self.figure_list))
-                    await asyncio.sleep(0.3/len(self.figure_list))
-                await asyncio.sleep(0.05)
-            else:
-                await asyncio.sleep(1.0)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
+            while self.running:
+                if self.figure_list:
+                    for fig in self.figure_list:
+                        fig.canvas.start_event_loop(0.7/len(self.figure_list))
+                        await asyncio.sleep(0.3/len(self.figure_list))
+                    await asyncio.sleep(0.05)
+                else:
+                    await asyncio.sleep(1.0)
 
     def ask_exit(self, *args, **kwargs):
         self.running = False
@@ -466,10 +470,10 @@ class AsyncSession:
         return web.json_response(data_out)
 
     async def mytask(self, corofunc):
-        print('Starting task')
+        print('Starting task', corofunc)
         while self.running:
             await corofunc(self)
-        print('Task finished')
+        print('Task finished', corofunc)
 
     def run(self, *tasks):
         loop = asyncio.get_event_loop()
