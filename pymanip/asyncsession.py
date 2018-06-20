@@ -265,11 +265,12 @@ class AsyncSession:
         Asynchronous task which sends an email every delay_hours hours.
         """
 
+        if self.session_name is None:
+            title = "Pymanip session"
+        else:
+            title = self.session_name
         if subject is None:
-            if self.session_name is None:
-                subject = "Pymanip session"
-            else:
-                subject = self.session_name
+            subject = title
 
         if initial_delay_hours is None:
             initial_delay_hours = delay_hours/2
@@ -277,8 +278,9 @@ class AsyncSession:
         if initial_delay_hours > 0:
             await self.sleep(initial_delay_hours*3600, verbose=False)
 
+        jinja2_autoescape = jinja2.select_autoescape(['html'])
         jinja2_env = jinja2.Environment(loader=self.jinja2_loader,
-                                        autoescape=jinja2.select_autoescape(['html']))
+                                        autoescape=jinja2_autoescape)
         template = jinja2_env.get_template("email.html")
 
         while self.running:
@@ -290,8 +292,9 @@ class AsyncSession:
                 last_values[name] = (timestamp, value,
                                      time.strftime(dateformat,
                                                    time.localtime(timestamp)))
-            message_html = template.render(title=subject,
-                                           fignums=range(len(self.figure_list)),
+            n_figs = len(self.figure_list)
+            message_html = template.render(title=title,
+                                           fignums=range(n_figs),
                                            last_values=last_values)
 
             # Create Email message
@@ -303,6 +306,11 @@ class AsyncSession:
             msg.add_alternative(message_html, subtype='html')
 
             # Add figure images
+            dt_n = datetime.now()
+            dt_fmt = '{:}{:02d}{:02d}-{:02d}{:02d}{:02d}'
+            datestr = dt_fmt.format(dt_n.year, dt_n.month,
+                                    dt_n.day, dt_n.hour,
+                                    dt_n.minute, dt_n.second)
             for fignum, fig in enumerate(self.figure_list):
                 fd, fname = tempfile.mkstemp(suffix=".png")
                 with os.fdopen(fd, 'wb') as f_png:
@@ -311,9 +319,13 @@ class AsyncSession:
                 with open(fname, 'rb') as image_file:
                     figure_data = image_file.read()
                 os.remove(fname)
-                msg.get_payload()[1].add_related(figure_data,
-                                                 maintype='image', subtype='png',
-                                                 cid='part1.{:d}'.format(fignum))
+                p = msg.get_payload()[1]
+                p.add_related(figure_data,
+                              maintype='image',
+                              subtype='png',
+                              cid='part1.{:d}'.format(fignum),
+                              filename='fig{:d}-{:}.png'.format(fignum,
+                                                                datestr))
 
             with smtplib.SMTP(host, port) as smtp:
                 try:
@@ -407,7 +419,8 @@ class AsyncSession:
 
     async def figure_gui_update(self):
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
+            warnings.filterwarnings("ignore",
+                                    category=MatplotlibDeprecationWarning)
             while self.running:
                 if self.figure_list:
                     for fig in self.figure_list:
@@ -491,11 +504,16 @@ class AsyncSession:
         # web server
         app = web.Application(loop=loop)
         aiohttp_jinja2.setup(app, loader=self.jinja2_loader)
-        app.router.add_routes([web.get('/', self.server_main_page),
-                               web.get('/api/logged_last_values', self.server_logged_last_values),
-                               web.get('/plot/{name}', self.server_plot_page),
-                               web.static('/static', self.static_dir),
-                               web.post('/api/data_from_ts', self.server_data_from_ts)])
+        app.router.add_routes([web.get('/',
+                                       self.server_main_page),
+                               web.get('/api/logged_last_values',
+                                       self.server_logged_last_values),
+                               web.get('/plot/{name}',
+                                       self.server_plot_page),
+                               web.static('/static',
+                                          self.static_dir),
+                               web.post('/api/data_from_ts',
+                                        self.server_data_from_ts)])
 
         webserver = loop.create_server(app.make_handler(),
                                        host=None, port=6913)
