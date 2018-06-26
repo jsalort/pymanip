@@ -37,7 +37,7 @@ __all__ = ['AsyncSession']
 
 
 class AsyncSession:
-    database_version = 2
+    database_version = 3
 
     def __init__(self, session_name=None, variable_list=None):
         if variable_list is None:
@@ -80,6 +80,11 @@ class AsyncSession:
                     (name, value)
                     VALUES (?,?);
                     """, ('_database_version', AsyncSession.database_version))
+                c.execute("""
+                    INSERT INTO parameters
+                    (name, value)
+                    VALUES (?,?);
+                    """, ('_session_creation_timestamp', datetime.now().timestamp()))
         self.figure_list = []
         self.template_dir = os.path.join(os.path.dirname(__file__), 'web')
         self.static_dir = os.path.join(os.path.dirname(__file__), 'web_static')
@@ -96,6 +101,18 @@ class AsyncSession:
         if version is None:
             version = 1
         return version
+
+    @property
+    def initial_timestamp(self):
+        t0 = self.parameter('_session_creation_timestamp')
+        if t0 is not None:
+            return t0
+        logged_data = self.logged_first_values()
+        if logged_data:
+            t0 = min([v[0] for k,v in logged_data.items()])
+            self.save_parameter(_session_creation_timestamp=t0)
+            return t0
+        return 0
 
     def add_entry(self, **kwargs):
         ts = datetime.now().timestamp()
@@ -360,18 +377,17 @@ class AsyncSession:
         if saved_geom:
             mngr.window.setGeometry(saved_geom)
         ax = fig.add_subplot(111)
-        initial_timestamps = dict()
         line_objects = dict()
         self.figure_list.append(fig)
+        ts0 = self.initial_timestamp
         while self.running:
             data = {k: self.logged_data_fromtimestamp(k, last_update[k])
                     for k in varnames}
             for name, values in data.items():
                 ts, vs = values
                 if ts.size > 0:
-                    if name in initial_timestamps:
+                    if name in line_objects:
                         #print('updating plot')
-                        ts0 = initial_timestamps[name]
                         p = line_objects[name]
                         x = np.hstack((p.get_xdata(), (ts-ts0)/3600))
                         y = np.hstack((p.get_ydata(), vs))
@@ -389,8 +405,6 @@ class AsyncSession:
                             ax.set_ylim(ylim)
                     else:
                         #print('initial plot')
-                        ts0 = ts[0]
-                        initial_timestamps[name] = ts0
                         x = (ts-ts0)/3600
                         y = vs
                         if x.size > maxvalues:
