@@ -236,8 +236,11 @@ class AsyncSession:
     def dataset_names(self):
         with self.conn as conn:
             c = conn.cursor()
-            c.execute("SELECT name from dataset_names;")
-            data = c.fetchall()
+            try:
+                c.execute("SELECT name from dataset_names;")
+                data = c.fetchall()
+            except sqlite3.OperationalError:
+                return set()
         return set([d[0] for d in data])
 
     def datasets(self, name):
