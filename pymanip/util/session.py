@@ -36,21 +36,8 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
             version = sesn.get_version()
             print(sessionName,
                   'is an asynchroneous session (version {:}).'.format(version))
-            first_values = sesn.logged_first_values()
+            print()
             last_values = sesn.logged_last_values()
-
-            try:
-                first_ts = min([t_v[0] for name, t_v in first_values.items()])
-                last_ts = max([t_v[0] for name, t_v in last_values.items()])
-                start_string = time.strftime(dateformat,
-                                             time.localtime(first_ts))
-                end_string = time.strftime(dateformat,
-                                           time.localtime(last_ts))
-                print(colored.blue('*** Start date: ' + start_string))
-                print(colored.blue('***   End date: ' + end_string))
-            except ValueError:
-                print(colored.red('No logged variables'))
-
             params = {key: val for key, val in sesn.parameters().items()
                       if not key.startswith('_')}
             if params:
@@ -60,13 +47,20 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
                     print(key, ':', val)
                 print()
 
-            if first_values:
+            if last_values:
                 print('Logged variables')
                 print('================')
                 for name, t_v in last_values.items():
                     print(name, '(', t_v[1], ')')
-            else:
-                print('No logged variable')
+                print()
+
+            ds_names = sesn.dataset_names()
+            if ds_names:
+                print('Datasets')
+                print('========')
+                for ds in ds_names:
+                    print(ds)
+                print()
         return
 
     if sessionName.endswith('.hdf5'):
@@ -134,8 +128,8 @@ def check_hdf(acqName, variable_to_plot):
     data = pd.read_csv(datfile, sep=' ')
     start_t = data['Time'].values[0]
     end_t = data['Time'].values[-1]
-    start_string = time.strftime(MI.dateformat, time.localtime(start_t))
-    end_string = time.strftime(MI.dateformat, time.localtime(end_t))
+    start_string = time.strftime(dateformat, time.localtime(start_t))
+    end_string = time.strftime(dateformat, time.localtime(end_t))
     print(colored.blue('*** Start date: ' + start_string))
     print(colored.blue('***  End date: ' + end_string))
 

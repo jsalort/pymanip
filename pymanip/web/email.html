@@ -29,7 +29,7 @@
         <h2> Figures </h2>
 
         {% for fignum in fignums %}
-        <p><img src="cid:part1.{{ fignum }}" 
+        <p><img src="cid:{{ fignum }}{{ datestr }}" 
                 alt="Figure {{ fignum }}"
                 style="width: 50%;" /></p>
         {% endfor %}

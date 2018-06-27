@@ -25,6 +25,7 @@ import jinja2
 import tempfile
 import smtplib
 from email.message import EmailMessage
+from clint.textui import colored
 
 try:
     import PyQt5.QtCore
@@ -39,7 +40,7 @@ __all__ = ['AsyncSession']
 class AsyncSession:
     database_version = 3
 
-    def __init__(self, session_name=None, variable_list=None):
+    def __init__(self, session_name=None, variable_list=None, verbose=True):
         if variable_list is None:
             variable_list = []
         self.session_name = session_name
@@ -84,7 +85,10 @@ class AsyncSession:
                     INSERT INTO parameters
                     (name, value)
                     VALUES (?,?);
-                    """, ('_session_creation_timestamp', datetime.now().timestamp()))
+                    """, ('_session_creation_timestamp',
+                          datetime.now().timestamp()))
+            elif verbose:
+                self.print_welcome()
         self.figure_list = []
         self.template_dir = os.path.join(os.path.dirname(__file__), 'web')
         self.static_dir = os.path.join(os.path.dirname(__file__), 'web_static')
@@ -103,16 +107,46 @@ class AsyncSession:
         return version
 
     @property
-    def initial_timestamp(self):
+    def t0(self):
+        if hasattr(self, '_session_creation_timestamp'):
+            return self._session_creation_timestamp
         t0 = self.parameter('_session_creation_timestamp')
         if t0 is not None:
+            self._session_creation_timestamp = t0
             return t0
         logged_data = self.logged_first_values()
         if logged_data:
-            t0 = min([v[0] for k,v in logged_data.items()])
+            t0 = min([v[0] for k, v in logged_data.items()])
             self.save_parameter(_session_creation_timestamp=t0)
+            self._session_creation_timestamp = t0
             return t0
         return 0
+
+    @property
+    def initial_timestamp(self):
+        return self.t0
+
+    @property
+    def last_timestamp(self):
+        ts = list()
+        last_values = self.logged_last_values()
+        if last_values:
+            ts.append(max([t_v[0] for name, t_v in last_values.items()]))
+        for ds_name in self.dataset_names():
+            ts.append(max(self.dataset_times(ds_name)))
+        if ts:
+            return max(ts)
+        return None
+
+    def print_welcome(self):
+        start_string = time.strftime(dateformat,
+                                     time.localtime(self.initial_timestamp))
+        print(colored.blue('*** Start date: ' + start_string))
+        last = self.last_timestamp
+        if last:
+            end_string = time.strftime(dateformat,
+                                       time.localtime(last))
+            print(colored.blue('***   End date: ' + end_string))
 
     def add_entry(self, **kwargs):
         ts = datetime.now().timestamp()
@@ -219,6 +253,25 @@ class AsyncSession:
     def dataset_last_data(self, name):
         return next(self.datasets(name))
 
+    def dataset_times(self, name):
+        with self.conn as conn:
+            c = conn.cursor()
+            it = c.execute("""SELECT timestamp FROM dataset
+                              WHERE name='{:}'
+                              ORDER BY timestamp ASC;
+                           """.format(name))
+            t = np.array([v[0] for v in it])
+        return t
+
+    def dataset(self, name, ts):
+        with self.conn as conn:
+            c = conn.cursor()
+            c.execute("""SELECT data FROM dataset
+                         WHERE name='{:}' AND timestamp='{:}';
+                      """.format(name, ts))
+            data = pickle.loads(c.fetchone()[0])
+        return data
+
     def save_parameter(self, **kwargs):
         with self.conn as conn:
             c = conn.cursor()
@@ -302,6 +355,11 @@ class AsyncSession:
 
         while self.running:
 
+            dt_n = datetime.now()
+            dt_fmt = '{:}{:02d}{:02d}-{:02d}{:02d}{:02d}'
+            datestr = dt_fmt.format(dt_n.year, dt_n.month,
+                                    dt_n.day, dt_n.hour,
+                                    dt_n.minute, dt_n.second)
             # Generate HTML content
             last_values = self.logged_last_values()
             for name in last_values:
@@ -312,6 +370,7 @@ class AsyncSession:
             n_figs = len(self.figure_list)
             message_html = template.render(title=title,
                                            fignums=range(n_figs),
+                                           datestr=datestr,
                                            last_values=last_values)
 
             # Create Email message
@@ -323,11 +382,6 @@ class AsyncSession:
             msg.add_alternative(message_html, subtype='html')
 
             # Add figure images
-            dt_n = datetime.now()
-            dt_fmt = '{:}{:02d}{:02d}-{:02d}{:02d}{:02d}'
-            datestr = dt_fmt.format(dt_n.year, dt_n.month,
-                                    dt_n.day, dt_n.hour,
-                                    dt_n.minute, dt_n.second)
             for fignum, fig in enumerate(self.figure_list):
                 fd, fname = tempfile.mkstemp(suffix=".png")
                 with os.fdopen(fd, 'wb') as f_png:
@@ -340,7 +394,7 @@ class AsyncSession:
                 p.add_related(figure_data,
                               maintype='image',
                               subtype='png',
-                              cid='part1.{:d}'.format(fignum),
+                              cid='{:d}{:}'.format(fignum, datestr),
                               filename='fig{:d}-{:}.png'.format(fignum,
                                                                 datestr))
 
