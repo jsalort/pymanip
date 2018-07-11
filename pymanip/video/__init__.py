@@ -229,7 +229,10 @@ class Camera:
                 dt.append(ts)
             ii+=1
             if progressbar:
-                bar.update(ii)
+                try:
+                    bar.update(ii)
+                except Exception:
+                    print(ii)
             await asyncio.sleep(0.001)
         if progressbar:
             print("")
@@ -243,7 +246,10 @@ class Camera:
                            compression, compression_level)
                 computation_time += time.process_time()-start_time
                 if progressbar:
-                    bar.update(ii+1)
+                    try:
+                        bar.update(ii+1)
+                    except Exception:
+                        print(ii)
                 await asyncio.sleep(0.0001)
         if progressbar:
             print("")
