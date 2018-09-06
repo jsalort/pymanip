@@ -20,5 +20,5 @@ setup(name='pymanip',
       license='CeCILL-B',
       packages=['pymanip'],
       install_requires=['h5py', 'clint', 'fluidlab (>=0.0.3)',
-                        'opencv-python', 'progressbar2',
+                        'progressbar2',
                         'aiohttp', 'aiohttp_jinja2'])
