@@ -96,7 +96,7 @@ class BaseSession(object):
     def __init__(self, session_name=None):
         if session_name is None:
             session_name = makeAcqName()
-            
+
         self.session_name = session_name
         self.storename = session_name + '.hdf5'
         self.session_opening_time = time.time()
@@ -147,7 +147,7 @@ class BaseSession(object):
     def dataset(self, name):
         if self.grp_datasets_defined:
             return self.grp_datasets[name].value
-            
+
     def dataset_names(self):
         return self.grp_datasets.keys()
 
@@ -168,7 +168,7 @@ class BaseSession(object):
 
     def log_variable_list(self):
         return self.grp_variables.keys()
-    
+
     def log(self, varname):
         if self.opened:
             if varname == 'Time' or varname == 'time' or varname == 't':
@@ -271,23 +271,29 @@ class BaseSession(object):
     def __exit__(self, type_, value, cb):
         self.exited = True
 
+
 class SavedSession(BaseSession):
-    def __init__(self, session_name, cache_override=False, cache_location='.', verbose=True):
+    def __init__(self, session_name, cache_override=False, cache_location='.',
+                 verbose=True):
         super(SavedSession, self).__init__(session_name)
         self.store = h5py.File(self.storename, 'r')
-        self.dset_time = self.store["time"]
+        try:
+            self.dset_time = self.store["time"]
+        except KeyError:
+            print("The file '" + self.storename + "' is not a pymanip session file.")
+            raise RuntimeError("Wrong hdf5 data")
         self.grp_variables = self.store["variables"]
         self.verbose = verbose
         try:
             self.parameters = self.store.attrs
             self.parameters_defined = True
-        except:
+        except Exception:
             self.parameters_defined = False
             pass
         try:
             self.grp_datasets = self.store["datasets"]
             self.grp_datasets_defined = True
-        except:
+        except Exception:
             self.grp_datasets_defined = False
             pass
         self.opened = True
@@ -454,7 +460,7 @@ class SavedSession(BaseSession):
             self.cachestore = None
         super(SavedSession, self).__exit__(type, value, cb)
 
-        
+
 class Session(BaseSession):
     def __init__(self, session_name, variable_list=[], allow_override_datasets=False):
         if has_pathlib:
