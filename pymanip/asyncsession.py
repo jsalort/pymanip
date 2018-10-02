@@ -637,8 +637,12 @@ class RemoteObserver:
         url = 'http://{host:}:{port:}/api/{api:}'.format(host=self.host,
                                                          port=self.port,
                                                          api=apiname)
-        r = requests.post(url, params=params)
-        return r.json()
+        r = requests.post(url, json=params)
+        try:
+            return r.json()
+        except json.decoder.JSONDecodeError:
+            print(r.text)
+            raise
 
     def get_last_values(self):
         """
@@ -654,14 +658,25 @@ class RemoteObserver:
         data = self.get_last_values()
         self.remote_varnames = list(data.keys())
 
-    def stop_recording(self):
-        recordings = list()
+    def stop_recording(self, reduce_time=True):
+        recordings = dict()
         for varname in self.remote_varnames:
             data = self._post_request('data_from_ts',
                                       params={'name': varname,
                                               'last_ts': self.server_ts_start,
                                               })
-            recordings.append(data)
+            recordings[varname] = {'t': [d[0] for d in data],
+                                   'value': [d[1] for d in data]}
+        if reduce_time:
+            t = recordings[self.remote_varnames[0]]['t']
+            print('t =', t)
+            print([recordings[varname]['t'] == t
+                    for varname in self.remote_varnames])
+            if all([recordings[varname]['t'] == t
+                    for varname in self.remote_varnames]):
+                recordings = {k: v['value'] for k, v in recordings.items()}
+                recordings['time'] = t
+
         return recordings
 
 
