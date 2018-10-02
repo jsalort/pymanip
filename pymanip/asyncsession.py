@@ -26,6 +26,7 @@ import tempfile
 import smtplib
 from email.message import EmailMessage
 from clint.textui import colored
+import requests
 
 try:
     import PyQt5.QtCore
@@ -553,6 +554,9 @@ class AsyncSession:
         #print('from', last_ts, data_out)
         return web.json_response(data_out)
 
+    async def server_current_ts(self):
+        return web.json_response({'now': datetime.now().timestamp()})
+
     async def mytask(self, corofunc):
         print('Starting task', corofunc)
         while self.running:
@@ -584,7 +588,10 @@ class AsyncSession:
                                web.static('/static',
                                           self.static_dir),
                                web.post('/api/data_from_ts',
-                                        self.server_data_from_ts)])
+                                        self.server_data_from_ts),
+                               web.get('/api/server_current_ts',
+                                       self.server_current_ts),
+                               ])
 
         webserver = loop.create_server(app.make_handler(),
                                        host=None, port=6913)
@@ -603,6 +610,54 @@ class AsyncSession:
         loop.run_until_complete(asyncio.gather(webserver,
                                                self.figure_gui_update(),
                                                *tasks_final))
+
+
+class RemoteObserver:
+    """
+    Remote observation of a running async session
+    """
+
+    def __init__(self, host, port=6913):
+        self.host = host
+        self.port = port
+
+    def _get_request(self, apiname):
+        url = 'http://{host:}:{port:}/api/{api:}'.format(host=self.host,
+                                                         port=self.port,
+                                                         api=apiname)
+        r = requests.get(url)
+        return r.json()
+
+    def _post_request(self, apiname, params):
+        url = 'http://{host:}:{port:}/api/{api:}'.format(host=self.host,
+                                                         port=self.port,
+                                                         api=apiname)
+        r = requests.post(url, params=params)
+        return r.json()
+
+    def get_last_values(self):
+        """
+        Client function to grab the last set of values from
+        a remote running async session
+        """
+
+        data = self._get_request('logged_last_values')
+        return {d['name']: d['value'] for d in data}
+
+    def start_recording(self):
+        self.server_ts_start = self._get_request('server_current_ts')['now']
+        data = self.get_last_values()
+        self.remote_varnames = list(data.keys())
+
+    def stop_recording(self):
+        recordings = list()
+        for varname in self.remote_varnames:
+            data = self._post_request('data_from_ts',
+                                      params={'name': varname,
+                                              'last_ts': self.server_ts_start,
+                                              })
+            recordings.append(data)
+        return recordings
 
 
 if __name__ == '__main__':
