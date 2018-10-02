@@ -27,6 +27,7 @@ import smtplib
 from email.message import EmailMessage
 from clint.textui import colored
 import requests
+import json
 
 try:
     import PyQt5.QtCore
@@ -554,7 +555,7 @@ class AsyncSession:
         #print('from', last_ts, data_out)
         return web.json_response(data_out)
 
-    async def server_current_ts(self):
+    async def server_current_ts(self, request):
         return web.json_response({'now': datetime.now().timestamp()})
 
     async def mytask(self, corofunc):
@@ -626,7 +627,11 @@ class RemoteObserver:
                                                          port=self.port,
                                                          api=apiname)
         r = requests.get(url)
-        return r.json()
+        try:
+            return r.json()
+        except json.decoder.JSONDecodeError:
+            print(r.text)
+            raise
 
     def _post_request(self, apiname, params):
         url = 'http://{host:}:{port:}/api/{api:}'.format(host=self.host,
