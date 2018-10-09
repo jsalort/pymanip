@@ -8,7 +8,11 @@ from pathlib import Path
 from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
-from pymanip.util.video import preview_pco, preview_avt
+try:
+	from pymanip.util.video import preview_pco, preview_avt
+	has_video = True
+except ImportError:
+	has_video = False
 try:
     from pymanip.daq import DAQmx
     has_daq = True
@@ -120,6 +124,8 @@ elif args.command == 'rebuild_hdf':
 elif args.command == 'scan_gpib':
     scanGpib(int(args.boardNumber))
 elif args.command == 'video':
+    if not has_video:
+        print('Video libraries not found')
     if isinstance(args.toolkit, list):
         tk = args.toolkit[0]
     else:

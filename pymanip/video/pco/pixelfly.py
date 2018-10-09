@@ -12,7 +12,11 @@ import datetime
 
 # Open DLL
 pixelfly_dllpath = r"C:\Program Files\Digital Camera Toolbox\Camware4\SC2_Cam.dll"
-pixelfly_dll = ctypes.windll.LoadLibrary(pixelfly_dllpath)
+try:
+	pixelfly_dll = ctypes.windll.LoadLibrary(pixelfly_dllpath)
+except OSError:
+	print(pixelfly_dllpath, 'not found')
+	raise ImportError
 
 # General constants
 class PCO_ErrorLayer(IntEnum):
