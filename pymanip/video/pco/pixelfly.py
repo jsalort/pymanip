@@ -156,17 +156,16 @@ Interface type: {inter:}""".format(type=self.wCamType,
             inter=self.wInterfaceType)
 
 class PCO_General(ctypes.Structure):
-    _fields_ = [('wSize', ctypes.c_ushort),
-                ('ZZwAlignDummy1', ctypes.c_ushort),
+    _fields_ = [('wSize', ctypes.wintypes.WORD),
+                ('ZZwAlignDummy1', ctypes.wintypes.WORD),
                 ('strCamType', PCO_CameraType),
-                ('dwCamHealthWarnings', ctypes.c_uint),
-                ('dwCamHealthErrors', ctypes.c_uint),
-                ('dwCamHealthStatus', ctypes.c_uint),
-                ('sCCDTemperature', ctypes.c_short),
-                ('sCamTemperature', ctypes.c_short),
-                ('sPowerSupplyTemperature', ctypes.c_short),
-                ('sPowerSupplyTemperature', ctypes.c_short),
-                ('ZZwDummy', ctypes.c_ushort * 37)]
+                ('dwCamHealthWarnings', ctypes.wintypes.DWORD),
+                ('dwCamHealthErrors', ctypes.wintypes.DWORD),
+                ('dwCamHealthStatus', ctypes.wintypes.DWORD),
+                ('sCCDTemperature', ctypes.wintypes.SHORT),
+                ('sCamTemperature', ctypes.wintypes.SHORT),
+                ('sPowerSupplyTemperature', ctypes.wintypes.SHORT),
+                ('ZZwDummy', ctypes.wintypes.WORD * 37)]
     
     def __init__(self):
         super(PCO_General, self).__init__()
@@ -648,9 +647,9 @@ def PCO_OpenCamera(board=0):
     """
     
     f = pixelfly_dll.PCO_OpenCamera
-    f.argtypes = (ctypes.POINTER(ctypes.c_int), ctypes.c_ushort)
+    f.argtypes = (ctypes.POINTER(ctypes.wintypes.HANDLE), ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
-    h = ctypes.c_int(0)
+    h = ctypes.wintypes.HANDLE(0)
     ret_code = f(ctypes.byref(h), board)
     PCO_manage_error(ret_code)
     return h
@@ -661,7 +660,7 @@ def PCO_CloseCamera(handle):
     """
     
     f = pixelfly_dll.PCO_CloseCamera
-    f.argtypes = (ctypes.c_int,)
+    f.argtypes = (ctypes.wintypes.HANDLE,)
     f.restype = ctypes.c_int
     ret_code = f(handle)
     PCO_manage_error(ret_code)
@@ -672,7 +671,8 @@ def PCO_GetInfoString(handle):
     """
     
     f = pixelfly_dll.PCO_GetInfoString
-    f.argtypes = (ctypes.c_int, ctypes.c_uint, ctypes.c_char_p, ctypes.c_ushort)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD, 
+                  ctypes.c_char_p, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     p = ctypes.create_string_buffer(256)
     ret_code = f(handle, 0, p, 256)
@@ -685,7 +685,7 @@ def PCO_GetCameraName(handle):
     """
     
     f = pixelfly_dll.PCO_GetCameraName
-    f.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.wintypes.WORD)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.c_char_p, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     cameraName = ctypes.create_string_buffer(41)
     ret_code = f(handle, cameraName, 41)
@@ -703,7 +703,7 @@ def PCO_GetGeneral(handle):
     """
     
     f = pixelfly_dll.PCO_GetGeneral
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(PCO_General))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(PCO_General))
     f.restype = ctypes.c_int
     strGeneral = PCO_General()
     ret_code = f(handle, ctypes.byref(strGeneral))
@@ -716,7 +716,7 @@ def PCO_GetSensorStruct(handle):
     """
     
     f = pixelfly_dll.PCO_GetSensorStruct
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(PCO_Sensor))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(PCO_Sensor))
     f.restype = ctypes.c_int
     strSensor = PCO_Sensor()
     ret_code = f(handle, ctypes.byref(strSensor))
@@ -731,7 +731,7 @@ def PCO_GetCameraDescription(handle):
     """
     
     f = pixelfly_dll.PCO_GetCameraDescription
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(PCO_Description))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(PCO_Description))
     f.restype = ctypes.c_int
     desc = PCO_Description()
     ret_code = f(handle, ctypes.byref(desc))
@@ -746,7 +746,8 @@ def PCO_GetCameraHealthStatus(handle):
     
     # Call PCO_GetCameraHealthStatus function
     f = pixelfly_dll.PCO_GetCameraHealthStatus
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.DWORD), ctypes.POINTER(ctypes.wintypes.DWORD), ctypes.POINTER(ctypes.wintypes.DWORD))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.wintypes.DWORD), 
+                  ctypes.POINTER(ctypes.wintypes.DWORD), ctypes.POINTER(ctypes.wintypes.DWORD))
     f.restype = ctypes.c_int
     dwWarn = ctypes.wintypes.DWORD()
     dwErr = ctypes.wintypes.DWORD()
@@ -765,7 +766,7 @@ def PCO_GetRecordingStruct(handle):
     
     strRecording = PCO_Recording()
     f = pixelfly_dll.PCO_GetRecordingStruct
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(PCO_Recording))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(PCO_Recording))
     f.restype = ctypes.c_int
     ret_code = f(handle, ctypes.byref(strRecording))
     PCO_manage_error(ret_code)
@@ -777,7 +778,8 @@ def PCO_GetSizes(handle: int) -> Tuple[int, int, int, int]:
     """
     
     f = pixelfly_dll.PCO_GetSizes
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.WORD),
+    f.argtypes = (ctypes.wintypes.HANDLE, 
+                  ctypes.POINTER(ctypes.wintypes.WORD),
                   ctypes.POINTER(ctypes.wintypes.WORD),
                   ctypes.POINTER(ctypes.wintypes.WORD),
                   ctypes.POINTER(ctypes.wintypes.WORD))
@@ -795,7 +797,7 @@ def PCO_AllocateBuffer(handle: int,
                        bufNr: int, 
                        size: int, 
                        bufPtr: ctypes.POINTER(ctypes.wintypes.WORD), 
-                       hEvent: int=0) -> Tuple[int, 
+                       hEvent: ctypes.wintypes.HANDLE=0) -> Tuple[int, 
                                                  ctypes.POINTER(ctypes.wintypes.WORD), 
                                                  int]:
     """
@@ -811,14 +813,14 @@ def PCO_AllocateBuffer(handle: int,
     """
     
     f = pixelfly_dll.PCO_AllocateBuffer
-    f.argtypes = (ctypes.c_int,                          # handle
+    f.argtypes = (ctypes.wintypes.HANDLE,                # handle
                   ctypes.POINTER(ctypes.wintypes.SHORT), # sBufNr
                   ctypes.wintypes.DWORD,                 # dwSize
                   ctypes.POINTER(ctypes.POINTER(ctypes.wintypes.WORD)),
-                  ctypes.POINTER(ctypes.c_int))
+                  ctypes.POINTER(ctypes.wintypes.HANDLE))
     f.restype = ctypes.c_int
     sBufNr = ctypes.wintypes.SHORT(bufNr)
-    hEvent = ctypes.c_int(hEvent)
+    hEvent = ctypes.wintypes.HANDLE(hEvent)
     ret_code = f(handle, ctypes.byref(sBufNr), size, 
                  ctypes.byref(bufPtr), 
                  ctypes.byref(hEvent))
@@ -834,7 +836,7 @@ def PCO_FreeBuffer(handle, bufNr):
     """
     
     f = pixelfly_dll.PCO_FreeBuffer
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.SHORT)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.SHORT)
     f.restype = ctypes.c_int
     ret_code = f(handle, bufNr)
     PCO_manage_error(ret_code)
@@ -854,7 +856,7 @@ def PCO_GetBufferStatus(handle, sBufNr):
     """
 
     f = pixelfly_dll.PCO_GetBufferStatus
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.SHORT,
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.SHORT,
                   ctypes.POINTER(ctypes.wintypes.DWORD),
                   ctypes.POINTER(ctypes.wintypes.DWORD))
     f.restype = ctypes.c_int
@@ -876,7 +878,7 @@ def PCO_ArmCamera(handle):
     """
     
     f = pixelfly_dll.PCO_ArmCamera
-    f.argtypes = (ctypes.c_int,)
+    f.argtypes = (ctypes.wintypes.HANDLE,)
     f.restype = ctypes.c_int
     ret_code = f(handle)
     PCO_manage_error(ret_code)
@@ -889,7 +891,7 @@ def PCO_GetRecordingState(handle):
     """
     
     f = pixelfly_dll.PCO_GetRecordingState
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.WORD))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.wintypes.WORD))
     f.restype = ctypes.c_int
     state = ctypes.wintypes.WORD()
     ret_code = f(handle, ctypes.byref(state))
@@ -914,9 +916,9 @@ def PCO_SetRecordingState(handle, state):
     if state not in (0x0000, 0x0001):
         raise ValueError('Wrong state value')
     f = pixelfly_dll.PCO_SetRecordingState
-    f.argtypes = (ctypes.c_int, ctypes.c_ushort)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
-    wRecState = ctypes.c_ushort(1 if state else 0)
+    wRecState = ctypes.wintypes.WORD(1 if state else 0)
     ret_code = f(handle, wRecState)
     PCO_manage_error(ret_code)
 
@@ -931,7 +933,7 @@ def PCO_GetBitAlignment(handle):
     """
     
     f = pixelfly_dll.PCO_GetBitAlignment
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.WORD))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.wintypes.WORD))
     f.restype = ctypes.c_int
     bitAlignment = ctypes.wintypes.WORD()
     ret_code = f(handle, ctypes.byref(bitAlignment))
@@ -946,7 +948,7 @@ def PCO_SetBitAlignment(handle, littleEndian):
     """
     
     f = pixelfly_dll.PCO_SetBitAlignment
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     ret_code = f(handle, littleEndian)
     PCO_manage_error(ret_code)
@@ -959,7 +961,7 @@ def PCO_GetImageStruct(handle):
     """
     
     f = pixelfly_dll.PCO_GetImageStruct
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(PCO_Image))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(PCO_Image))
     f.restype = ctypes.c_int
     strImage = PCO_Image()
     ret_code = f(handle, ctypes.byref(strImage))
@@ -975,7 +977,7 @@ def PCO_GetMetaData(handle, bufNr):
     """
     
     f = pixelfly_dll.PCO_GetMetaData
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.SHORT,
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.SHORT,
                   ctypes.POINTER(PCO_METADATA),
                   ctypes.wintypes.DWORD, ctypes.wintypes.DWORD)
     f.restype = ctypes.c_int
@@ -996,7 +998,7 @@ def PCO_SetMetaDataMode(handle, MetaDataMode):
     """
     
     f = pixelfly_dll.PCO_SetMetaDataMode
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD,
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD,
                   ctypes.POINTER(ctypes.wintypes.WORD),
                   ctypes.POINTER(ctypes.wintypes.WORD))
     f.restype = ctypes.c_int
@@ -1013,7 +1015,7 @@ def PCO_GetMetaDataMode(handle):
     """
     
     f = pixelfly_dll.PCO_GetMetaDataMode
-    f.argtypes = (ctypes.c_int,
+    f.argtypes = (ctypes.wintypes.HANDLE,
                   ctypes.POINTER(ctypes.wintypes.WORD),
                   ctypes.POINTER(ctypes.wintypes.WORD),
                   ctypes.POINTER(ctypes.wintypes.WORD))
@@ -1041,7 +1043,7 @@ def PCO_SetTimestampMode(handle, mode):
     if mode not in (0x0000, 0x0001, 0x0002, 0x0003):
         raise ValueError('Bad mode value')
     f = pixelfly_dll.PCO_SetTimestampMode
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     ret_code = f(handle, mode)
     PCO_manage_error(ret_code)
@@ -1053,7 +1055,7 @@ def PCO_AddBufferEx(handle, dw1stImage, dwLastImage, sBufNr, wXRes, wYRes, wBitP
     """
 
     f = pixelfly_dll.PCO_AddBufferEx
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.DWORD,
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD,
                   ctypes.wintypes.DWORD, ctypes.wintypes.SHORT,
                   ctypes.wintypes.WORD, ctypes.wintypes.WORD,
                   ctypes.wintypes.WORD)
@@ -1071,7 +1073,7 @@ def PCO_CancelImages(handle):
     """
     
     f = pixelfly_dll.PCO_CancelImages
-    f.argtypes = (ctypes.c_int,)
+    f.argtypes = (ctypes.wintypes.HANDLE,)
     f.restype = ctypes.c_int
     ret_code = f(handle)
     PCO_manage_error(ret_code)
@@ -1093,7 +1095,7 @@ def PCO_SetImageParameters(handle, XRes, YRes, flags):
         raise ValueError('Wrong flag value')
     
     f = pixelfly_dll.PCO_SetImageParameters
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD,
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD,
                   ctypes.wintypes.WORD, ctypes.wintypes.DWORD,
                   ctypes.c_void_p, ctypes.c_int)
     f.restype = ctypes.c_int
@@ -1112,7 +1114,7 @@ def PCO_GetImageEx(handle, segment, firstImage, lastImage, bufNr,
     """
     
     f = pixelfly_dll.PCO_GetImageEx
-    f.argtypes = (ctypes.c_int,          # handle
+    f.argtypes = (ctypes.wintypes.HANDLE,# handle
                   ctypes.wintypes.WORD,  # wSegment
                   ctypes.wintypes.DWORD, # dw1stImage
                   ctypes.wintypes.DWORD, # dwLastImage
@@ -1151,7 +1153,7 @@ def PCO_SetDelayExposureTime(handle, dwDelay, dwExposure,
     """
     
     f = pixelfly_dll.PCO_SetDelayExposureTime
-    f.argtypes = (ctypes.c_int,
+    f.argtypes = (ctypes.wintypes.HANDLE,
                   ctypes.wintypes.DWORD, ctypes.wintypes.DWORD,
                   ctypes.wintypes.WORD, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
@@ -1164,7 +1166,7 @@ def PCO_GetDelayExposureTime(handle):
     """
     
     f = pixelfly_dll.PCO_GetDelayExposureTime
-    f.argtypes = (ctypes.c_int,
+    f.argtypes = (ctypes.wintypes.HANDLE,
                   ctypes.POINTER(ctypes.wintypes.DWORD),
                   ctypes.POINTER(ctypes.wintypes.DWORD),
                   ctypes.POINTER(ctypes.wintypes.WORD),
@@ -1188,7 +1190,7 @@ def PCO_GetTriggerMode(handle):
     """
     
     f = pixelfly_dll.PCO_GetTriggerMode
-    f.argtypes = (ctypes.c_int,
+    f.argtypes = (ctypes.wintypes.HANDLE,
                   ctypes.POINTER(ctypes.wintypes.WORD))
     f.restype = ctypes.c_int
     triggerMode = ctypes.wintypes.WORD()
@@ -1212,7 +1214,7 @@ def PCO_SetTriggerMode(handle, mode):
     """
     
     f = pixelfly_dll.PCO_SetTriggerMode
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     ret_code = f(handle, mode)
     PCO_manage_error(ret_code)
@@ -1232,7 +1234,7 @@ def PCO_SetADCOperation(handle, operation):
     """
     
     f = pixelfly_dll.PCO_SetADCOperation
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.WORD)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     ret_code = f(handle, operation)
     PCO_manage_error(ret_code)
@@ -1243,7 +1245,7 @@ def PCO_GetADCOperation(handle):
     """
     
     f = pixelfly_dll.PCO_GetADCOperation
-    f.argtypes = (ctypes.c_int,
+    f.argtypes = (ctypes.wintypes.HANDLE,
                   ctypes.POINTER(ctypes.wintypes.WORD))
     f.restype = ctypes.c_int
     operation = ctypes.wintypes.WORD()
@@ -1257,7 +1259,7 @@ def PCO_SetPixelRate(handle, rate):
     """
     
     f = pixelfly_dll.PCO_SetPixelRate
-    f.argtypes = (ctypes.c_int, ctypes.wintypes.DWORD)
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD)
     f.restype = ctypes.c_int
     ret_code = f(handle, rate)
     PCO_manage_error(ret_code)
@@ -1269,7 +1271,7 @@ def PCO_GetPixelRate(handle):
     """
     
     f = pixelfly_dll.PCO_GetPixelRate
-    f.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.wintypes.DWORD))
+    f.argtypes = (ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.wintypes.DWORD))
     f.restype = ctypes.c_int
     rate = ctypes.wintypes.DWORD()
     ret_code = f(handle, ctypes.byref(rate))
@@ -1279,12 +1281,13 @@ def PCO_GetPixelRate(handle):
 if __name__ == '__main__':
     try:
         h = PCO_OpenCamera()
+        print('h =', h)
         info = PCO_GetInfoString(h)
-        print(info)
+        print('info =', info)
         general = PCO_GetGeneral(h)
-        print(general)
+        print('general =', general)
         sensor = PCO_GetSensorStruct(h)
-        print(sensor)
+        print('sensor =', sensor)
     except PCO_Error as pe:
         print('Error: "', pe.args[0], '"')
     finally:

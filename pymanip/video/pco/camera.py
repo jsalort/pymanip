@@ -16,7 +16,7 @@ import asyncio
 from pymanip.asynctools import synchronize_generator
 
 from pymanip.video import MetadataArray, Camera
-from . import pixelfly as pf
+import pymanip.video.pco.pixelfly as pf
 
 def PCO_get_binary_timestamp(image):
     """
