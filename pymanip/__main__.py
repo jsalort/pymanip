@@ -148,10 +148,14 @@ elif args.command == 'video':
         exposure_ms = args.exposure[0]
     else:
         exposure_ms = args.exposure
+    if isinstance(args.board, list):
+        board = int(args.board[0])
+    else:
+        board = int(args.board)
     if args.camera_type.upper() == 'PCO':
-        preview_pco(args.board, tk, slice, zoom, Trigger, exposure_ms)
+        preview_pco(board, tk, slice, zoom, Trigger, exposure_ms)
     elif args.camera_type.upper() == 'AVT':
-        preview_avt(args.board, tk, slice, zoom, Trigger)
+        preview_avt(board, tk, slice, zoom, Trigger)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:

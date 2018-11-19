@@ -295,7 +295,7 @@ class PCO_Camera(Camera):
                                                           win32event.WaitForMultipleObjects,
                                                           [buffer.event_handle for buffer in buffers], 0, timeout)											 
                     if waitstat == win32event.WAIT_TIMEOUT:
-                        raise RuntimeError('Timeout')
+                        raise RuntimeError(f'Timeout ({timeout:})')
                     for ii, buffer in zip(range(4), buffer_ring):
                         waitstat = await loop.run_in_executor(None,
 														      win32event.WaitForSingleObject,
