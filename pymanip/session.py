@@ -572,6 +572,19 @@ class Session(BaseSession):
         self.datfile.flush()
         self.store.flush()
 
+    def save_remote_data(self, data):
+        """
+        Save data from RemoteObserver object as datasets and parameters
+        """
+        for k, v in data.items():
+            try:
+                v[0]
+                # we are iterable
+                self.save_dataset(k, data)
+            except TypeError:
+                # we are not iterable
+                self.save_parameter(k, data)
+
     def save_parameter(self, parameter_name, dict_caller=None):
         if dict_caller is None:
             stack = inspect.stack()

@@ -531,12 +531,16 @@ class AsyncSession:
         return response
 
     async def server_logged_last_values(self, request):
-        #print('[', datetime.now(), request.remote, request.rel_url, ']')
         data = [{'name': name,
                  'value': v[1],
                  'datestr': time.strftime(dateformat, time.localtime(v[0]))}
                 for name, v in self.logged_last_values().items()]
         return web.json_response(data)
+
+    async def server_get_parameters(self, request):
+        params = {k: v for k,v in self.parameters().items()
+                  if not k.startswith('_')}
+        return web.json_response(params)
 
     async def server_plot_page(self, request):
         print('[', datetime.now(), request.remote, request.rel_url, ']')
@@ -592,6 +596,8 @@ class AsyncSession:
                                         self.server_data_from_ts),
                                web.get('/api/server_current_ts',
                                        self.server_current_ts),
+                               web.get('/api/get_parameters',
+                                       self.server_get_parameters),
                                ])
 
         webserver = loop.create_server(app.make_handler(),
@@ -669,13 +675,15 @@ class RemoteObserver:
                                    'value': [d[1] for d in data]}
         if reduce_time:
             t = recordings[self.remote_varnames[0]]['t']
-            print('t =', t)
-            print([recordings[varname]['t'] == t
-                    for varname in self.remote_varnames])
+            #print('t =', t)
+            #print([recordings[varname]['t'] == t
+            #        for varname in self.remote_varnames])
             if all([recordings[varname]['t'] == t
                     for varname in self.remote_varnames]):
                 recordings = {k: v['value'] for k, v in recordings.items()}
                 recordings['time'] = t
+        parameters = self._get_request('get_parameters')
+        recordings.update(parameters)
 
         return recordings
 
