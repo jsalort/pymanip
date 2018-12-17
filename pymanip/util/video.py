@@ -68,10 +68,21 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
                     cam.set_trigger_mode(False)
                 cam.preview(backend, slice, zoom)
 
-def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None, exposure_ms=1):
+def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None, exposure_ms=1, bitdepth=12):
     if not has_andor:
         print('Andor bindings are not available.')
     else:
         with Andor_Camera(num) as cam:
             cam.set_exposure_time(exposure_ms/1000)
+            cam.FrameRate.setValue(10.0)
+            if bitdepth == 12:
+                cam.PixelEncoding.setString('Mono12Packed') #Mono12Packed Mono16
+                #cam.BitDepth.setString('12 Bit')
+                cam.SimplePreAmpGainControl.setString('11-bit (low noise)')
+            elif bitdepth == 16:
+                cam.PixelEncoding.setString('Mono16')
+                #cam.BitDepth.setString('16 Bit')
+                cam.SimplePreAmpGainControl.setString('16-bit (low noise & high well capacity)')
+            else:
+                raise ValueError('Only 12-bits or 16-bits')
             cam.preview(backend, slice, zoom)
