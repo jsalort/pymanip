@@ -7,12 +7,12 @@ Utility function for cameras and videos
 try:
     from pymanip.video.pco import PCO_Camera
     has_pco = True
-except ModuleNotFoundError:
+except Exception:
     has_pco = False
 try:
     from pymanip.video.avt import AVT_Camera
     has_avt = True
-except ModuleNotFoundError:
+except Exception:
     has_avt = False
 try:
     from pymanip.video.andor import Andor_Camera

@@ -4,7 +4,7 @@ import os
 from pymanip.video.andor import Andor_Camera
 
 # Exemple avec one-shot
-if False:
+if True:
     with Andor_Camera() as cam:
         for n in range(5):
             img = cam.acquisition_oneshot()
