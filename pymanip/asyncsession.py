@@ -11,6 +11,7 @@ import sys
 import os.path
 import pickle
 import warnings
+from pprint import pprint
 
 import sqlite3
 from datetime import datetime
@@ -671,17 +672,19 @@ class RemoteObserver:
                                       params={'name': varname,
                                               'last_ts': self.server_ts_start,
                                               })
-            recordings[varname] = {'t': [d[0] for d in data],
-                                   'value': [d[1] for d in data]}
+            if len(data) > 0:
+                recordings[varname] = {'t': [d[0] for d in data],
+                                       'value': [d[1] for d in data]}
         if reduce_time:
             t = recordings[self.remote_varnames[0]]['t']
-            #print('t =', t)
-            #print([recordings[varname]['t'] == t
-            #        for varname in self.remote_varnames])
             if all([recordings[varname]['t'] == t
-                    for varname in self.remote_varnames]):
+                    for varname in recordings]):
                 recordings = {k: v['value'] for k, v in recordings.items()}
                 recordings['time'] = t
+            else:
+                print('t =', t)
+                pprint({varname: recordings[varname]['t']
+                        for varname in self.remote_varnames})
         parameters = self._get_request('get_parameters')
         recordings.update(parameters)
 

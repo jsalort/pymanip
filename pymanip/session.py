@@ -577,11 +577,12 @@ class Session(BaseSession):
         Save data from RemoteObserver object as datasets and parameters
         """
         for k, v in data.items():
+            #print(k,type(v),v)
             try:
                 v[0]
                 # we are iterable
                 self.save_dataset(k, data)
-            except TypeError:
+            except (TypeError, KeyError):
                 # we are not iterable
                 self.save_parameter(k, data)
 

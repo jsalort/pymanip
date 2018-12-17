@@ -1,0 +1,228 @@
+"""
+
+Implements the pymanip.video.Camera object using pyAndorNeo module
+
+"""
+
+import time
+import asyncio
+import ctypes
+
+import numpy as np
+from pymanip.video import MetadataArray, Camera
+from pymanip.asynctools import synchronize_generator
+
+import AndorNeo.SDK3Cam as SDK3Cam
+import AndorNeo.SDK3 as SDK3
+
+MODE_CONTINUOUS = 1
+MODE_SINGLE_SHOT = 0
+
+validROIS = [(2592, 2160,1, 1),
+             (2544,2160,1,25),
+             (2064,2048,57,265),
+             (1776,1760,201,409),
+             (1920,1080,537,337),
+             (1392,1040,561,601),
+             (528,512,825,1033),
+             (240,256,953,1177),
+             (144,128,1017,1225)]
+                 
+class Andor_Camera(Camera):
+    
+    def __init__(self, camNum=0):
+        self.camNum = camNum
+        
+        # Auto properties (bound in SDK3Cam __init__)
+        self.CameraAcquiring = SDK3Cam.ATBool()
+        self.SensorCooling = SDK3Cam.ATBool()
+        
+        self.AcquisitionStart = SDK3Cam.ATCommand()
+        self.AcquisitionStop = SDK3Cam.ATCommand()
+        
+        self.CycleMode = SDK3Cam.ATEnum()
+        self.ElectronicShutteringMode = SDK3Cam.ATEnum()
+        self.FanSpeed = SDK3Cam.ATEnum()
+        self.PreAmpGainChannel = SDK3Cam.ATEnum()
+        self.PixelEncoding = SDK3Cam.ATEnum()
+        self.PixelReadoutRate = SDK3Cam.ATEnum()
+        self.PreAmpGain = SDK3Cam.ATEnum()
+        self.PreAmpGainSelector = SDK3Cam.ATEnum()
+        self.TriggerMode = SDK3Cam.ATEnum()
+        
+        self.AOIHeight = SDK3Cam.ATInt()
+        self.AOILeft = SDK3Cam.ATInt()
+        self.AOITop = SDK3Cam.ATInt()
+        self.AOIWidth = SDK3Cam.ATInt()
+        self.AOIStride = SDK3Cam.ATInt()
+        self.FrameCount = SDK3Cam.ATInt()
+        self.ImageSizeBytes = SDK3Cam.ATInt()
+        self.SensorHeight = SDK3Cam.ATInt()
+        self.SensorWidth = SDK3Cam.ATInt()
+        
+        self.CameraModel = SDK3Cam.ATString()
+        self.SerialNumber = SDK3Cam.ATString()
+        
+        self.ExposureTime = SDK3Cam.ATFloat()
+        self.FrameRate = SDK3Cam.ATFloat()
+        self.SensorTemperature = SDK3Cam.ATFloat()
+        self.TargetSensorTemperature = SDK3Cam.ATFloat()
+        
+        self.Overlap = SDK3Cam.ATBool()
+        self.SpuriousNoiseFilter = SDK3Cam.ATBool()
+        
+        self.CameraDump = SDK3Cam.ATCommand()
+        self.SoftwareTrigger = SDK3Cam.ATCommand()
+        
+        self.TemperatureControl = SDK3Cam.ATEnum()
+        self.TemperatureStatus = SDK3Cam.ATEnum()
+        self.SimplePreAmpGainControl = SDK3Cam.ATEnum()
+        self.BitDepth = SDK3Cam.ATEnum()
+        
+        self.ActualExposureTime = SDK3Cam.ATFloat()
+        self.BurstRate = SDK3Cam.ATFloat()
+        self.ReadoutTime = SDK3Cam.ATFloat()
+        
+        self.AccumulateCount = SDK3Cam.ATInt()
+        self.BaselineLevel = SDK3Cam.ATInt()
+        self.BurstCount = SDK3Cam.ATInt()
+        self.LUTIndex = SDK3Cam.ATInt()
+        self.LUTValue = SDK3Cam.ATInt()
+        
+        self.ControllerID = SDK3Cam.ATString()
+        self.FirmwareVersion = SDK3Cam.ATString()
+        
+        # Initialisation
+        self.handle = SDK3.Open(self.camNum)
+        for name, var in self.__dict__.items():
+            if isinstance(var, SDK3Cam.ATProperty):
+                var.connect(self.handle, name)
+        
+        #set some initial parameters
+        #self.FrameCount.setValue(1) #only for fixed mode?
+        self.CycleMode.setString('Continuous')
+        self.SimplePreAmpGainControl.setString('11-bit (low noise)')
+        self.PixelEncoding.setString('Mono12Packed') #FIXME allow Mono16
+        
+        # Camera object properties
+        self.FrameRate.setValue(self.FrameRate.max())
+        self.name = 'Andor ' + self.CameraModel.getValue() + ' ' + self.SerialNumber.getValue()
+        print(self.name)
+    
+    def close(self):
+        SDK3.Close(self.handle)
+    
+    def __exit__(self, type_, value, cb):
+        super(Andor_Camera, self).__exit__(type_, value, cb)
+        self.close()
+        
+    def set_exposure_time(self, seconds):
+        self.ExposureTime.setValue(seconds)
+        
+    def get_exposure_time(self):
+        """ returns exposure time in seconds """
+        return self.ExposureTime.getValue()
+
+    def acquisition_oneshot(self, timeout=1.0):
+        """
+        Simple one shot image grabbing.
+        Returns an autonomous numpy array
+        """
+        
+        # Make sure no acquisition is running & flush
+        if self.CameraAcquiring.getValue():
+            self.AcquisitionStop()
+        SDK3.Flush(self.handle)
+        
+        # Init buffer & queue
+        bufSize = self.ImageSizeBytes.getValue()
+        buf = np.empty(bufSize, 'uint8')
+        SDK3.QueueBuffer(self.handle, buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)), buf.nbytes)
+        
+        # Start acquisition
+        self.AcquisitionStart()
+        print('Start acquisition at framerate:', self.FrameRate.getValue())
+        
+        try:
+            # Wait for buffer
+            pData, lData = SDK3.WaitBuffer(self.handle, 100)
+            
+            # Convert buffer into numpy image
+            rbuf, cbuf = self.AOIWidth.getValue(), self.AOIHeight.getValue()
+            img = np.empty((rbuf, cbuf), np.uint16)
+            xs, ys = img.shape[:2]
+            a_s = self.AOIStride.getValue()
+            dt = self.PixelEncoding.getString()
+            SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
+                               img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
+                               xs, ys, a_s, dt, 'Mono16')
+        finally:
+            self.AcquisitionStop()
+        
+        return img.reshape((cbuf, rbuf), order='C')
+
+    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
+                                framerate=10.0, external_trigger=False, initialising_cams=None):
+        """
+        Multiple image acquisition
+        yields a shared memory numpy array
+        """
+        
+        loop = asyncio.get_event_loop()
+        
+        # Make sure no acquisition is running & flush
+        if self.CameraAcquiring.getValue():
+            self.AcquisitionStop()
+        SDK3.Flush(self.handle)
+        self.CycleMode.setString('Continuous')
+        self.FrameRate.setValue(float(framerate))
+        
+        # Init buffers
+        bufSize = self.ImageSizeBytes.getValue()
+        buf = np.empty(bufSize, 'uint8')
+        rbuf, cbuf = self.AOIWidth.getValue(), self.AOIHeight.getValue()
+        img = np.empty((rbuf, cbuf), np.uint16)
+        xs, ys = img.shape[:2]
+        a_s = self.AOIStride.getValue()
+        dt = self.PixelEncoding.getString()
+        print('Original pixel encoding:', dt)
+            
+        # Start acquisition
+        self.AcquisitionStart()
+        print('Started acquisition at framerate:', self.FrameRate.getValue())
+        print('Exposure time is {:.1f} ms'.format(self.ExposureTime.getValue()*1000))
+        
+        try:
+            count = 0
+            while count < num:
+                SDK3.QueueBuffer(self.handle,
+                                 buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
+                                 buf.nbytes)
+                pData, lData = await loop.run_in_executor(None,
+                                                          SDK3.WaitBuffer,
+                                                          self.handle, 100)
+                # Convert buffer and yield image
+                SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
+                                   img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
+                                   xs, ys, a_s, dt, 'Mono16')
+                yield MetadataArray(img.reshape((cbuf, rbuf), order='C'),
+                                    metadata={'counter': count,
+                                              'timestamp': 0}) # TODO
+                count = count + 1
+        
+        finally:
+            self.AcquisitionStop()
+    
+    def acquisition(self, num=np.inf, timeout=1000, raw=False,
+                    framerate=10.0, external_trigger=False):
+        yield from synchronize_generator(self.acquisition_async, num, timeout, raw,
+                                         framerate, external_trigger)
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    with Andor_Camera() as ac:
+        ac.set_exposure_time(1e-3)
+        img = ac.acquisition_oneshot()
+    plt.figure()
+    plt.imshow(img, cmap='gray')
+    plt.show()

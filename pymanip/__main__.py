@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
 try:
-	from pymanip.util.video import preview_pco, preview_avt
+	from pymanip.util.video import preview_pco, preview_avt, preview_andor
 	has_video = True
 except ImportError:
 	has_video = False
@@ -156,6 +156,8 @@ elif args.command == 'video':
         preview_pco(board, tk, slice, zoom, Trigger, exposure_ms)
     elif args.camera_type.upper() == 'AVT':
         preview_avt(board, tk, slice, zoom, Trigger)
+    elif args.camera_type.upper() == 'ANDOR':
+        preview_andor(board, tk, slice, zoom, Trigger)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:

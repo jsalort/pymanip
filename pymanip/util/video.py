@@ -14,6 +14,11 @@ try:
     has_avt = True
 except ModuleNotFoundError:
     has_avt = False
+try:
+    from pymanip.video.andor import Andor_Camera
+    has_andor = True
+except Exception:
+    has_andor = False
 from contextlib import ExitStack
 import asyncio
 
@@ -62,3 +67,11 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
                     print('Internal trigger')
                     cam.set_trigger_mode(False)
                 cam.preview(backend, slice, zoom)
+
+def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None, exposure_ms=1):
+    if not has_andor:
+        print('Andor bindings are not available.')
+    else:
+        with Andor_Camera(num) as cam:
+            cam.set_exposure_time(exposure_ms/1000)
+            cam.preview(backend, slice, zoom)

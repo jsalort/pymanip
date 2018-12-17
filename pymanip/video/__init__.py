@@ -79,6 +79,9 @@ class Camera:
         - resolution, name, bitdepth properties
     """
 
+    def __init__(self):
+        super(Camera, self).__init__()
+        
     def __enter__(self):
         return self
 
