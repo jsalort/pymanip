@@ -18,10 +18,11 @@ from pymanip.asynctools import synchronize_generator
 from pymanip.video import MetadataArray, Camera
 import pymanip.video.pco.pixelfly as pf
 
+
 def PCO_get_binary_timestamp(image):
     """
     Reads the BCD coded timestamp in the first 14 pixels of an image
-    
+
     Format:
     Pixel  1: Image counter (MSB) 00..99
     Pixel  2: Image counter       00..99
@@ -46,7 +47,9 @@ def PCO_get_binary_timestamp(image):
     minutes = pf.bcd_to_int(image[9])
     seconds = pf.bcd_to_int(image[10])
     microseconds = pf.bcd_to_int(image[11:], endianess='big')
-    return counter, datetime.datetime(year, month, day, hour, minutes, seconds, microseconds)
+    return counter, datetime.datetime(year, month, day, hour,
+                                      minutes, seconds, microseconds)
+
 
 class PCO_Buffer:
 
@@ -252,19 +255,21 @@ class PCO_Camera(Camera):
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
         return array
-    
+
     def acquisition(self, num=np.inf, timeout=1000, raw=False):
-        yield from synchronize_generator(self.acquisition_async,num, timeout, raw)
-		
-    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False, initialising_cams=None):
+        yield from synchronize_generator(self.acquisition_async,
+                                         num, timeout, raw)
+
+    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
+                                initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
         """
-        
+
         loop = asyncio.get_event_loop()
-		
+
         # Arm camera
         if pf.PCO_GetRecordingState(self.handle):
             pf.PCO_SetRecordingState(self.handle, False)
@@ -273,12 +278,12 @@ class PCO_Camera(Camera):
         if err != 0:
             raise RuntimeError('Camera has error status!')
         XResAct, YResAct, XResMax, YResMax = pf.PCO_GetSizes(self.handle)
-        
+
         with PCO_Buffer(self.handle, XResAct, YResAct) as buf1, \
              PCO_Buffer(self.handle, XResAct, YResAct) as buf2, \
              PCO_Buffer(self.handle, XResAct, YResAct) as buf3, \
              PCO_Buffer(self.handle, XResAct, YResAct) as buf4:
-            
+
             buffers = (buf1, buf2, buf3, buf4)
             try:
                 pf.PCO_SetImageParameters(self.handle, XResAct, YResAct,
@@ -293,13 +298,13 @@ class PCO_Camera(Camera):
                     #                                             0, timeout)
                     waitstat = await loop.run_in_executor(None, 
                                                           win32event.WaitForMultipleObjects,
-                                                          [buffer.event_handle for buffer in buffers], 0, timeout)											 
+                                                          [buffer.event_handle for buffer in buffers], 0, timeout)                                           
                     if waitstat == win32event.WAIT_TIMEOUT:
                         raise RuntimeError(f'Timeout ({timeout:})')
                     for ii, buffer in zip(range(4), buffer_ring):
                         waitstat = await loop.run_in_executor(None,
-														      win32event.WaitForSingleObject,
-															  buffer.event_handle, 0)
+                                                              win32event.WaitForSingleObject,
+                                                              buffer.event_handle, 0)
                         if waitstat == win32event.WAIT_OBJECT_0:
                             win32event.ResetEvent(buffer.event_handle)
                             statusDLL, statusDrv = pf.PCO_GetBufferStatus(self.handle, buffer.bufNr)
@@ -311,26 +316,28 @@ class PCO_Camera(Camera):
                                     counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
                                     data['counter'] = counter
                                     data['timestamp'] = dt
-                                yield data
+                                stop_signal = yield data
                             else:
                                 if self.metadata_mode:
                                     metadata = pf.PCO_GetMetaData(self.handle, buffer.bufNr)
-                                    yield MetadataArray(buffer.as_array(), metadata=metadata)
+                                    stop_signal = yield MetadataArray(buffer.as_array(), metadata=metadata)
                                 elif self.timestamp_mode:
                                     counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
-                                    yield MetadataArray(buffer.as_array(), metadata={'counter': counter, 'timestamp': dt})
+                                    stop_signal = yield MetadataArray(buffer.as_array(), metadata={'counter': counter, 'timestamp': dt})
                                 else:
-                                    yield buffer.as_array()
+                                    stop_signal = yield buffer.as_array()
                             count += 1
-                            pf.PCO_AddBufferEx(self.handle, 0, 0, buffer.bufNr, XResAct, YResAct, 16)
+                            pf.PCO_AddBufferEx(self.handle, 0, 0, buffer.bufNr,
+                                               XResAct, YResAct, 16)
                         else:
                             break
+                    if stop_signal:
+                        break
             finally:
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
 
 
-    
 if __name__ == '__main__':
     #import matplotlib.pyplot as plt
     #with PCO_Camera() as cam:

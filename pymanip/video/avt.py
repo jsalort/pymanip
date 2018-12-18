@@ -3,15 +3,15 @@ from pymanip.video import MetadataArray, Camera
 from pymanip.asynctools import synchronize_generator
 from pymba import Vimba
 from pymba.vimbaexception import VimbaException
-import asyncio
 import sys
+
 
 class AVT_Camera(Camera):
     # Class attributes
     system = None
     vimba = None
     active_cameras = set()
-    
+
     @classmethod
     def get_camera_list(cls):
         if cls.vimba:
@@ -19,7 +19,7 @@ class AVT_Camera(Camera):
         else:
             with Vimba() as vimba_:
                 return vimba_.getCameraIds()
-        
+
     def __init__(self, cam_num=0, pixelFormat='Mono16'):
         if not AVT_Camera.vimba:
             AVT_Camera.vimba = Vimba().__enter__()
@@ -34,15 +34,17 @@ class AVT_Camera(Camera):
         self.name = 'AVT ' + str(cam_num)
         self.model_name = self.camera.DeviceModelName.decode('ascii')
         print('cam' + str(self.num) + ':', self.model_name)
-        # par défaut, on démarre en Mode 0 avec la résolution maximale à la création de
-        # l'objet
+        # par défaut, on démarre en Mode 0 avec la résolution maximale à la
+        # création de l'objet
         self.camera.IIDCMode = 'Mode0'
         self.camera.Width = self.camera.WidthMax
         self.camera.Height = self.camera.HeightMax
-        print('cam' + str(self.num) + ': maximum resolution is', self.camera.Width, 'x', self.camera.Height)
-        print('cam' + str(self.num) + ': maximum framerate is', self.camera_feature_info('AcquisitionFrameRate')['range'][1])
+        print('cam' + str(self.num) + ': maximum resolution is',
+              self.camera.Width, 'x', self.camera.Height)
+        print('cam' + str(self.num) + ': maximum framerate is',
+              self.camera_feature_info('AcquisitionFrameRate')['range'][1])
         self.camera.PixelFormat = pixelFormat.encode('ascii')
-        
+
     def close(self):
         self.camera.closeCamera()
         self.camera = None
@@ -51,15 +53,15 @@ class AVT_Camera(Camera):
             AVT_Camera.system = None
             AVT_Camera.vimba.__exit__(None, None, None)
             AVT_Camera.vimba = None
-        
+
     def __exit__(self, type_, value, cb):
         super(AVT_Camera, self).__exit__(type_, value, cb)
         self.close()
-    
+
     def camera_features(self):
         cameraFeatureNames = self.camera.getFeatureNames()
         return [f.decode('ascii') for f in cameraFeatureNames]
-        
+
     def camera_feature_info(self, featureName):
         featureInfo = self.camera.getFeatureInfo(featureName)
         featDict = {field.decode('ascii') if isinstance(field, bytes) else field: getattr(featureInfo, field) for field in featureInfo.getFieldNames()}
@@ -87,14 +89,14 @@ class AVT_Camera(Camera):
             if isinstance(featDict[k], bytes):
                 featDict[k] = featDict[k].decode('ascii')
         return featDict
-        
+
     # Image acquisition
     def acquisition_oneshot(self):
         """
         Simple one shot image grabbing.
         Returns an autonomous numpy array
         """
-        
+
         self.camera.AcquisitionMode = 'SingleFrame'
         self.frame = self.camera.getFrame()
         self.frame.announceFrame()
@@ -113,50 +115,53 @@ class AVT_Camera(Camera):
             else:
                 raise NotImplementedError
             img = np.ndarray(buffer=self.frame.getBufferByteData(),
-                           dtype=dt,
-                           shape=(self.frame.height, self.frame.width)).copy()
-            
+                             dtype=dt,
+                             shape=(self.frame.height, self.frame.width)).copy()
+
         finally:
             self.camera.endCapture()
             self.camera.revokeAllFrames()
-            
+
         return img
-        
+
     def set_trigger_mode(self, mode=False):
         """
-        True if external trigger. Then also sets IIDCPacketSizeAuto to 'Maximize'
+        True if external trigger.
+        Then also sets IIDCPacketSizeAuto to 'Maximize'
         """
-        
+
         if mode:
             self.camera.TriggerMode = 'On'
             self.camera.TriggerSource = 'InputLines'
             self.camera.IIDCPacketSizeAuto = 'Maximize'
         else:
             self.camera.TriggerMode = 'Off'
-            
+
     def set_exposure_time(self, seconds):
         """
         Range: from 33.0 to 67108895.0
         """
         self.camera.ExposureMode = 'Timed'
         self.camera.ExposureTime = seconds*1e6
-                    
+
     def acquisition(self, num=np.inf, timeout=1000, raw=False,
                     framerate=None, external_trigger=False):
-        yield from synchronize_generator(self.acquisition_async, num, timeout, raw,
-                                         framerate, external_trigger)
+        yield from synchronize_generator(self.acquisition_async, num, timeout,
+                                         raw, framerate, external_trigger)
 
     async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
-                                framerate=None, external_trigger=False, initialising_cams=None):
+                                framerate=None, external_trigger=False,
+                                initialising_cams=None):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
         """
-        
+
         self.camera.AcquisitionMode = 'Continuous'
         if framerate is not None:
-            # Not usable if HighSNRIImages>0, external triggering or IIDCPacketSizeAuto are active
+            # Not usable if HighSNRIImages>0, external triggering or
+            # IIDCPacketSizeAuto are active
             self.camera.AcquisitionFrameRate = framerate
         if external_trigger:
             self.camera.TriggerMode = 'On'
@@ -184,38 +189,41 @@ class AVT_Camera(Camera):
                     dt = np.uint16
                 else:
                     raise NotImplementedError
-                yield MetadataArray(np.ndarray(buffer=self.frame.getBufferByteData(),
-                                               dtype=dt,
-                                               shape=(self.frame.height, self.frame.width)),
-                                    metadata={'counter': count,
-                                              'timestamp': self.frame.timestamp*1e-7})
+                stop_signal = yield MetadataArray(np.ndarray(buffer=self.frame.getBufferByteData(),
+                                                             dtype=dt,
+                                                             shape=(self.frame.height, self.frame.width)),
+                                                  metadata={'counter': count,
+                                                            'timestamp': self.frame.timestamp*1e-7})
                 count += 1
-                
+                if stop_signal:
+                    break
+
         finally:
             self.camera.runFeatureCommand("AcquisitionStop")
             self.camera.endCapture()
             self.camera.revokeAllFrames()
-    
+        yield True
+
+
 if __name__ == '__main__':
     try:
         output = open(sys.argv[1], 'w')
     except IndexError:
         output = sys.stdout
-    
+
     list = AVT_Camera.get_camera_list()
     for l in list:
         print(l.decode('ascii'), file=output)
-    
+
     with AVT_Camera(0) as cam:
         # features
         for f in cam.camera_features():
             print(f, file=output)
 
         print('-'*8, file=output)
-        
-            
+
         img = cam.acquisition_oneshot()
-        
+
         for feat in ['PixelFormat', 'AcquisitionFrameRate', 'AcquisitionMode',
                      'ExposureAuto', 'ExposureMode', 'ExposureTime',
                      'IIDCMode', 'IIDCIsoChannel', 'IIDCPacketSize', 'IIDCPacketSizeAuto',
@@ -227,13 +235,8 @@ if __name__ == '__main__':
             for k, v in featDict.items():
                 print(k, ':', v, file=output)
             print('-'*8, file=output)
-        
-        
+
+
     import matplotlib.pyplot as plt
     plt.imshow(img, origin='lower', cmap='gray')
     plt.show()
-        
-        
-        
-    
-    

@@ -81,7 +81,7 @@ class Camera:
 
     def __init__(self):
         super(Camera, self).__init__()
-        
+
     def __enter__(self):
         return self
 
@@ -102,7 +102,8 @@ class Camera:
         maximum = None
         cv2.namedWindow(name)
         try:
-            async for im in self.acquisition_async():
+            preview_generator = self.acquisition_async()
+            async for im in preview_generator:
                 #if minimum is None:
                 if True:
                     minimum = np.min(im)
@@ -119,6 +120,9 @@ class Camera:
                            cv2.resize(img, (int(l*zoom), int(c*zoom))))
                 k = cv2.waitKey(1)
                 if k in (0x1b, ord('s')):
+                    clean = preview_generator.send(True)
+                    if not clean:
+                        print("Generator not cleaned")
                     break
                 await asyncio.sleep(0.001)
         except KeyboardInterrupt:
@@ -130,12 +134,24 @@ class Camera:
         return synchronize_function(self.preview_async_cv, slice_, zoom,
                                     name="Preview")
 
+    def preview_exitHandler(self):
+        """
+
+        This method sends a stop signal to the camera acquisition generator
+
+        """
+
+        clean = self.preview_generator.send(True)
+        if not clean:
+            print("Generator not cleaned")
+
     def preview_qt(self, slice, zoom, app=None):
         if app:
             self.app = app
             just_started = False
         elif not hasattr(self, 'app'):
             self.app = QtGui.QApplication([])
+            self.app.aboutToQuit.connect(self.preview_exitHandler)
             just_started = True
         else:
             just_started = False

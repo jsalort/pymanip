@@ -19,27 +19,29 @@ MODE_CONTINUOUS = 1
 MODE_SINGLE_SHOT = 0
 
 
-validROIS = [(2592, 2160,1, 1),
-             (2544,2160,1,25),
-             (2064,2048,57,265),
-             (1776,1760,201,409),
-             (1920,1080,537,337),
-             (1392,1040,561,601),
-             (528,512,825,1033),
-             (240,256,953,1177),
-             (144,128,1017,1225)]
+validROIS = [(2592, 2160, 1, 1),
+             (2544, 2160, 1, 25),
+             (2064, 2048, 57, 265),
+             (1776, 1760, 201, 409),
+             (1920, 1080, 537, 337),
+             (1392, 1040, 561, 601),
+             (528, 512, 825, 1033),
+             (240, 256, 953, 1177),
+             (144, 128, 1017, 1225)]
+
 
 def parse_metadata(buf, verbose=False):
     """
-    Parse metadata at the end of buffer, happened when EnableMetadata boolean feature is true.
-    
+    Parse metadata at the end of buffer, happened when EnableMetadata boolean
+    feature is true.
+
     Metadata format: Frame data; CID; Length
     FrameData (CID=0), FPGA Ticks (CID=1), FrameInfo (CID=7)
     """
     LENGTH_FIELD_SIZE = 4
     CID_FIELD_SIZE = 4
-    TIMESTAMP_FIELD_SIZE = 8
-    
+    #TIMESTAMP_FIELD_SIZE = 8
+
     n = buf.size
     for ind in range(3):
         length = buf[n-LENGTH_FIELD_SIZE:n]
@@ -47,7 +49,8 @@ def parse_metadata(buf, verbose=False):
         #if verbose:
         #    print('length =', length)
         #    print('cid =', cid)
-        length = length[0]+(2**8)*length[1]+(2**16)*length[2]+(2**32)*length[3]-CID_FIELD_SIZE
+        length = length[0]+(2**8)*length[1]+(2**16)*length[2]+\
+                 (2**32)*length[3]-CID_FIELD_SIZE
         cid = cid[0]+(2**8)*cid[1]+(2**16)*cid[2]+(2**32)*cid[3]
         data = buf[n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE+length):n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE)]
         if verbose:
@@ -56,24 +59,25 @@ def parse_metadata(buf, verbose=False):
             print('data =', data)
         if cid == 1:
             return sum([(256**i)*b for i, b in enumerate(data)])
-        
+
         n -= CID_FIELD_SIZE+LENGTH_FIELD_SIZE+length
-                    
+
+
 class Andor_Camera(Camera):
-    
+
     def __init__(self, camNum=0):
         self.camNum = camNum
-        
+
         # Auto properties (bound in SDK3Cam __init__)
         self.CameraAcquiring = SDK3Cam.ATBool()
         self.SensorCooling = SDK3Cam.ATBool()
         self.MetadataEnable = SDK3Cam.ATBool()
         self.TimestampClock = SDK3Cam.ATInt()
         self.TimestampClockFrequency = SDK3Cam.ATInt()
-        
+
         self.AcquisitionStart = SDK3Cam.ATCommand()
         self.AcquisitionStop = SDK3Cam.ATCommand()
-        
+
         self.CycleMode = SDK3Cam.ATEnum()
         self.ElectronicShutteringMode = SDK3Cam.ATEnum()
         self.FanSpeed = SDK3Cam.ATEnum()
@@ -83,7 +87,7 @@ class Andor_Camera(Camera):
         self.PreAmpGain = SDK3Cam.ATEnum()
         self.PreAmpGainSelector = SDK3Cam.ATEnum()
         self.TriggerMode = SDK3Cam.ATEnum()
-        
+
         self.AOIHeight = SDK3Cam.ATInt()
         self.AOILeft = SDK3Cam.ATInt()
         self.AOITop = SDK3Cam.ATInt()
@@ -93,66 +97,66 @@ class Andor_Camera(Camera):
         self.ImageSizeBytes = SDK3Cam.ATInt()
         self.SensorHeight = SDK3Cam.ATInt()
         self.SensorWidth = SDK3Cam.ATInt()
-        
+
         self.CameraModel = SDK3Cam.ATString()
         self.SerialNumber = SDK3Cam.ATString()
-        
+
         self.ExposureTime = SDK3Cam.ATFloat()
         self.FrameRate = SDK3Cam.ATFloat()
         self.SensorTemperature = SDK3Cam.ATFloat()
         self.TargetSensorTemperature = SDK3Cam.ATFloat()
-        
+
         self.Overlap = SDK3Cam.ATBool()
         self.SpuriousNoiseFilter = SDK3Cam.ATBool()
-        
+
         self.CameraDump = SDK3Cam.ATCommand()
         self.SoftwareTrigger = SDK3Cam.ATCommand()
-        
+
         self.TemperatureControl = SDK3Cam.ATEnum()
         self.TemperatureStatus = SDK3Cam.ATEnum()
         self.SimplePreAmpGainControl = SDK3Cam.ATEnum()
         self.BitDepth = SDK3Cam.ATEnum()
-        
+
         self.ActualExposureTime = SDK3Cam.ATFloat()
         self.BurstRate = SDK3Cam.ATFloat()
         self.ReadoutTime = SDK3Cam.ATFloat()
-        
+
         self.AccumulateCount = SDK3Cam.ATInt()
         self.BaselineLevel = SDK3Cam.ATInt()
         self.BurstCount = SDK3Cam.ATInt()
         self.LUTIndex = SDK3Cam.ATInt()
         self.LUTValue = SDK3Cam.ATInt()
-        
+
         self.ControllerID = SDK3Cam.ATString()
         self.FirmwareVersion = SDK3Cam.ATString()
-        
+
         # Initialisation
         self.handle = SDK3.Open(self.camNum)
         for name, var in self.__dict__.items():
             if isinstance(var, SDK3Cam.ATProperty):
                 var.connect(self.handle, name)
-        
+
         #set some initial parameters
         #self.FrameCount.setValue(1) #only for fixed mode?
         self.CycleMode.setString('Continuous')
         self.SimplePreAmpGainControl.setString('11-bit (low noise)')
-        self.PixelEncoding.setString('Mono12Packed') #Mono12Packed Mono16
-        
+        self.PixelEncoding.setString('Mono12Packed')  # Mono12Packed Mono16
+
         # Camera object properties
         self.FrameRate.setValue(self.FrameRate.max())
         self.name = 'Andor ' + self.CameraModel.getValue() + ' ' + self.SerialNumber.getValue()
         print(self.name)
-    
+
     def close(self):
         SDK3.Close(self.handle)
-    
+
     def __exit__(self, type_, value, cb):
         super(Andor_Camera, self).__exit__(type_, value, cb)
         self.close()
-        
+
     def set_exposure_time(self, seconds):
         self.ExposureTime.setValue(seconds)
-        
+
     def get_exposure_time(self):
         """ returns exposure time in seconds """
         return self.ExposureTime.getValue()
@@ -162,7 +166,7 @@ class Andor_Camera(Camera):
         Simple one shot image grabbing.
         Returns an autonomous numpy array
         """
-        
+
         # Make sure no acquisition is running & flush
         if self.CameraAcquiring.getValue():
             self.AcquisitionStop()
@@ -171,20 +175,22 @@ class Andor_Camera(Camera):
         pc_clock = time.time()
         timestamp_clock = self.TimestampClock.getValue()
         timestamp_frequency = self.TimestampClockFrequency.getValue()
-        
+
         # Init buffer & queue
         bufSize = self.ImageSizeBytes.getValue()
         buf = np.empty(bufSize, 'uint8')
-        SDK3.QueueBuffer(self.handle, buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)), buf.nbytes)
-        
+        SDK3.QueueBuffer(self.handle,
+                         buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
+                         buf.nbytes)
+
         # Start acquisition
         self.AcquisitionStart()
         print('Start acquisition at framerate:', self.FrameRate.getValue())
-        
+
         try:
             # Wait for buffer
             pData, lData = SDK3.WaitBuffer(self.handle, 100)
-            
+
             # Convert buffer into numpy image
             rbuf, cbuf = self.AOIWidth.getValue(), self.AOIHeight.getValue()
             img = np.empty((rbuf, cbuf), np.uint16)
@@ -193,14 +199,14 @@ class Andor_Camera(Camera):
             dt = self.PixelEncoding.getString()
             ticks = parse_metadata(buf)
             ts = (ticks-timestamp_clock)/timestamp_frequency+pc_clock
-            SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
-                               img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
+            SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+                               img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
                                xs, ys, a_s, dt, 'Mono16')
         finally:
             self.AcquisitionStop()
-        
+
         return MetadataArray(img.reshape((cbuf, rbuf), order='C'),
-                                    metadata={'timestamp': ts})
+                             metadata={'timestamp': ts})
 
     async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
                                 initialising_cams=None):
@@ -208,14 +214,14 @@ class Andor_Camera(Camera):
         Multiple image acquisition
         yields a shared memory numpy array
         """
-        
+
         loop = asyncio.get_event_loop()
-        
+
         # Make sure no acquisition is running & flush
         if self.CameraAcquiring.getValue():
             self.AcquisitionStop()
         SDK3.Flush(self.handle)
-        
+
         # Set acquisition mode
         self.CycleMode.setString('Continuous')
         #self.FrameRate.setValue(float(framerate))
@@ -225,7 +231,7 @@ class Andor_Camera(Camera):
         timestamp_frequency = self.TimestampClockFrequency.getValue()
         print('ts clock =', timestamp_clock)
         print('ts freq =', timestamp_frequency)
-        
+
         # Init buffers
         bufSize = self.ImageSizeBytes.getValue()
         buf = np.empty(bufSize, 'uint8')
@@ -235,12 +241,12 @@ class Andor_Camera(Camera):
         a_s = self.AOIStride.getValue()
         dt = self.PixelEncoding.getString()
         print('Original pixel encoding:', dt)
-            
+
         # Start acquisition
         self.AcquisitionStart()
         print('Started acquisition at framerate:', self.FrameRate.getValue())
         print('Exposure time is {:.1f} ms'.format(self.ExposureTime.getValue()*1000))
-        
+
         try:
             count = 0
             while count < num:
@@ -251,8 +257,8 @@ class Andor_Camera(Camera):
                                                           SDK3.WaitBuffer,
                                                           self.handle, 1000)
                 # Convert buffer and yield image
-                SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
-                                   img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)), 
+                SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+                                   img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
                                    xs, ys, a_s, dt, 'Mono16')
                 ticks = parse_metadata(buf)
                 ts = (ticks-timestamp_clock)/timestamp_frequency+pc_clock
@@ -261,17 +267,21 @@ class Andor_Camera(Camera):
                 #if count < 10:
                 #    print('FPGA ticks =', ticks)
                 #    print('Timestamp =', ts)
-                
-                yield MetadataArray(img.reshape((cbuf, rbuf), order='C'),
-                                    metadata={'counter': count,
-                                              'timestamp': ts})
+
+                stop_signal = yield MetadataArray(img.reshape((cbuf, rbuf), order='C'),
+                                                  metadata={'counter': count,
+                                                            'timestamp': ts})
                 count = count + 1
-        
+                if stop_signal:
+                    break
+
         finally:
             self.AcquisitionStop()
-    
+
     def acquisition(self, num=np.inf, timeout=1000, raw=False):
-        yield from synchronize_generator(self.acquisition_async, num, timeout, raw)
+        yield from synchronize_generator(self.acquisition_async,
+                                         num, timeout, raw)
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

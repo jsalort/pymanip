@@ -8,13 +8,15 @@ def synchronize_generator(async_generator, *args, **kwargs):
 
     ag = async_generator(*args, **kwargs)
 
-    async def consume_generator():
-        r = await ag.__anext__()
+    async def consume_generator(stop_signal):
+        r = await ag.asend(stop_signal)
         return r
     loop = asyncio.new_event_loop()
     try:
+        stop_signal = None
         while True:
-            yield loop.run_until_complete(consume_generator())
+            val = loop.run_until_complete(consume_generator(stop_signal))
+            stop_signal = yield val
     except StopAsyncIteration:
         pass
     loop.close()
