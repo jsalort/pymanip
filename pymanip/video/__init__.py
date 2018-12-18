@@ -120,7 +120,7 @@ class Camera:
                            cv2.resize(img, (int(l*zoom), int(c*zoom))))
                 k = cv2.waitKey(1)
                 if k in (0x1b, ord('s')):
-                    clean = preview_generator.send(True)
+                    clean = await preview_generator.asend(True)
                     if not clean:
                         print("Generator not cleaned")
                     break

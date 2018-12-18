@@ -14,12 +14,18 @@ def synchronize_generator(async_generator, *args, **kwargs):
     loop = asyncio.new_event_loop()
     try:
         stop_signal = None
-        while True:
+        while not stop_signal:
             val = loop.run_until_complete(consume_generator(stop_signal))
             stop_signal = yield val
+        if stop_signal:
+            val = loop.run_until_complete(consume_generator(stop_signal))
+            loop.close()
+            loop = None
+            yield val
     except StopAsyncIteration:
-        pass
-    loop.close()
+        loop.close()
+        loop = None
+    assert loop is None
 
 
 def synchronize_function(async_func, *args, **kwargs):
