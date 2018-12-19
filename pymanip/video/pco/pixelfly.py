@@ -90,7 +90,7 @@ class PCO_Warning(RuntimeWarning):
 def PCO_manage_error(ret_code):
     if ret_code != 0:
         f = pixelfly_dll.PCO_GetErrorText
-        f.argtypes = (ctypes.c_uint, ctypes.c_char_p, ctypes.c_uint)
+        f.argtypes = (ctypes.wintypes.DWORD, ctypes.c_char_p, ctypes.wintypes.DWORD)
         desc = ctypes.create_string_buffer(256)
         f(ret_code, desc, 256)
         description = desc.raw.decode('ascii')
@@ -103,40 +103,40 @@ def PCO_manage_error(ret_code):
 # C Structure definitions
 class PCO_SC2_Hardware_DESC(ctypes.Structure):
     _fields_ = [('szName', ctypes.c_char * 16),
-                ('wBatchNo', ctypes.c_ushort),
-                ('wRevision', ctypes.c_ushort),
-                ('wVariant', ctypes.c_ushort),
-                ('ZZwDummy', ctypes.c_ushort * 20)]
+                ('wBatchNo', ctypes.wintypes.WORD),
+                ('wRevision', ctypes.wintypes.WORD),
+                ('wVariant', ctypes.wintypes.WORD),
+                ('ZZwDummy', ctypes.wintypes.WORD * 20)]
 
 PCO_MAXVERSIONHW = 10               
 class PCO_HW_Vers(ctypes.Structure):
-    _fields_ = [('BoardNum', ctypes.c_ushort),
+    _fields_ = [('BoardNum', ctypes.wintypes.WORD),
                 ('Board', PCO_SC2_Hardware_DESC * PCO_MAXVERSIONHW)]
 
 class PCO_SC2_Firmware_DESC(ctypes.Structure):
     _fields_ = [('szName', ctypes.c_char * 16),
-                ('bMinorRev', ctypes.c_byte),
-                ('bMajorRev', ctypes.c_byte),
-                ('wVariant', ctypes.c_ushort),
-                ('ZZwDummy', ctypes.c_ushort * 22)]
+                ('bMinorRev', ctypes.wintypes.BYTE),
+                ('bMajorRev', ctypes.wintypes.BYTE),
+                ('wVariant', ctypes.wintypes.WORD),
+                ('ZZwDummy', ctypes.wintypes.WORD * 22)]
 
 PCO_MAXVERSIONFW = 10               
 class PCO_FW_Vers(ctypes.Structure):
-    _fields_ = [('DeviceNum', ctypes.c_ushort),
+    _fields_ = [('DeviceNum', ctypes.wintypes.WORD),
                 ('Device', PCO_SC2_Firmware_DESC * PCO_MAXVERSIONFW)]
                 
 class PCO_CameraType(ctypes.Structure):
-    _fields_ = [('wSize', ctypes.c_ushort),
-                ('wCamType', ctypes.c_ushort),
-                ('wCamSubType', ctypes.c_ushort),
-                ('ZZwAlignDummy1', ctypes.c_ushort),
-                ('dwSerialNumber', ctypes.c_uint),
-                ('dwHWVersion', ctypes.c_uint),
-                ('dwFWVersion', ctypes.c_uint),
-                ('wInterfaceType', ctypes.c_ushort),
+    _fields_ = [('wSize', ctypes.wintypes.WORD),
+                ('wCamType', ctypes.wintypes.WORD),
+                ('wCamSubType', ctypes.wintypes.WORD),
+                ('ZZwAlignDummy1', ctypes.wintypes.WORD),
+                ('dwSerialNumber', ctypes.wintypes.DWORD),
+                ('dwHWVersion', ctypes.wintypes.DWORD),
+                ('dwFWVersion', ctypes.wintypes.DWORD),
+                ('wInterfaceType', ctypes.wintypes.WORD),
                 ('strHardwareVersion', PCO_HW_Vers),
                 ('strFirmwareVersion', PCO_FW_Vers),
-                ('ZZwDummy', ctypes.c_ushort * 39)]
+                ('ZZwDummy', ctypes.wintypes.WORD * 39)]
     
     def __init__(self):
         super(PCO_CameraType, self).__init__()
@@ -187,87 +187,87 @@ Power Supply Temperature = {power:}""".format(camType=str(self.strCamType),
                 
 PCO_RECORDINGDUMMY = 22
 class PCO_Recording(ctypes.Structure):
-    _fields_ = [("wSize", ctypes.c_ushort),
-                ("wStorageMode", ctypes.c_ushort),
-                ("wRecSubmode", ctypes.c_ushort),
-                ("wRecState", ctypes.c_ushort),
-                ("wAcquMode", ctypes.c_ushort),
-                ("wAcquEnableStatus", ctypes.c_ushort),
-                ("ucDay", ctypes.c_byte),
-                ("ucMonth", ctypes.c_byte),
-                ("wYear", ctypes.c_ushort),
-                ("wHour", ctypes.c_ushort),
-                ("ucMin", ctypes.c_byte),
-                ("ucSec", ctypes.c_byte),
-                ("wTimeSampMode", ctypes.c_ushort),
-                ("wRecordStopEventMode", ctypes.c_ushort),
-                ("dwRecordStopDelayImages", ctypes.c_uint),
-                ("wMetaDataMode", ctypes.c_ushort),
-                ("wMetaDataSize", ctypes.c_ushort),
-                ("wMetaDataVersion", ctypes.c_ushort),
-                ("ZZwDummy1", ctypes.c_ushort),
-                ("dwAcquModeExNumberImages", ctypes.c_uint),
-                ("dwAcquModeExReserved", ctypes.c_uint * 4),
-                ("ZZwDummy", ctypes.c_short * PCO_RECORDINGDUMMY)]
+    _fields_ = [("wSize", ctypes.wintypes.WORD),
+                ("wStorageMode", ctypes.wintypes.WORD),
+                ("wRecSubmode", ctypes.wintypes.WORD),
+                ("wRecState", ctypes.wintypes.WORD),
+                ("wAcquMode", ctypes.wintypes.WORD),
+                ("wAcquEnableStatus", ctypes.wintypes.WORD),
+                ("ucDay", ctypes.wintypes.BYTE),
+                ("ucMonth", ctypes.wintypes.BYTE),
+                ("wYear", ctypes.wintypes.WORD),
+                ("wHour", ctypes.wintypes.WORD),
+                ("ucMin", ctypes.wintypes.BYTE),
+                ("ucSec", ctypes.wintypes.BYTE),
+                ("wTimeSampMode", ctypes.wintypes.WORD),
+                ("wRecordStopEventMode", ctypes.wintypes.WORD),
+                ("dwRecordStopDelayImages", ctypes.wintypes.DWORD),
+                ("wMetaDataMode", ctypes.wintypes.WORD),
+                ("wMetaDataSize", ctypes.wintypes.WORD),
+                ("wMetaDataVersion", ctypes.wintypes.WORD),
+                ("ZZwDummy1", ctypes.wintypes.WORD),
+                ("dwAcquModeExNumberImages", ctypes.wintypes.DWORD),
+                ("dwAcquModeExReserved", ctypes.wintypes.DWORD * 4),
+                ("ZZwDummy", ctypes.wintypes.WORD * PCO_RECORDINGDUMMY)]
     
     def __init__(self):
         super(PCO_Recording, self).__init__()
         self.wSize = ctypes.sizeof(PCO_Recording)
 
 class PCO_Description(ctypes.Structure):
-    _fields_ = [("wSize", ctypes.c_ushort),
-                ("wSensorTypeDESC", ctypes.c_ushort),
-                ("wSensorSubTypeDESC", ctypes.c_ushort),
-                ("wMaxHorzResStdDESC", ctypes.c_ushort),
-                ("wMaxVertResStdDESC", ctypes.c_ushort),
-                ("wMaxHorzResExtDESC", ctypes.c_ushort),
-                ("wMaxVertResExtDESC", ctypes.c_ushort),
-                ("wDynResDESC", ctypes.c_ushort),
-                ("wMaxBinHorzDESC", ctypes.c_ushort),
-                ("wBinHorzSteppingDESC", ctypes.c_ushort),
-                ("wMaxBinVertDESC", ctypes.c_ushort),
-                ("wBinVertSteppingDESC", ctypes.c_ushort),
-                ("wRoiHorStepsDESC", ctypes.c_ushort),
-                ("wRoiVertStepsDESC", ctypes.c_ushort),
-                ("wNumADCsDESC", ctypes.c_ushort),
-                ("wMinSizeHorzDESC", ctypes.c_ushort),
-                ("dwPixelRateDESC", ctypes.c_uint*4),
-                ("ZZdwDummypr", ctypes.c_uint*20),
-                ("wConvFactDESC", ctypes.c_ushort*4),
-                ("sCoolingSetPoints", ctypes.c_short*10),
-                ("ZZdwDummycv", ctypes.c_ushort*8),
-                ("wSoftRoiHozStepsDESC", ctypes.c_ushort),
-                ("wSoftRoiVertStepsDESC", ctypes.c_ushort),
-                ("wIRDESC", ctypes.c_ushort),
-                ("wMinSizeVertDESC", ctypes.c_ushort),
-                ("dwMinDelayDESC", ctypes.c_uint),
-                ("dwMaxDelayDESC", ctypes.c_uint),
-                ("dwMinDelayStepDESC", ctypes.c_uint),
-                ("dwMinExposureDESC", ctypes.c_uint),
-                ("dwMaxExposureDESC", ctypes.c_uint),
-                ("dwMinExposureStepDESC", ctypes.c_uint),
-                ("dwMinDelayIRDESC", ctypes.c_uint),
-                ("dwMaxDelayIRDESC", ctypes.c_uint),
-                ("dwMinExposureIRDESC", ctypes.c_uint),
-                ("dwMaxExposureIRDESC", ctypes.c_uint),
-                ("wTimeTableDESC", ctypes.c_ushort),
-                ("wDoubleImageDESC", ctypes.c_ushort),
-                ("sMinCoolSetDESC", ctypes.c_short),
-                ("sMaxCoolSetDESC", ctypes.c_short),
-                ("sDefaultCoolSetDESC", ctypes.c_short),
-                ("wPowerDownModeDESC", ctypes.c_ushort),
-                ("wOffsetRegulationDESC", ctypes.c_ushort),
-                ("wColorPatternDESC", ctypes.c_ushort),
-                ("wPatternTypeDESC", ctypes.c_ushort),
-                ("wDummy1", ctypes.c_ushort),
-                ("wDummy2", ctypes.c_ushort),
-                ("wNumCoolingSetpoints", ctypes.c_ushort),
-                ("dwGeneralCapsDESC1", ctypes.c_uint),
-                ("dwGeneralCapsDESC2", ctypes.c_uint),
-                ("dwExtSyncFrequency", ctypes.c_uint*4),
-                ("dwGeneralCapsDESC3", ctypes.c_uint),
-                ("dwGeneralCapsDESC4", ctypes.c_uint),
-                ("ZZdwDummy", ctypes.c_uint*40)]
+    _fields_ = [("wSize", ctypes.wintypes.WORD),
+                ("wSensorTypeDESC", ctypes.wintypes.WORD),
+                ("wSensorSubTypeDESC", ctypes.wintypes.WORD),
+                ("wMaxHorzResStdDESC", ctypes.wintypes.WORD),
+                ("wMaxVertResStdDESC", ctypes.wintypes.WORD),
+                ("wMaxHorzResExtDESC", ctypes.wintypes.WORD),
+                ("wMaxVertResExtDESC", ctypes.wintypes.WORD),
+                ("wDynResDESC", ctypes.wintypes.WORD),
+                ("wMaxBinHorzDESC", ctypes.wintypes.WORD),
+                ("wBinHorzSteppingDESC", ctypes.wintypes.WORD),
+                ("wMaxBinVertDESC", ctypes.wintypes.WORD),
+                ("wBinVertSteppingDESC", ctypes.wintypes.WORD),
+                ("wRoiHorStepsDESC", ctypes.wintypes.WORD),
+                ("wRoiVertStepsDESC", ctypes.wintypes.WORD),
+                ("wNumADCsDESC", ctypes.wintypes.WORD),
+                ("wMinSizeHorzDESC", ctypes.wintypes.WORD),
+                ("dwPixelRateDESC", ctypes.wintypes.DWORD*4),
+                ("ZZdwDummypr", ctypes.wintypes.DWORD*20),
+                ("wConvFactDESC", ctypes.wintypes.WORD*4),
+                ("sCoolingSetPoints", ctypes.wintypes.SHORT*10),
+                ("ZZdwDummycv", ctypes.wintypes.WORD*8),
+                ("wSoftRoiHozStepsDESC", ctypes.wintypes.WORD),
+                ("wSoftRoiVertStepsDESC", ctypes.wintypes.WORD),
+                ("wIRDESC", ctypes.wintypes.WORD),
+                ("wMinSizeVertDESC", ctypes.wintypes.WORD),
+                ("dwMinDelayDESC", ctypes.wintypes.DWORD),
+                ("dwMaxDelayDESC", ctypes.wintypes.DWORD),
+                ("dwMinDelayStepDESC", ctypes.wintypes.DWORD),
+                ("dwMinExposureDESC", ctypes.wintypes.DWORD),
+                ("dwMaxExposureDESC", ctypes.wintypes.DWORD),
+                ("dwMinExposureStepDESC", ctypes.wintypes.DWORD),
+                ("dwMinDelayIRDESC", ctypes.wintypes.DWORD),
+                ("dwMaxDelayIRDESC", ctypes.wintypes.DWORD),
+                ("dwMinExposureIRDESC", ctypes.wintypes.DWORD),
+                ("dwMaxExposureIRDESC", ctypes.wintypes.DWORD),
+                ("wTimeTableDESC", ctypes.wintypes.WORD),
+                ("wDoubleImageDESC", ctypes.wintypes.WORD),
+                ("sMinCoolSetDESC", ctypes.wintypes.SHORT),
+                ("sMaxCoolSetDESC", ctypes.wintypes.SHORT),
+                ("sDefaultCoolSetDESC", ctypes.wintypes.SHORT),
+                ("wPowerDownModeDESC", ctypes.wintypes.WORD),
+                ("wOffsetRegulationDESC", ctypes.wintypes.WORD),
+                ("wColorPatternDESC", ctypes.wintypes.WORD),
+                ("wPatternTypeDESC", ctypes.wintypes.WORD),
+                ("wDummy1", ctypes.wintypes.WORD),
+                ("wDummy2", ctypes.wintypes.WORD),
+                ("wNumCoolingSetpoints", ctypes.wintypes.WORD),
+                ("dwGeneralCapsDESC1", ctypes.wintypes.DWORD),
+                ("dwGeneralCapsDESC2", ctypes.wintypes.DWORD),
+                ("dwExtSyncFrequency", ctypes.wintypes.DWORD*4),
+                ("dwGeneralCapsDESC3", ctypes.wintypes.DWORD),
+                ("dwGeneralCapsDESC4", ctypes.wintypes.DWORD),
+                ("ZZdwDummy", ctypes.wintypes.DWORD*40)]
     
     def __init__(self):
         super(PCO_Description, self).__init__()
@@ -367,26 +367,26 @@ Possible exposure: min {:} ns, max {:} ms, step {:} ns""".format( \
         return desc + "\n" + caps
         
 class PCO_Description2(ctypes.Structure):
-    _fields_ = [("wSize", ctypes.c_ushort),
-                ("ZZwAlignDummy1", ctypes.c_ushort),
-                ("dwMinPeriodicalTimeDESC2", ctypes.c_uint),
-                ("dwMaxPeriodicalTimeDESC2", ctypes.c_uint),
-                ("dwMinPeriodicalConditionDESC2", ctypes.c_uint),
-                ("dwMaxNumberOfExposuresDESC2", ctypes.c_uint),
-                ("lMinMonitorSignalOffsetDESC2", ctypes.c_long),
-                ("dwMaxMonitorSignalOffsetDESC2", ctypes.c_uint),
-                ("dwMinPeriodicalStepDESC2", ctypes.c_uint),
-                ("dwStartTimeDelayDESC2", ctypes.c_uint),
-                ("dwMinMonitorStepDESC2", ctypes.c_uint),
-                ("dwMinDelayModDESC2", ctypes.c_uint),
-                ("dwMaxDelayModDESC2", ctypes.c_uint),
-                ("dwMinDelayStepModDESC2", ctypes.c_uint),
-                ("dwMinExposureModDESC2", ctypes.c_uint),
-                ("dwMaxExposureModDESC2", ctypes.c_uint),
-                ("dwMinExposureStepModDESC2", ctypes.c_uint),
-                ("dwModulateCapsDESC2", ctypes.c_uint),
-                ("dwReserved", ctypes.c_uint*16),
-                ("ZZdwDummy", ctypes.c_uint*41)]
+    _fields_ = [("wSize", ctypes.wintypes.WORD),
+                ("ZZwAlignDummy1", ctypes.wintypes.WORD),
+                ("dwMinPeriodicalTimeDESC2", ctypes.wintypes.DWORD),
+                ("dwMaxPeriodicalTimeDESC2", ctypes.wintypes.DWORD),
+                ("dwMinPeriodicalConditionDESC2", ctypes.wintypes.DWORD),
+                ("dwMaxNumberOfExposuresDESC2", ctypes.wintypes.DWORD),
+                ("lMinMonitorSignalOffsetDESC2", ctypes.wintypes.LONG),
+                ("dwMaxMonitorSignalOffsetDESC2", ctypes.wintypes.DWORD),
+                ("dwMinPeriodicalStepDESC2", ctypes.wintypes.DWORD),
+                ("dwStartTimeDelayDESC2", ctypes.wintypes.DWORD),
+                ("dwMinMonitorStepDESC2", ctypes.wintypes.DWORD),
+                ("dwMinDelayModDESC2", ctypes.wintypes.DWORD),
+                ("dwMaxDelayModDESC2", ctypes.wintypes.DWORD),
+                ("dwMinDelayStepModDESC2", ctypes.wintypes.DWORD),
+                ("dwMinExposureModDESC2", ctypes.wintypes.DWORD),
+                ("dwMaxExposureModDESC2", ctypes.wintypes.DWORD),
+                ("dwMinExposureStepModDESC2", ctypes.wintypes.DWORD),
+                ("dwModulateCapsDESC2", ctypes.wintypes.DWORD),
+                ("dwReserved", ctypes.wintypes.DWORD*16),
+                ("ZZdwDummy", ctypes.wintypes.DWORD*41)]
     
     def __init__(self):
         super(PCO_Description2, self).__init__()
@@ -397,24 +397,24 @@ NUM_SIGNALS = 4
 NUM_SIGNAL_NAMES = 4
 
 class PCO_Single_Signal_Desc(ctypes.Structure):
-    _fields_ = [("wSize", ctypes.c_ushort),
-                ("ZZwAlignDummy1", ctypes.c_ushort),
+    _fields_ = [("wSize", ctypes.wintypes.WORD),
+                ("ZZwAlignDummy1", ctypes.wintypes.WORD),
                 ("strSignalName", (ctypes.c_char*25)*NUM_SIGNAL_NAMES),
-                ("wSignalDefinitions", ctypes.c_ushort),
-                ("wSignalTypes", ctypes.c_ushort),
-                ("wSignalPolarity", ctypes.c_ushort),
-                ("wSignalFilter", ctypes.c_ushort),
-                ("dwDummy", ctypes.c_uint*22)]
+                ("wSignalDefinitions", ctypes.wintypes.WORD),
+                ("wSignalTypes", ctypes.wintypes.WORD),
+                ("wSignalPolarity", ctypes.wintypes.WORD),
+                ("wSignalFilter", ctypes.wintypes.WORD),
+                ("dwDummy", ctypes.wintypes.DWORD*22)]
     
     def __init__(self):
         super(PCO_Single_Signal_Desc, self).__init__()
         self.wSize = ctypes.sizeof(PCO_Single_Signal_Desc)
         
 class PCO_Signal_Description(ctypes.Structure):
-    _fields_ = [("wSize", ctypes.c_ushort),
-                ("wNumOfSignals", ctypes.c_ushort),
+    _fields_ = [("wSize", ctypes.wintypes.WORD),
+                ("wNumOfSignals", ctypes.wintypes.WORD),
                 ("strSingleSignalDesc", PCO_Single_Signal_Desc*NUM_MAX_SIGNALS),
-                ("dwDummy", ctypes.c_uint*524)]
+                ("dwDummy", ctypes.wintypes.DWORD*524)]
                 
     def __init__(self):
         super(PCO_Signal_Description, self).__init__()
@@ -424,33 +424,33 @@ class PCO_Signal_Description(ctypes.Structure):
             
 PCO_SENSORDUMMY = 7
 class PCO_Sensor(ctypes.Structure):
-    _fields_ = [("wSize", ctypes.c_ushort),
-                ("ZZwAlignDummy1", ctypes.c_ushort),
+    _fields_ = [("wSize", ctypes.wintypes.WORD),
+                ("ZZwAlignDummy1", ctypes.wintypes.WORD),
                 ("strDescription", PCO_Description),
                 ("strDescription2", PCO_Description2),
-                ("ZZdwDummy2", ctypes.c_uint * 256),
-                ("wSensorFormat", ctypes.c_ushort),
-                ("wRoiX0", ctypes.c_ushort),
-                ("wRoiY0", ctypes.c_ushort),
-                ("wRoiX1", ctypes.c_ushort),
-                ("wRoiY1", ctypes.c_ushort),
-                ("wBinHorz", ctypes.c_ushort),
-                ("wBinVert", ctypes.c_ushort),
-                ("ZZwAlignDummy2", ctypes.c_ushort),
-                ("dwPixelRate", ctypes.c_uint),
-                ("wConvFact", ctypes.c_ushort),
-                ("wDoubleImage", ctypes.c_ushort),
-                ("wADCOperation", ctypes.c_ushort),
-                ("wIR", ctypes.c_ushort),
-                ("sCoolSet", ctypes.c_short),
-                ("wOffsetRegulation", ctypes.c_ushort),
-                ("wNoiseFilterMode", ctypes.c_ushort),
-                ("wFastReadoutMode", ctypes.c_ushort),
-                ("wDSNUAdjustMode", ctypes.c_ushort),
-                ("wCDIMode", ctypes.c_ushort),
-                ("ZZwDummy", ctypes.c_ushort * 36),
+                ("ZZdwDummy2", ctypes.wintypes.DWORD * 256),
+                ("wSensorFormat", ctypes.wintypes.WORD),
+                ("wRoiX0", ctypes.wintypes.WORD),
+                ("wRoiY0", ctypes.wintypes.WORD),
+                ("wRoiX1", ctypes.wintypes.WORD),
+                ("wRoiY1", ctypes.wintypes.WORD),
+                ("wBinHorz", ctypes.wintypes.WORD),
+                ("wBinVert", ctypes.wintypes.WORD),
+                ("ZZwAlignDummy2", ctypes.wintypes.WORD),
+                ("dwPixelRate", ctypes.wintypes.DWORD),
+                ("wConvFact", ctypes.wintypes.WORD),
+                ("wDoubleImage", ctypes.wintypes.WORD),
+                ("wADCOperation", ctypes.wintypes.WORD),
+                ("wIR", ctypes.wintypes.WORD),
+                ("sCoolSet", ctypes.wintypes.SHORT),
+                ("wOffsetRegulation", ctypes.wintypes.WORD),
+                ("wNoiseFilterMode", ctypes.wintypes.WORD),
+                ("wFastReadoutMode", ctypes.wintypes.WORD),
+                ("wDSNUAdjustMode", ctypes.wintypes.WORD),
+                ("wCDIMode", ctypes.wintypes.WORD),
+                ("ZZwDummy", ctypes.wintypes.WORD * 36),
                 ("strSignalDesc", PCO_Signal_Description),
-                ("ZZdwDummy", ctypes.c_uint * PCO_SENSORDUMMY)]
+                ("ZZdwDummy", ctypes.wintypes.DWORD * PCO_SENSORDUMMY)]
                 
     def __init__(self):
         super(PCO_Sensor, self).__init__()
