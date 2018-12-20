@@ -212,7 +212,7 @@ class Andor_Camera(Camera):
         return MetadataArray(img.reshape((cbuf, rbuf), order='C'),
                              metadata={'timestamp': ts})
 
-    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
+    async def acquisition_async(self, num=np.inf, timeout=None, raw=False,
                                 initialising_cams=None, raise_on_timeout=True):
         """
         Multiple image acquisition
@@ -251,9 +251,11 @@ class Andor_Camera(Camera):
         self.AcquisitionStart()
         print('Started acquisition at framerate:', self.FrameRate.getValue())
         print('Exposure time is {:.1f} ms'.format(self.ExposureTime.getValue()*1000))
-        exposure_ms = self.ExposureTime.getValue()*1000
-        framerate_ms = 1000/self.FrameRate.getValue()
-        timeout_ms = int(max((2*exposure_ms, 2*framerate_ms, 1000)))
+        if timeout is None:
+            exposure_ms = self.ExposureTime.getValue()*1000
+            framerate_ms = 1000/self.FrameRate.getValue()
+            timeout_ms = int(max((2*exposure_ms, 2*framerate_ms, 1000)))
+            timeout = timeout_ms
             
         try:
             count = 0
@@ -266,7 +268,7 @@ class Andor_Camera(Camera):
                 try:
                     pData, lData = await loop.run_in_executor(None,
                                                               SDK3.WaitBuffer,
-                                                              self.handle, timeout_ms)
+                                                              self.handle, timeout)
                 except Exception:
                     if raise_on_timeout:
                         raise CameraTimeout()
@@ -300,7 +302,7 @@ class Andor_Camera(Camera):
         if stop_signal:
             yield True
 
-    def acquisition(self, num=np.inf, timeout=1000, raw=False, raise_on_timeout=True):
+    def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
         yield from synchronize_generator(self.acquisition_async,
                                          num, timeout, raw, None, raise_on_timeout)
 
