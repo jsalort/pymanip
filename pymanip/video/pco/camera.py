@@ -331,11 +331,15 @@ class PCO_Camera(Camera):
                                                XResAct, YResAct, 16)
                         else:
                             break
+                        if stop_signal:
+                            break
                     if stop_signal:
                         break
             finally:
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
+        if stop_signal:
+            yield True
 
 
 if __name__ == '__main__':

@@ -117,7 +117,7 @@ class Camera:
                     img = (maxint//(maximum-minimum))*(im-minimum)
                 l, c = img.shape
                 cv2.imshow(name,
-                           cv2.resize(img, (int(l*zoom), int(c*zoom))))
+                           cv2.resize(img, (int(c*zoom), int(l*zoom))))
                 k = cv2.waitKey(1)
                 if k in (0x1b, ord('s')):
                     clean = await preview_generator.asend(True)
