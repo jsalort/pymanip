@@ -34,7 +34,7 @@ def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, e
             cam.set_delay_exposuretime(exposuretime=exposure_ms/1000)
             cam.preview(backend, slice, zoom)
 
-def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
+def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=10):
     if not has_avt:
         print('Pymba is not available.')
     else:
@@ -66,6 +66,7 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None):
                 else:
                     print('Internal trigger')
                     cam.set_trigger_mode(False)
+                cam.set_exposure_time(exposure_ms/1000)
                 cam.preview(backend, slice, zoom)
 
 def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None, exposure_ms=1, bitdepth=12, framerate=10.0):

@@ -166,7 +166,7 @@ elif args.command == 'video':
     if args.camera_type.upper() == 'PCO':
         preview_pco(board, tk, slice, zoom, Trigger, exposure_ms)
     elif args.camera_type.upper() == 'AVT':
-        preview_avt(board, tk, slice, zoom, Trigger)
+        preview_avt(board, tk, slice, zoom, Trigger, exposure_ms)
     elif args.camera_type.upper() == 'ANDOR':
         preview_andor(board, tk, slice, zoom, Trigger, exposure_ms, bitdepth, framerate)
     else:

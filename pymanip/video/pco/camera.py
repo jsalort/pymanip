@@ -15,7 +15,7 @@ import numpy as np
 import asyncio
 from pymanip.asynctools import synchronize_generator
 
-from pymanip.video import MetadataArray, Camera
+from pymanip.video import MetadataArray, Camera, CameraTimeout
 import pymanip.video.pco.pixelfly as pf
 
 
@@ -256,12 +256,12 @@ class PCO_Camera(Camera):
                 pf.PCO_CancelImages(self.handle)
         return array
 
-    def acquisition(self, num=np.inf, timeout=1000, raw=False):
+    def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
         yield from synchronize_generator(self.acquisition_async,
-                                         num, timeout, raw)
+                                         num, timeout, raw, None, raise_on_timeout)
 
-    async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
-                                initialising_cams=None):
+    async def acquisition_async(self, num=np.inf, timeout=None, raw=False,
+                                initialising_cams=None, raise_on_timeout=True):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
@@ -269,6 +269,10 @@ class PCO_Camera(Camera):
         """
 
         loop = asyncio.get_event_loop()
+        
+        if timeout is None:
+            delay, exposure = self.current_delay_exposure_time()
+            timeout = int(max((2000*exposure, 1000)))
 
         # Arm camera
         if pf.PCO_GetRecordingState(self.handle):
@@ -300,7 +304,14 @@ class PCO_Camera(Camera):
                                                           win32event.WaitForMultipleObjects,
                                                           [buffer.event_handle for buffer in buffers], 0, timeout)                                           
                     if waitstat == win32event.WAIT_TIMEOUT:
-                        raise RuntimeError(f'Timeout ({timeout:})')
+                        if raise_on_timeout:
+                            raise CameraTimeout(f'Timeout ({timeout:})')
+                        else:
+                            stop_signal = yield None
+                            if not stop_signal:
+                                continue
+                            else:
+                                break
                     for ii, buffer in zip(range(4), buffer_ring):
                         waitstat = await loop.run_in_executor(None,
                                                               win32event.WaitForSingleObject,

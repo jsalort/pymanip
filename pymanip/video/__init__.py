@@ -25,6 +25,8 @@ from progressbar import ProgressBar
 import asyncio
 from pymanip.asynctools import synchronize_function
 
+class CameraTimeout(Exception):
+    pass
 
 def save_image(im, ii, basename, zerofill, file_format,
                compression, compression_level):
@@ -165,22 +167,24 @@ class Camera:
             self.window.setWindowTitle(self.name)
             self.image_view = pg.ImageView()
             self.window.setCentralWidget(self.image_view)
-            just_created = True
-        else:
-            just_created = False
+            self.range_set = False
 
         # instantiate generator
         if not hasattr(self, 'preview_generator'):
-            self.preview_generator = self.acquisition()
+            self.preview_generator = self.acquisition(timeout=5, raise_on_timeout=False)
 
-        # update view with latest image
-        self.image_view.setImage(next(self.preview_generator).T,
-                                 autoRange=False, autoLevels=False,
-                                 autoHistogramRange=False)
-        if just_created:
-            self.image_view.autoRange()
-            self.image_view.autoLevels()
-
+        # update view with latest image if it is ready
+        # do nothing otherwise (to allow GUI interaction while waiting for camera reading)
+        img = next(self.preview_generator)
+        if img is not None:
+            self.image_view.setImage(img.T,
+                                     autoRange=False, autoLevels=False,
+                                     autoHistogramRange=False)
+            if not self.range_set:
+                self.image_view.autoRange()
+                self.image_view.autoLevels()
+                self.range_set = True
+        
         # set timer for refreshing in 10 ms
         QtCore.QTimer.singleShot(10, lambda: self.preview_qt(slice, zoom))
 

@@ -9,7 +9,7 @@ import asyncio
 import ctypes
 
 import numpy as np
-from pymanip.video import MetadataArray, Camera
+from pymanip.video import MetadataArray, Camera, CameraTimeout
 from pymanip.asynctools import synchronize_generator
 
 import AndorNeo.SDK3Cam as SDK3Cam
@@ -213,7 +213,7 @@ class Andor_Camera(Camera):
                              metadata={'timestamp': ts})
 
     async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
-                                initialising_cams=None):
+                                initialising_cams=None, raise_on_timeout=True):
         """
         Multiple image acquisition
         yields a shared memory numpy array
@@ -225,6 +225,7 @@ class Andor_Camera(Camera):
         if self.CameraAcquiring.getValue():
             self.AcquisitionStop()
         SDK3.Flush(self.handle)
+        self.buffer_queued = False
 
         # Set acquisition mode
         self.CycleMode.setString('Continuous')
@@ -257,12 +258,24 @@ class Andor_Camera(Camera):
         try:
             count = 0
             while count < num:
-                SDK3.QueueBuffer(self.handle,
-                                 buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
-                                 buf.nbytes)
-                pData, lData = await loop.run_in_executor(None,
-                                                          SDK3.WaitBuffer,
-                                                          self.handle, timeout_ms)
+                if not self.buffer_queued:
+                    SDK3.QueueBuffer(self.handle,
+                                     buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
+                                     buf.nbytes)
+                    self.buffer_queued = True
+                try:
+                    pData, lData = await loop.run_in_executor(None,
+                                                              SDK3.WaitBuffer,
+                                                              self.handle, timeout_ms)
+                except Exception:
+                    if raise_on_timeout:
+                        raise CameraTimeout()
+                    else:
+                        stop_signal = yield None
+                        if stop_signal:
+                            break
+                        else:
+                            continue
                 # Convert buffer and yield image
                 SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
                                    img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
@@ -274,7 +287,7 @@ class Andor_Camera(Camera):
                 #if count < 10:
                 #    print('FPGA ticks =', ticks)
                 #    print('Timestamp =', ts)
-
+                self.buffer_queued = False
                 stop_signal = yield MetadataArray(img.reshape((cbuf, rbuf), order='C'),
                                                   metadata={'counter': count,
                                                             'timestamp': ts})
@@ -287,9 +300,9 @@ class Andor_Camera(Camera):
         if stop_signal:
             yield True
 
-    def acquisition(self, num=np.inf, timeout=1000, raw=False):
+    def acquisition(self, num=np.inf, timeout=1000, raw=False, raise_on_timeout=True):
         yield from synchronize_generator(self.acquisition_async,
-                                         num, timeout, raw)
+                                         num, timeout, raw, None, raise_on_timeout)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 import numpy as np
-from pymanip.video import MetadataArray, Camera
+from pymanip.video import MetadataArray, Camera, CameraTimeout
 from pymanip.asynctools import synchronize_generator
 from pymba import Vimba
 from pymba.vimbaexception import VimbaException
@@ -145,13 +145,14 @@ class AVT_Camera(Camera):
         self.camera.ExposureTime = seconds*1e6
 
     def acquisition(self, num=np.inf, timeout=1000, raw=False,
-                    framerate=None, external_trigger=False):
+                    framerate=None, external_trigger=False, raise_on_timeout=True):
         yield from synchronize_generator(self.acquisition_async, num, timeout,
-                                         raw, framerate, external_trigger)
+                                         raw, framerate, external_trigger,
+                                         None, raise_on_timeout)
 
     async def acquisition_async(self, num=np.inf, timeout=1000, raw=False,
                                 framerate=None, external_trigger=False,
-                                initialising_cams=None):
+                                initialising_cams=None, raise_on_timeout=True):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
@@ -170,17 +171,25 @@ class AVT_Camera(Camera):
         self.frame.announceFrame()
         self.camera.startCapture()
         self.camera.runFeatureCommand("AcquisitionStart")
+        self.buffer_queued = False
         try:
             count = 0
             while count < num:
-                self.frame.queueFrameCapture()
+                if not self.buffer_queued:
+                    self.frame.queueFrameCapture()
+                    self.buffer_queued = True
                 if count == 0 and initialising_cams is not None and self in initialising_cams:
                     initialising_cams.remove(self)
-                errorCode = await self.frame.waitFrameCapture_async()
+                errorCode = await self.frame.waitFrameCapture_async(int(timeout))
                 if errorCode == -12:
-                    print('')
-                    print('cam' + str(self.num) + ' timeout')
-                    break
+                    if raise_on_timeout:
+                        raise CameraTimeout('cam' + str(self.num) + ' timeout')
+                    else:
+                        stop_signal = yield None
+                        if stop_signal:
+                            break
+                        else:
+                            continue
                 elif errorCode != 0:
                     raise VimbaException(errorCode)
                 if self.frame.pixel_bytes == 1:
@@ -189,6 +198,7 @@ class AVT_Camera(Camera):
                     dt = np.uint16
                 else:
                     raise NotImplementedError
+                self.buffer_queued = False
                 stop_signal = yield MetadataArray(np.ndarray(buffer=self.frame.getBufferByteData(),
                                                              dtype=dt,
                                                              shape=(self.frame.height, self.frame.width)),
