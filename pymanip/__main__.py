@@ -102,8 +102,10 @@ parser_video.add_argument('-e', '--exposure',
 parser_video.add_argument('-d', '--bitdepth',
                           help='Bit depth',
                           metavar='bitdepth', default=12, type=int, nargs=1)
-                          
-                          
+parser_video.add_argument('-f', '--framerate',
+                          help='Acquisition framerate in Herz',
+                          metavar='framerate', default=10.0, type=float, nargs=1)
+                                     
 # Parse arguments
 args = parser.parse_args()
 
@@ -157,12 +159,16 @@ elif args.command == 'video':
         bitdepth = int(args.bitdepth[0])
     else:
         bitdepth = int(args.bitdepth)
+    if isinstance(args.framerate, list):
+        framerate = float(args.framerate[0])
+    else:
+        framerate = float(args.framerate)
     if args.camera_type.upper() == 'PCO':
         preview_pco(board, tk, slice, zoom, Trigger, exposure_ms)
     elif args.camera_type.upper() == 'AVT':
         preview_avt(board, tk, slice, zoom, Trigger)
     elif args.camera_type.upper() == 'ANDOR':
-        preview_andor(board, tk, slice, zoom, Trigger, exposure_ms, bitdepth)
+        preview_andor(board, tk, slice, zoom, Trigger, exposure_ms, bitdepth, framerate)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:

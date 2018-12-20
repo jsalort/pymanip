@@ -189,7 +189,11 @@ class Andor_Camera(Camera):
 
         try:
             # Wait for buffer
-            pData, lData = SDK3.WaitBuffer(self.handle, 100)
+            exposure_ms = self.ExposureTime.getValue()*1000
+            framerate_ms = 1000/self.FrameRate.getValue()
+            timeout_ms = int(max((2*exposure_ms, 2*framerate_ms, 1000)))
+            
+            pData, lData = SDK3.WaitBuffer(self.handle, timeout_ms)
 
             # Convert buffer into numpy image
             rbuf, cbuf = self.AOIWidth.getValue(), self.AOIHeight.getValue()
@@ -246,7 +250,10 @@ class Andor_Camera(Camera):
         self.AcquisitionStart()
         print('Started acquisition at framerate:', self.FrameRate.getValue())
         print('Exposure time is {:.1f} ms'.format(self.ExposureTime.getValue()*1000))
-
+        exposure_ms = self.ExposureTime.getValue()*1000
+        framerate_ms = 1000/self.FrameRate.getValue()
+        timeout_ms = int(max((2*exposure_ms, 2*framerate_ms, 1000)))
+            
         try:
             count = 0
             while count < num:
@@ -255,7 +262,7 @@ class Andor_Camera(Camera):
                                  buf.nbytes)
                 pData, lData = await loop.run_in_executor(None,
                                                           SDK3.WaitBuffer,
-                                                          self.handle, 1000)
+                                                          self.handle, timeout_ms)
                 # Convert buffer and yield image
                 SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
                                    img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
@@ -277,6 +284,8 @@ class Andor_Camera(Camera):
 
         finally:
             self.AcquisitionStop()
+        if stop_signal:
+            yield True
 
     def acquisition(self, num=np.inf, timeout=1000, raw=False):
         yield from synchronize_generator(self.acquisition_async,
