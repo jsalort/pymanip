@@ -18,22 +18,20 @@ Typical GPIB usage
 from pymanip import Session
 from pymanip.instruments import Agilent34970a
 
-MI = Session('Monitoring', ('R1', 'R2') )
+with Session('Monitoring', ('R1', 'R2') ) as MI:
 
-try:
-    multiplexer = Agilent34970a('GPIB0::9::INSTR')
-   
-    while True:
-        (R1, R2) = multiplexer.ohm_4w.get( (101, 102) )
-        
-        MI.log_addline()
-        MI.log_plot(1, ('R1') )
-        MI.sleep(30)
-
-except KeyboardInterrupt:
-    pass
-finally:
-    MI.Stop()
+    try:
+        multiplexer = Agilent34970a('GPIB0::9::INSTR')
+       
+        while True:
+            (R1, R2) = multiplexer.ohm_4w.get( (101, 102) )
+            
+            MI.log_addline()
+            MI.log_plot(1, ('R1') )
+            MI.sleep(30)
+    
+    except KeyboardInterrupt:
+        pass
 ```
 
 Typical Acquisition card usage
