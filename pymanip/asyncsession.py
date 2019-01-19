@@ -508,6 +508,16 @@ class AsyncSession:
         self.running = False
         print(' Signal caught... stopping...')
 
+    async def sweep(self, task, iterable):
+        # expects task of the format
+        # async def balayage(sesn, voltage):
+        #   do something with voltage
+        for val in iterable:
+            await task(self, val)
+            if not self.running:
+                break
+        self.running = False
+        
     async def sleep(self, duration, verbose=True):
         start = time.monotonic()
         while self.running and time.monotonic()-start < duration:
