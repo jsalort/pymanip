@@ -584,7 +584,18 @@ class Session(BaseSession):
                 self.save_dataset(k, data)
             except (TypeError, KeyError):
                 # we are not iterable
-                self.save_parameter(k, data)
+                if isinstance(v, dict):
+                    # non reduced data, v is a dictionnary with two keys, 't' and 'value'
+                    self.save_dataset(k, {k: v['value']})
+                    self.save_dataset(k + '_time', {k + '_time': v['t']})
+                else:
+                    try:
+                        # data must be a scalar
+                        float(v)
+                    except TypeError:
+                        print('skipping', k, type(v))
+                        continue
+                    self.save_parameter(k, data)
 
     def save_parameter(self, parameter_name, dict_caller=None):
         if dict_caller is None:
@@ -594,8 +605,14 @@ class Session(BaseSession):
             finally:
                 del stack
         if isinstance(parameter_name, six.string_types):
-            value = dict_caller[parameter_name]
-            self.parameters[parameter_name] = value
+            try:
+                value = dict_caller[parameter_name]
+                self.parameters[parameter_name] = value
+            except TypeError:
+                print(f'Failed to save parameter {parameter_name:}')
+                print(type(value))
+                print(value)
+                raise
         elif isinstance(parameter_name, dict):
             for k,v in parameter_name.items():
                 self.parameters[k] = v

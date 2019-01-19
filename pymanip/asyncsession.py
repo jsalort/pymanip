@@ -665,7 +665,7 @@ class RemoteObserver:
         data = self.get_last_values()
         self.remote_varnames = list(data.keys())
 
-    def stop_recording(self, reduce_time=True):
+    def stop_recording(self, reduce_time=True, force_reduce_time=True):
         recordings = dict()
         for varname in self.remote_varnames:
             data = self._post_request('data_from_ts',
@@ -678,12 +678,12 @@ class RemoteObserver:
         if reduce_time:
             t = recordings[self.remote_varnames[0]]['t']
             if all([recordings[varname]['t'] == t
-                    for varname in recordings]):
+                    for varname in recordings]) or force_reduce_time:
                 recordings = {k: v['value'] for k, v in recordings.items()}
                 recordings['time'] = t
             else:
                 print('t =', t)
-                pprint({varname: recordings[varname]['t']
+                pprint({varname: recordings[varname]['t'] == t
                         for varname in self.remote_varnames})
         parameters = self._get_request('get_parameters')
         recordings.update(parameters)
