@@ -138,7 +138,7 @@ def read_complex_matrix_var(f, verbose):
             print('  num_elems:', num_elems)
         num_doubles = 2*num_elems
         fortran_vec = unpack('d'*num_doubles, f.read(8*num_doubles))
-        fortran_vec_complex = [fortran_vec[i]+fortran_vec[i+1]*1j for i in xrange(0,num_doubles,2)]
+        fortran_vec_complex = [fortran_vec[i]+fortran_vec[i+1]*1j for i in range(0,num_doubles,2)]
         var = np.array(fortran_vec_complex).reshape(dv, order='F')
         if verbose:
             print("     matrix:", var.shape)
@@ -156,7 +156,7 @@ def read_complex_matrix_var(f, verbose):
         if verbose:
             print('  num_elems:', num_elems)
         fortran_vec = unpack('d'*num_elems, f.read(8*num_doubles))
-        fortran_vec_complex = [fortran_vec[i]+fortran_vec[i+1]*1j for i in xrange(0,num_doubles,2)]
+        fortran_vec_complex = [fortran_vec[i]+fortran_vec[i+1]*1j for i in range(0,num_doubles,2)]
         var = np.array(fortran_vec_complex).reshape(dv, order='F')
         if verbose:
             print("     matrix:", var.shape)
