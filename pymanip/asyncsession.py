@@ -419,11 +419,25 @@ class AsyncSession:
 
             await self.sleep(delay_hours*3600, verbose=False)
 
-    async def plot(self, varnames, maxvalues=1000, yscale=None):
-        if isinstance(varnames, str):
-            varnames = (varnames,)
-        param_key_window = '_window_' + '_'.join(varnames)
-        param_key_figsize = '_figsize_' + '_'.join(varnames)
+    async def plot(self, varnames=None, maxvalues=1000, yscale=None, *, x=None, y=None):
+        """
+        if x, y is specified instead of varnames, plot var y against var x
+        """
+        if varnames is None:
+            if not isinstance(x, str) or not isinstance(y, str):
+                raise TypeError('x and y should be strings')
+            varnames = (x, y)
+            param_key_window = '_window_xy_' + '_'.join(varnames)
+            param_key_figsize = '_figsize_xy_' + '_'.join(varnames)
+            xymode = True
+        else:
+            if x is not None or y is not None:
+                raise ValueError('Cannot specify both varnames and (x,y)')
+            if isinstance(varnames, str):
+                varnames = (varnames,)
+            param_key_window = '_window_' + '_'.join(varnames)
+            param_key_figsize = '_figsize_' + '_'.join(varnames)
+            xymode = False
         last_update = {k: 0 for k in varnames}
         saved_geom = self.parameter(param_key_window)
         if saved_geom:
@@ -443,43 +457,74 @@ class AsyncSession:
         while self.running:
             data = {k: self.logged_data_fromtimestamp(k, last_update[k])
                     for k in varnames}
-            for name, values in data.items():
-                ts, vs = values
-                if ts.size > 0:
-                    if name in line_objects:
-                        #print('updating plot')
-                        p = line_objects[name]
-                        x = np.hstack((p.get_xdata(), (ts-ts0)/3600))
-                        y = np.hstack((p.get_ydata(), vs))
-                        if x.size > maxvalues:
-                            x = x[-maxvalues:]
-                            y = y[-maxvalues:]
-                        p.set_xdata(x)
-                        p.set_ydata(y)
+            if xymode:
+                ts_x, vs_x = data[x]
+                ts_y, vs_y = data[y]
+                if (ts_x != ts_y).any():
+                    raise ValueError('xymode can only be used if x and y are synchronous')
+                if ts_x.size > 0:
+                    if y in line_objects:
+                        p = line_objects[y]
+                        xx = np.hstack((p.get_xdata(), vs_x))
+                        yy = np.hstack((p.get_ydata(), vs_y))
+                        p.set_xdata(xx)
+                        p.set_ydata(yy)
+                        xlim = ax.get_xlim()
                         ylim = ax.get_ylim()
-                        if x[0] != x[-1]:
-                            ax.set_xlim((x[0], x[-1]))
-                        if ylim[1] < np.max(y) or ylim[0] > np.min(y):
-                            ylim = (min((ylim[0], np.min(y))),
-                                    max((ylim[1], np.max(y))))
-                            ax.set_ylim(ylim)
+                        if xlim[1] < np.max(xx) or xlim[0] > np.min(xx):
+                            ax.set_xlim((np.min(xx), np.max(xx)))
+                        if ylim[1] < np.max(yy) or ylim[0] > np.min(yy):
+                            ax.set_ylim((np.min(yy), np.max(yy)))
                     else:
-                        #print('initial plot')
-                        x = (ts-ts0)/3600
-                        y = vs
-                        if x.size > maxvalues:
-                            x = x[-maxvalues:]
-                            y = y[-maxvalues:]
-                        p, = ax.plot(x, y, 'o-', label=name)
-                        line_objects[name] = p
-                        ax.set_xlabel('t [h]')
-                        if x[0] != x[-1]:
-                            ax.set_xlim((x[0], x[-1]))
-                        if yscale:
-                            ax.set_yscale(yscale)
-                        ax.legend()
+                        p, = ax.plot(vs_x, vs_y, 's-')
+                        line_objects[y] = p
+                        ax.set_xlabel(x)
+                        ax.set_ylabel(y)
+                        if np.min(vs_x) != np.max(vs_x):
+                            ax.set_xlim((np.min(vs_x), np.max(vs_x)))
+                        if np.min(vs_y) != np.max(vs_y):
+                            ax.set_ylim((np.min(vs_y), np.max(vs_y)))
                         fig.show()
-                    last_update[name] = ts[-1]
+                    last_update[x] = ts_x[-1]
+                    last_update[y] = ts_y[-1]
+            else:
+                for name, values in data.items():
+                    ts, vs = values
+                    if ts.size > 0:
+                        if name in line_objects:
+                            #print('updating plot')
+                            p = line_objects[name]
+                            x = np.hstack((p.get_xdata(), (ts-ts0)/3600))
+                            y = np.hstack((p.get_ydata(), vs))
+                            if x.size > maxvalues:
+                                x = x[-maxvalues:]
+                                y = y[-maxvalues:]
+                            p.set_xdata(x)
+                            p.set_ydata(y)
+                            ylim = ax.get_ylim()
+                            if x[0] != x[-1]:
+                                ax.set_xlim((x[0], x[-1]))
+                            if ylim[1] < np.max(y) or ylim[0] > np.min(y):
+                                ylim = (min((ylim[0], np.min(y))),
+                                        max((ylim[1], np.max(y))))
+                                ax.set_ylim(ylim)
+                        else:
+                            #print('initial plot')
+                            x = (ts-ts0)/3600
+                            y = vs
+                            if x.size > maxvalues:
+                                x = x[-maxvalues:]
+                                y = y[-maxvalues:]
+                            p, = ax.plot(x, y, 'o-', label=name)
+                            line_objects[name] = p
+                            ax.set_xlabel('t [h]')
+                            if x[0] != x[-1]:
+                                ax.set_xlim((x[0], x[-1]))
+                            if yscale:
+                                ax.set_yscale(yscale)
+                            ax.legend()
+                            fig.show()
+                        last_update[name] = ts[-1]
             await asyncio.sleep(1)
 
         # Saving figure positions
