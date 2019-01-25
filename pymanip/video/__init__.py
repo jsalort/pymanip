@@ -8,6 +8,8 @@ Depends on :
 
 """
 
+import sys
+import signal
 import os
 import gzip
 import numpy as np
@@ -25,8 +27,10 @@ from progressbar import ProgressBar
 import asyncio
 from pymanip.asynctools import synchronize_function
 
+
 class CameraTimeout(Exception):
     pass
+
 
 def save_image(im, ii, basename, zerofill, file_format,
                compression, compression_level):
@@ -171,10 +175,12 @@ class Camera:
 
         # instantiate generator
         if not hasattr(self, 'preview_generator'):
-            self.preview_generator = self.acquisition(timeout=5, raise_on_timeout=False)
+            self.preview_generator = self.acquisition(timeout=5,
+                                                      raise_on_timeout=False)
 
         # update view with latest image if it is ready
-        # do nothing otherwise (to allow GUI interaction while waiting for camera reading)
+        # do nothing otherwise (to allow GUI interaction while waiting
+        # for camera reading)
         img = next(self.preview_generator)
         if img is not None:
             self.image_view.setImage(img.T,
@@ -184,7 +190,7 @@ class Camera:
                 self.image_view.autoRange()
                 self.image_view.autoLevels()
                 self.range_set = True
-        
+
         # set timer for refreshing in 10 ms
         QtCore.QTimer.singleShot(10, lambda: self.preview_qt(slice, zoom))
 
@@ -194,6 +200,15 @@ class Camera:
     def acquire_to_files(self, *args, **kwargs):
         return synchronize_function(self.acquire_to_files_async,
                                     *args, **kwargs)
+
+    def acquire_signalHandler(self):
+        """
+
+        This method sends a stop signal to the camera acquisition generator
+
+        """
+
+        self.acqinterrupted = True
 
     async def acquire_to_files_async(self, num, basename, zerofill=4,
                                      dryrun=False, file_format='png',
@@ -222,6 +237,15 @@ class Camera:
 
         """
 
+        # signal handling
+        if sys.platform == 'win32':
+            signal.signal(signal.SIGINT, self.acquire_signalHandler)
+        else:
+            loop = asyncio.get_event_loop()
+            for signame in ('SIGINT', 'SIGTERM'):
+                loop.add_signal_handler(getattr(signal, signame),
+                                        self.acquire_signalHandler)
+
         dirname = os.path.dirname(basename)
         if len(dirname):
             try:
@@ -241,9 +265,11 @@ class Camera:
         computation_time = 0.0
         images = list()
         ii = 0
-        async for im in self.acquisition_async(num,
-                                               initialising_cams=initialising_cams,
-                                               **kwargs):
+        acqgen = self.acquisition_async(num,
+                                        initialising_cams=initialising_cams,
+                                        **kwargs)
+        self.acqinterrupted = False
+        async for im in acqgen:
             if dryrun:
                 continue
             if ii == 0:
@@ -270,6 +296,12 @@ class Camera:
                 except Exception:
                     print(ii)
             await asyncio.sleep(0.001)
+            if self.acqinterrupted:
+                print('Signal caught... Stopping camera acquisition...')
+                clean = await acqgen.asend(True)
+                if not clean:
+                    print('Camera was not successfully interrupted')
+                break
         if progressbar:
             print("")
         if delay_save and not dryrun:
@@ -294,6 +326,7 @@ class Camera:
             print('Average saving time per image:',
                   1000*computation_time/(ii+1), 'ms')
             print('average fps =', 1/np.mean(dt[1:]-dt[:-1]))
-            print('image size:', images[0].shape)
-            print('image dtype:', images[0].dtype)
+            if images:
+                print('image size:', images[0].shape)
+                print('image dtype:', images[0].dtype)
         return count, dt
