@@ -201,7 +201,7 @@ class Camera:
         return synchronize_function(self.acquire_to_files_async,
                                     *args, **kwargs)
 
-    def acquire_signalHandler(self):
+    def acquire_signalHandler(self, *args, **kwargs):
         """
 
         This method sends a stop signal to the camera acquisition generator
@@ -297,6 +297,7 @@ class Camera:
                     print(ii)
             await asyncio.sleep(0.001)
             if self.acqinterrupted:
+                print('')
                 print('Signal caught... Stopping camera acquisition...')
                 clean = await acqgen.asend(True)
                 if not clean:
@@ -307,7 +308,7 @@ class Camera:
         if delay_save and not dryrun:
             print('Acquisition complete. Saving to disk...')
             if progressbar:
-                bar = ProgressBar(max_value=num)
+                bar = ProgressBar(max_value=ii)
             for ii, im in enumerate(images):
                 start_time = time.process_time()
                 save_image(im, ii, basename, zerofill, file_format,
