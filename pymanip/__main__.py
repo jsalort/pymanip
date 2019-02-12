@@ -9,6 +9,8 @@ from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
 from pymanip.util.video import preview_pco, preview_avt, preview_andor
+from pymanip.util.oscillo import Oscillo
+
 has_video = True
 
 try:
@@ -75,6 +77,31 @@ parser_gpib.add_argument('boardNumber',
             help="GPIB board to scan for connected instruments", 
             metavar="board_number", type=int, default=0, nargs='?')
 
+# Create parser for "oscillo"
+parser_oscillo = subparsers.add_parser("oscillo",
+                                       help="Use DAQmx cards as oscilloscope")
+parser_oscillo.add_argument('channel',
+                            help='DAQmx channel names',
+                            metavar="Dev2/ai0",
+                            nargs='+')
+parser_oscillo.add_argument('-s', '--sampling',
+                            help='Sampling frequency',
+                            metavar='sampling_freq',
+                            default=5e3)
+parser_oscillo.add_argument('-r', '--range',
+                            help='Channel volt range',
+                            metavar='volt_range',
+                            default=10.0)
+parser_oscillo.add_argument('-t', '--trigger',
+                            help='Trigger level',
+                            metavar='level',
+                            default=None)
+parser_oscillo.add_argument('-T', '--trigsource',
+                            help='Trigger source index',
+                            metavar='0',
+                            default=0)
+
+
 # Create parser for "video"
 parser_video = subparsers.add_parser("video",
                                      help="Display video preview for specified camera")
@@ -126,6 +153,15 @@ elif args.command == 'rebuild_hdf':
     rebuild_from_dat(Path(args.input_file), args.output_name)
 elif args.command == 'scan_gpib':
     scanGpib(int(args.boardNumber))
+elif args.command == 'oscillo':
+    if args.trigger is not None:
+        trigger = float(args.trigger)
+    else:
+        trigger = None
+    oscillo = Oscillo(args.channel, float(args.sampling),
+                     float(args.range), trigger, 
+                     int(args.trigsource))
+    oscillo.run()
 elif args.command == 'video':
     if not has_video:
         print('Video libraries not found')
