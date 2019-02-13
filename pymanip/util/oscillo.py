@@ -8,14 +8,16 @@ import sys
 import signal
 import asyncio
 import time
+import math
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button, TextBox, CheckButtons
+from matplotlib.widgets import Button, TextBox, CheckButtons, RadioButtons
 
 from nidaqmx import Task
 from nidaqmx.constants import READ_ALL_AVAILABLE
 from nidaqmx.errors import DaqError
+from nidaqmx.constants import TerminalConfiguration
 
 class Oscillo:
 
@@ -24,8 +26,10 @@ class Oscillo:
         self.channel_list = channel_list
         self.sampling = sampling
         self.volt_range = volt_range
+        self.ignore_voltrange_submit = False
         self.trigger_level = trigger_level
         self.trigger_source = trigsource
+        self.N = 1024
         plt.ion()
         self.fig = plt.figure()
         # left, bottom, width, height
@@ -34,6 +38,16 @@ class Oscillo:
         self.last_trigged = 0
         self.ask_pause_acqui = False
         self.paused = False
+        self.freq = None
+        self.Pxx = None
+        self.N_spectra = 0
+        self.fig_spectrum = None
+        self.hanning = True
+        self.ac = True
+        self.power_spectrum = True
+        self.spectrum_unit = 1.0
+        self.spectrum_unit_str = 'V^2/Hz'
+        self.task = None
 
         # Configure widgets
         ax_sampling = self.fig.add_axes([0.825, 0.825, 0.15, 0.075])
@@ -46,12 +60,95 @@ class Oscillo:
         self.checkbox_trigger = CheckButtons(ax_enable_trigger, ['Trigger'], [trigger_level is not None])
         self.checkbox_trigger.on_clicked(self.ask_trigger_change)
 
-        ax_triggerlevel = self.fig.add_axes([0.825, 0.52, 0.15, 0.075])
+        ax_triggerlevel = self.fig.add_axes([0.825, 0.51, 0.15, 0.075])
         self.textbox_triggerlevel = TextBox(ax_triggerlevel, label='',
                                             initial=f'{trigger_level:.2f}' if trigger_level is not None else '1.0')
         self.textbox_triggerlevel.on_submit(self.ask_trigger_change)
         label_triggerlevel = ax_triggerlevel.text(0, 1.25, 'Level')
+
+        ax_winsize = self.fig.add_axes([0.825, 0.37, 0.15, 0.075])
+        self.textbox_winsize = TextBox(ax_winsize, label='',
+                                       initial=f'{self.N:d}')
+        self.textbox_winsize.on_submit(self.ask_winsize_change)
+        label_winsize = ax_winsize.text(0, 1.25, 'Win size')
+
+        ax_voltrange = self.fig.add_axes([0.825, 0.24, 0.15, 0.075])
+        self.textbox_voltrange = TextBox(ax_voltrange, label='',
+                                         initial=f'{self.volt_range:.1f}')
+        self.textbox_voltrange.on_submit(self.ask_voltrange_change)
+        label_voltrange = ax_voltrange.text(0, 1.25, 'Range')
+
+        ax_start_spectrum = self.fig.add_axes([0.825, 0.1, 0.15, 0.075])
+        self.btn_start_spectrum = Button(ax_start_spectrum, label='FFT')
+        self.btn_start_spectrum.on_clicked(self.start_spectrum)
         
+    def clean_spectrum(self, *args):
+        self.freq = None
+        self.Pxx = None
+        self.N_spectra = 0
+        
+    def start_spectrum(self, *args, **kwargs):
+        if self.fig_spectrum is None:
+            self.fig_spectrum = plt.figure()
+            self.ax_spectrum = self.fig_spectrum.add_axes([0.1,0.1,0.7,0.8])
+
+            # Widgets
+            ax_hanning = self.fig_spectrum.add_axes([0.825, 0.75, 0.15, 0.15])
+            self.checkbox_hanning = CheckButtons(ax_hanning, ['Hanning', 'AC'], [self.hanning, self.ac])
+            self.checkbox_hanning.on_clicked(self.ask_hanning_change)
+
+            ax_spectrum_unit = self.fig_spectrum.add_axes([0.825, 0.51, 0.15, 0.25])
+            self.radio_units = RadioButtons(ax_spectrum_unit, ['V^2/Hz', 
+                                                               'V/sq(Hz)',
+                                                               'mV/sq(Hz)',
+                                                               'µV/sq(Hz)',
+                                                               'nV/sq(Hz)'])
+            self.radio_units.on_clicked(self.ask_spectrum_units_change)
+
+            ax_restart = self.fig_spectrum.add_axes([0.825, 0.35, 0.15, 0.075])
+            self.btn_restart = Button(ax_restart, label='Restart')
+            self.btn_restart.on_clicked(self.clean_spectrum)
+
+        self.clean_spectrum()
+
+    def ask_spectrum_units_change(self, event):
+        power_spectrum_dict = {'V^2/Hz': True, 
+                               'V/sq(Hz)': False,
+                               'mV/sq(Hz)': False,
+                               'µV/sq(Hz)': False,
+                               'nV/sq(Hz)': False}
+        spectrum_unit_dict = {'V^2/Hz': 1.0, 
+                               'V/sq(Hz)': 1.0,
+                               'mV/sq(Hz)': 1e3,
+                               'µV/sq(Hz)': 1e6,
+                               'nV/sq(Hz)': 1e9}
+        if event in power_spectrum_dict:
+            self.spectrum_unit_str = event
+            self.power_spectrum = power_spectrum_dict[event]
+            self.spectrum_unit = spectrum_unit_dict[event]
+
+    async def winsize_change(self, new_N):
+        await self.pause_acqui()
+        old_N = self.N
+        self.N = new_N
+        self.clean_spectrum()
+        self.figure_t_axis()
+        try:
+            self.task.timing.cfg_samp_clk_timing(self.sampling, samps_per_chan=self.N)
+        except DaqError:
+            print('Invalid winsize')
+            self.N = old_N
+        await self.restart_acqui()
+
+    def ask_winsize_change(self, label):
+        try:
+            new_N = int(label)
+        except ValueError:
+            print('winsize must be an integer')
+            return
+        loop = asyncio.get_event_loop()
+        asyncio.ensure_future(self.winsize_change(new_N), loop=loop)
+
     def ask_trigger_change(self, label):
         changed = False
         trigger_enable, = self.checkbox_trigger.get_status()
@@ -92,17 +189,19 @@ class Oscillo:
                                                                       trigger_level=self.trigger_level)
         else:
             self.task.triggers.start_trigger.disable_start_trig()
+        self.clean_spectrum()
         await self.restart_acqui()
 
     async def sampling_change(self):
         await self.pause_acqui()
         try:
-            self.task.timing.cfg_samp_clk_timing(self.sampling, samps_per_chan=1024)
+            self.task.timing.cfg_samp_clk_timing(self.sampling, samps_per_chan=self.N)
         except DaqError:
             print('Invalid sampling frequency')
             self.ask_sampling_change(self.task.timing.samp_clk_max_rate)
             return
         self.figure_t_axis()
+        self.clean_spectrum()
         await self.restart_acqui()
         
     def ask_sampling_change(self, sampling):
@@ -117,8 +216,12 @@ class Oscillo:
             loop = asyncio.get_event_loop()
             asyncio.ensure_future(self.sampling_change(), loop=loop)
 
+    def ask_hanning_change(self, label):
+        self.hanning, self.ac = self.checkbox_hanning.get_status()
+        self.clean_spectrum()
+
     def figure_t_axis(self):
-        self.t = np.arange(1024)/self.sampling
+        self.t = np.arange(self.N)/self.sampling
         if self.t[-1] < 1:
             self.t *= 1000
             self.unit = '[ms]'
@@ -127,28 +230,68 @@ class Oscillo:
 
     async def run_gui(self):
         while self.running:
-            if time.monotonic()-self.last_trigged > 1024/self.sampling:
+            if time.monotonic()-self.last_trigged > self.N/self.sampling:
                 self.ax.set_title('Waiting for trigger')
             self.fig.canvas.start_event_loop(0.5)
             await asyncio.sleep(0.05)
             if not plt.fignum_exists(self.fig.number):
                 self.running = False
+            if self.fig_spectrum and not plt.fignum_exists(self.fig_spectrum.number):
+                self.fig_spectrum = None
+                self.freq = None
+                self.Pxx = None
+                self.N_spectra = 0
 
-    async def run_acqui(self):
-        loop = asyncio.get_event_loop()
+    def ask_voltrange_change(self, new_range):
+        if not self.ignore_voltrange_submit:
+            try:
+                new_range = float(new_range)
+            except ValueError:
+                print('Volt range must be a float')
+                return
+            loop = asyncio.get_event_loop()
+            asyncio.ensure_future(self.voltrange_change(new_range), loop=loop)
+
+    async def voltrange_change(self, new_range):
+        await self.pause_acqui()
+        self.volt_range = new_range
+        self.clean_spectrum()
+        self.create_task()
+        await self.restart_acqui()
+        actual_range = self.ai_channels[0].ai_max
+        print('actual_range =', actual_range)
+        self.ignore_voltrange_submit = True
+        self.textbox_voltrange.set_val(f'{actual_range:.1f}')
+        self.ignore_voltrange_submit = False
+
+    def create_task(self):
+        if self.task is not None:
+            self.task.close()
         self.task = Task()
+        self.ai_channels = list()
         for chan in self.channel_list:
-            self.task.ai_channels.add_ai_voltage_chan(chan)
-        self.task.timing.cfg_samp_clk_timing(self.sampling, samps_per_chan=1024)
+            ai_chan = self.task.ai_channels.add_ai_voltage_chan(chan,
+                                                      terminal_config=TerminalConfiguration.DIFFERENTIAL,
+                                                      min_val=-self.volt_range, 
+                                                      max_val=self.volt_range)
+            self.ai_channels.append(ai_chan)
+        self.task.timing.cfg_samp_clk_timing(self.sampling, samps_per_chan=self.N)
         if self.trigger_level is not None:
             self.task.triggers.start_trigger.cfg_anlg_edge_start_trig(self.channel_list[self.trigger_source], 
                                                                       trigger_level=self.trigger_level)
         self.figure_t_axis()
+
+    async def run_acqui(self):
+        loop = asyncio.get_event_loop()
+        self.create_task()
         try:
             while self.running:
                 while self.ask_pause_acqui and self.running:
                     self.paused = True
                     await asyncio.sleep(0.5)
+                #if self.paused:
+                #    print('Exiting pause loop')
+                #    print('self.t.shape =', self.t.shape)
                 self.paused = False
                 if not self.running:
                     break
@@ -164,7 +307,7 @@ class Oscillo:
                     done = True
                     break
                 if done:
-                    data = self.task.read(READ_ALL_AVAILABLE)
+                    data = np.array(self.task.read(READ_ALL_AVAILABLE))
                     self.last_trigged = time.monotonic()
                 self.task.stop()
                 if not done:
@@ -180,6 +323,58 @@ class Oscillo:
                 self.ax.set_xlim([self.t[0], self.t[-1]])
                 self.ax.set_title('Trigged!')
                 self.ax.set_xlabel('t ' + self.unit)
+                if self.fig_spectrum:
+                    if self.N_spectra == 0:
+                        self.freq = np.fft.fftfreq(self.N, 1.0/self.sampling)
+                        bb = self.freq > 0
+                        norm = math.pi*math.sqrt(self.N/self.sampling) 
+                        if self.hanning:
+                            window = np.hanning(self.N)
+                        else:
+                            window = np.ones((self.N,))
+                        if len(self.channel_list) == 1:
+                            if self.ac:
+                                m = np.mean(data)
+                            else:
+                                m = 0.0
+                            self.Pxx = np.abs(np.fft.fft((data-m)*window)/norm)**2
+                        else:
+                            if self.ac:
+                                ms = [np.mean(d) for d in data]
+                            else:
+                                ms = [0.0 for d in data]
+                            self.Pxx = [np.abs(np.fft.fft((d-m)*window)/norm)**2 for d, m in zip(data, ms)]
+                        self.N_spectra = 1
+                    else:
+                        if len(self.channel_list) == 1:
+                            if self.ac:
+                                m = np.mean(data)
+                            else:
+                                m = 0.0
+                            self.Pxx += np.abs(np.fft.fft((data-m)*window)/norm)**2
+                        else:
+                            if self.ac:
+                                ms = [np.mean(d) for d in data]
+                            else:
+                                ms = [0.0 for d in data]
+                            for p, d, m in zip(self.Pxx, data, ms):
+                                p += np.abs(np.fft.fft((d-m)*window)/norm)**2
+                        self.N_spectra += 1
+                    self.ax_spectrum.cla()
+                    if self.power_spectrum:
+                        def process_spec(s):
+                            return self.spectrum_unit*s
+                    else:
+                        def process_spec(s):
+                            return self.spectrum_unit*np.sqrt(s)
+                    if len(self.channel_list) == 1:
+                        self.ax_spectrum.loglog(self.freq[bb], process_spec(self.Pxx[bb]/self.N_spectra), '-')
+                    else:
+                        for p in self.Pxx:
+                            self.ax_spectrum.loglog(self.freq[bb], process_spec(p[bb]/self.N_spectra), '-')
+                    self.ax_spectrum.set_xlabel('f [Hz]')
+                    self.ax_spectrum.set_ylabel(self.spectrum_unit_str)
+                    self.ax_spectrum.set_title(f'N = {self.N_spectra:d}')
         finally:
             self.task.close()
 
