@@ -9,10 +9,12 @@ import signal
 import asyncio
 import time
 import math
+from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, TextBox, CheckButtons, RadioButtons
+import h5py
 
 from nidaqmx import Task
 from nidaqmx.constants import READ_ALL_AVAILABLE
@@ -49,6 +51,7 @@ class Oscillo:
         self.spectrum_unit = 1.0
         self.spectrum_unit_str = 'V^2/Hz'
         self.task = None
+        self.saved_spectra = list()
         
         self.fig_stats = None
 
@@ -145,9 +148,30 @@ class Oscillo:
             ax_restart = self.fig_spectrum.add_axes([0.825, 0.35, 0.15, 0.075])
             self.btn_restart = Button(ax_restart, label='Restart')
             self.btn_restart.on_clicked(self.clean_spectrum)
+            
+            ax_save_hold = self.fig_spectrum.add_axes([0.825, 0.25, 0.15, 0.075])
+            self.btn_save_hold = Button(ax_save_hold, label='Hold&Save')
+            self.btn_save_hold.on_clicked(self.save_hold)
 
         self.clean_spectrum()
 
+    def save_hold(self, event):
+        if self.N_spectra > 0:
+            dt = datetime.now()
+            filename = f'pymanip_oscillo_{dt.year:}-{dt.month}-{dt.day}_{dt.hour}-{dt.minute}-{dt.second}.hdf5'
+            bb = self.freq > 0
+            with h5py.File(filename) as f:
+                f.attrs['ts'] = dt.timestamp()
+                f.attrs['N_spectra'] = self.N_spectra
+                f.attrs['sampling'] = self.sampling
+                f.attrs['volt_range'] = self.volt_range
+                f.attrs['N'] = self.N
+                f.create_dataset('freq', data=self.freq[bb])
+                f.create_dataset('Pxx', data=self.Pxx[bb]/self.N_spectra)
+            self.saved_spectra.append({'freq': self.freq[bb],
+                                       'Pxx': self.Pxx[bb]/self.N_spectra})
+            
+        
     def ask_spectrum_units_change(self, event):
         power_spectrum_dict = {'V^2/Hz': True, 
                                'V/sq(Hz)': False,
@@ -372,6 +396,10 @@ class Oscillo:
                 self.ax.set_title('Trigged!')
                 self.ax.set_xlabel('t ' + self.unit)
                 if self.fig_spectrum:
+                    self.ax_spectrum.cla()
+                    if self.saved_spectra:
+                        for spectra in self.saved_spectra:
+                            self.ax_spectrum.loglog(spectra['freq'], spectra['Pxx'], '-')
                     if self.N_spectra == 0:
                         self.freq = np.fft.fftfreq(self.N, 1.0/self.sampling)
                         bb = self.freq > 0
@@ -408,7 +436,6 @@ class Oscillo:
                             for p, d, m in zip(self.Pxx, data, ms):
                                 p += np.abs(np.fft.fft((d-m)*window)/norm)**2
                         self.N_spectra += 1
-                    self.ax_spectrum.cla()
                     if self.power_spectrum:
                         def process_spec(s):
                             return self.spectrum_unit*s
