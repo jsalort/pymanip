@@ -212,7 +212,8 @@ class AVT_Camera(Camera):
             self.camera.runFeatureCommand("AcquisitionStop")
             self.camera.endCapture()
             self.camera.revokeAllFrames()
-        yield True
+        if stop_signal:
+            yield True
 
 
 if __name__ == '__main__':
