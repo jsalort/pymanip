@@ -38,6 +38,7 @@ class Oscillo:
         self.last_trigged = 0
         self.ask_pause_acqui = False
         self.paused = False
+        
         self.freq = None
         self.Pxx = None
         self.N_spectra = 0
@@ -48,6 +49,8 @@ class Oscillo:
         self.spectrum_unit = 1.0
         self.spectrum_unit_str = 'V^2/Hz'
         self.task = None
+        
+        self.fig_stats = None
 
         # Configure widgets
         ax_sampling = self.fig.add_axes([0.825, 0.825, 0.15, 0.075])
@@ -56,29 +59,33 @@ class Oscillo:
         self.textbox_sampling.on_submit(self.ask_sampling_change)
         label_sampling = ax_sampling.text(0, 1.25, 'Sampling')
 
-        ax_enable_trigger = self.fig.add_axes([0.825, 0.65, 0.15, 0.15])
+        ax_enable_trigger = self.fig.add_axes([0.825, 0.72, 0.15, 0.075])
         self.checkbox_trigger = CheckButtons(ax_enable_trigger, ['Trigger'], [trigger_level is not None])
         self.checkbox_trigger.on_clicked(self.ask_trigger_change)
 
-        ax_triggerlevel = self.fig.add_axes([0.825, 0.51, 0.15, 0.075])
+        ax_triggerlevel = self.fig.add_axes([0.825, 0.58, 0.15, 0.075])
         self.textbox_triggerlevel = TextBox(ax_triggerlevel, label='',
                                             initial=f'{trigger_level:.2f}' if trigger_level is not None else '1.0')
         self.textbox_triggerlevel.on_submit(self.ask_trigger_change)
         label_triggerlevel = ax_triggerlevel.text(0, 1.25, 'Level')
 
-        ax_winsize = self.fig.add_axes([0.825, 0.37, 0.15, 0.075])
+        ax_winsize = self.fig.add_axes([0.825, 0.44, 0.15, 0.075])
         self.textbox_winsize = TextBox(ax_winsize, label='',
                                        initial=f'{self.N:d}')
         self.textbox_winsize.on_submit(self.ask_winsize_change)
         label_winsize = ax_winsize.text(0, 1.25, 'Win size')
 
-        ax_voltrange = self.fig.add_axes([0.825, 0.24, 0.15, 0.075])
+        ax_voltrange = self.fig.add_axes([0.825, 0.31, 0.15, 0.075])
         self.textbox_voltrange = TextBox(ax_voltrange, label='',
                                          initial=f'{self.volt_range:.1f}')
         self.textbox_voltrange.on_submit(self.ask_voltrange_change)
         label_voltrange = ax_voltrange.text(0, 1.25, 'Range')
 
-        ax_start_spectrum = self.fig.add_axes([0.825, 0.1, 0.15, 0.075])
+        ax_start_stats = self.fig.add_axes([0.825, 0.2, 0.15, 0.075])
+        self.btn_start_stats = Button(ax_start_stats, label='Stats')
+        self.btn_start_stats.on_clicked(self.start_stats)
+        
+        ax_start_spectrum = self.fig.add_axes([0.825, 0.08, 0.15, 0.075])
         self.btn_start_spectrum = Button(ax_start_spectrum, label='FFT')
         self.btn_start_spectrum.on_clicked(self.start_spectrum)
         
@@ -86,7 +93,37 @@ class Oscillo:
         self.freq = None
         self.Pxx = None
         self.N_spectra = 0
-        
+    
+    def start_stats(self, event):
+        if self.fig_stats is None:
+            self.fig_stats = dict()
+            self.box_mean = dict()
+            self.box_std = dict()
+            self.box_min = dict()
+            self.box_max = dict()
+            self.box_freq = dict()
+        nbox = 5
+        height = 1.0/(nbox+1)
+        padding = height/4
+        for chan in self.channel_list:
+            if chan not in self.fig_stats:
+                self.fig_stats[chan] = plt.figure(figsize=(2,4))
+                
+                ax_mean = self.fig_stats[chan].add_axes([0.25, 9*height/2, 0.7, height-padding])
+                self.box_mean[chan] = TextBox(ax_mean, label='Mean', initial='')
+                
+                ax_std = self.fig_stats[chan].add_axes([0.25, 7*height/2, 0.7, height-padding])
+                self.box_std[chan] = TextBox(ax_std, label='Std', initial='')
+                
+                ax_min = self.fig_stats[chan].add_axes([0.25, 5*height/2, 0.7, height-padding])
+                self.box_min[chan] = TextBox(ax_min, label='Min', initial='')
+                
+                ax_max = self.fig_stats[chan].add_axes([0.25, 3*height/2, 0.7, height-padding])
+                self.box_max[chan] = TextBox(ax_max, label='Max', initial='')
+                
+                ax_freq = self.fig_stats[chan].add_axes([0.25, height/2, 0.7, height-padding])
+                self.box_freq[chan] = TextBox(ax_freq, label='Freq', initial='')
+                
     def start_spectrum(self, *args, **kwargs):
         if self.fig_spectrum is None:
             self.fig_spectrum = plt.figure()
@@ -241,6 +278,17 @@ class Oscillo:
                 self.freq = None
                 self.Pxx = None
                 self.N_spectra = 0
+            if self.fig_stats is not None:
+                for chan in list(self.fig_stats.keys()):
+                    if not plt.fignum_exists(self.fig_stats[chan].number):
+                        self.fig_stats.pop(chan)
+                        self.box_mean.pop(chan)
+                        self.box_std.pop(chan)
+                        self.box_min.pop(chan)
+                        self.box_max.pop(chan)
+                        self.box_freq.pop(chan)
+                    if not self.fig_stats:
+                        self.fig_stats = None
 
     def ask_voltrange_change(self, new_range):
         if not self.ignore_voltrange_submit:
@@ -375,6 +423,22 @@ class Oscillo:
                     self.ax_spectrum.set_xlabel('f [Hz]')
                     self.ax_spectrum.set_ylabel(self.spectrum_unit_str)
                     self.ax_spectrum.set_title(f'N = {self.N_spectra:d}')
+                if self.fig_stats:
+                    if len(self.channel_list) == 1:
+                        list_data = [data]
+                    else:
+                        list_data = data
+                    for chan, d in zip(self.channel_list, list_data):
+                        if chan in self.fig_stats:
+                            self.box_mean[chan].set_val('{:.5f}'.format(np.mean(d)))
+                            self.box_std[chan].set_val('{:.5f}'.format(np.std(d)))
+                            self.box_min[chan].set_val('{:.5f}'.format(np.min(d)))
+                            self.box_max[chan].set_val('{:.5f}'.format(np.max(d)))
+                            ff = np.fft.fftfreq(self.N, 1.0/self.sampling)
+                            pp = np.abs(np.fft.fft(d-np.mean(d)))
+                            ii = np.argmax(pp)
+                            self.box_freq[chan].set_val('{:.5f}'.format(ff[ii]))
+                        
         finally:
             self.task.close()
 
