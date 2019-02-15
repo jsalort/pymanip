@@ -20,6 +20,7 @@ from nidaqmx import Task
 from nidaqmx.constants import READ_ALL_AVAILABLE
 from nidaqmx.errors import DaqError
 from nidaqmx.constants import TerminalConfiguration
+from nidaqmx.system import system, device
 
 class Oscillo:
 
@@ -486,6 +487,20 @@ class Oscillo:
                                                self.run_acqui()))
 
 
+class ChannelSelector:
+
+    def __init__(self):
+        self.sys = system.System()
+        self.device_list = self.sys.devices.device_names
+        for devname in self.device_list:
+            dev = device.Device(devname)
+            print(dev.product_type)
+            print(dev.pxi_chassis_num)
+            print(dev.pxi_slot_num)
+            print(dev.ai_physical_chans.channel_names)
+
+
 if __name__ == '__main__':
-    oscillo = Oscillo(['Dev2/ai0', 'Dev2/ai1'], 5e3, 10.0, trigger_level=2.0)
-    oscillo.run()
+    chansel = ChannelSelector()
+    #oscillo = Oscillo(['Dev2/ai0', 'Dev2/ai1'], 5e3, 10.0, trigger_level=2.0)
+    #oscillo.run()
