@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
 from pymanip.util.video import preview_pco, preview_avt, preview_andor
-from pymanip.util.oscillo import Oscillo
+from pymanip.util.oscillo import Oscillo, ChannelSelector
 
 has_video = True
 
@@ -82,8 +82,8 @@ parser_oscillo = subparsers.add_parser("oscillo",
                                        help="Use DAQmx cards as oscilloscope")
 parser_oscillo.add_argument('channel',
                             help='DAQmx channel names',
-                            metavar="Dev2/ai0",
-                            nargs='+')
+                            metavar="channel_name",
+                            nargs='*', default=None)
 parser_oscillo.add_argument('-s', '--sampling',
                             help='Sampling frequency',
                             metavar='sampling_freq',
@@ -158,8 +158,21 @@ elif args.command == 'oscillo':
         trigger = float(args.trigger)
     else:
         trigger = None
-    oscillo = Oscillo(args.channel, float(args.sampling),
-                     float(args.range), trigger, 
+    if args.channel:
+        channel = args.channel
+    else:
+        chansel = ChannelSelector()
+        channel = chansel.gui_select()
+    if args.sampling:
+        sampling = float(args.sampling)
+    else:
+        sampling = 5e3
+    if args.range:
+        range_ = float(args.range)
+    else:
+        range_ = 10.0
+    oscillo = Oscillo(channel, sampling,
+                     range_, trigger, 
                      int(args.trigsource))
     oscillo.run()
 elif args.command == 'video':

@@ -10,6 +10,7 @@ import asyncio
 import time
 import math
 from datetime import datetime
+import tkinter
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,8 +25,8 @@ from nidaqmx.system import system, device
 
 class Oscillo:
 
-    def __init__(self, channel_list, sampling, volt_range, trigger_level=None,
-                 trigsource=0):
+    def __init__(self, channel_list, sampling=5e3, volt_range=10.0, 
+                 trigger_level=None, trigsource=0):
         self.channel_list = channel_list
         self.sampling = sampling
         self.volt_range = volt_range
@@ -112,6 +113,7 @@ class Oscillo:
         for chan in self.channel_list:
             if chan not in self.fig_stats:
                 self.fig_stats[chan] = plt.figure(figsize=(2,4))
+                self.fig_stats[chan].canvas.set_window_title(chan)
                 
                 ax_mean = self.fig_stats[chan].add_axes([0.25, 9*height/2, 0.7, height-padding])
                 self.box_mean[chan] = TextBox(ax_mean, label='Mean', initial='')
@@ -507,9 +509,28 @@ class ChannelSelector:
             print('-'*len(name))
             print(devlist)
 
+    def gui_select(self):
+        master = tkinter.Tk()
+        ii = 0
+        tkinter.Label(master, text='Choose channels').grid(row=ii, sticky=tkinter.W)
+        ii += 1
+        values = dict()
+        for card, devlist in self.device_list.items():
+            for dev in devlist:
+                values[dev] = tkinter.IntVar()
+                tkinter.Checkbutton(master,
+                                    text=dev,
+                                    variable=values[dev]).grid(row=ii,
+                                                               sticky=tkinter.W)
+                ii += 1
+        tkinter.Button(master, text='OK', command=master.quit).grid(row=ii,
+                                                                    sticky=tkinter.W)
+        tkinter.mainloop()
+        master.destroy()
+        return [chan for chan in values if values[chan].get()]
 
 if __name__ == '__main__':
     chansel = ChannelSelector()
-    chansel.print_channel_list()
-    #oscillo = Oscillo(['Dev2/ai0', 'Dev2/ai1'], 5e3, 10.0, trigger_level=2.0)
-    #oscillo.run()
+    chanlist = chansel.gui_select()
+    oscillo = Oscillo(chanlist)
+    oscillo.run()
