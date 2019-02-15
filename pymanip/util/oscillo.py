@@ -491,16 +491,25 @@ class ChannelSelector:
 
     def __init__(self):
         self.sys = system.System()
-        self.device_list = self.sys.devices.device_names
-        for devname in self.device_list:
+        self.device_list = dict()
+        for devname in self.sys.devices.device_names:
             dev = device.Device(devname)
-            print(dev.product_type)
-            print(dev.pxi_chassis_num)
-            print(dev.pxi_slot_num)
-            print(dev.ai_physical_chans.channel_names)
+            description = dev.product_type
+            if description.startswith('PXI'):
+                description = f'PXI {dev.pxi_chassis_num:d} Slot {dev.pxi_slot_num:d} ({dev.product_type:})'
+            elif description.startswith('PCI'):
+                description = f'{dev.product_type:} ({dev.pci_bus_num:} {dev.pci_dev_num:})'
+            self.device_list[description] = dev.ai_physical_chans.channel_names
+            
+    def print_channel_list(self):
+        for name, devlist in self.device_list.items():
+            print(name)
+            print('-'*len(name))
+            print(devlist)
 
 
 if __name__ == '__main__':
     chansel = ChannelSelector()
+    chansel.print_channel_list()
     #oscillo = Oscillo(['Dev2/ai0', 'Dev2/ai1'], 5e3, 10.0, trigger_level=2.0)
     #oscillo.run()
