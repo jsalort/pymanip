@@ -9,8 +9,10 @@ from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
 from pymanip.util.video import preview_pco, preview_avt, preview_andor
-from pymanip.util.oscillo import Oscillo, ChannelSelector
-
+try:
+    from pymanip.util.oscillo import Oscillo, ChannelSelector
+except ModuleNotFoundError:
+    has_oscillo = False
 has_video = True
 
 try:
