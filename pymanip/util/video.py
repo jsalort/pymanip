@@ -22,7 +22,7 @@ except Exception:
 from contextlib import ExitStack
 import asyncio
 
-def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=20):
+def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=20, rotate=0):
     if not has_pco:
         print('PCO bindings are not available.')
     else:
@@ -32,9 +32,9 @@ def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, e
             else:
                 cam.set_trigger_mode('auto sequence')
             cam.set_delay_exposuretime(exposuretime=exposure_ms/1000)
-            cam.preview(backend, slice, zoom)
+            cam.preview(backend, slice, zoom, rotate)
 
-def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=10):
+def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=10, rotate=0):
     if not has_avt:
         print('Pymba is not available.')
     else:
@@ -55,7 +55,8 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, e
                         c.set_trigger_mode(False)
                 loop = asyncio.get_event_loop()
                 loop.run_until_complete(asyncio.gather(*[c.preview_async_cv(slice, zoom, 
-                                                                            name="AVT " + str(c.num))
+                                                                            name="AVT " + str(c.num),
+                                                                            rotate=rotate)
                                                          for c in cams]))
                 loop.close()
         else:
@@ -67,9 +68,10 @@ def preview_avt(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, e
                     print('Internal trigger')
                     cam.set_trigger_mode(False)
                 cam.set_exposure_time(exposure_ms/1000)
-                cam.preview(backend, slice, zoom)
+                cam.preview(backend, slice, zoom, rotate)
 
-def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None, exposure_ms=1, bitdepth=12, framerate=10.0):
+def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None,
+                  exposure_ms=1, bitdepth=12, framerate=10.0, rotate=0):
     if not has_andor:
         print('Andor bindings are not available.')
     else:
@@ -86,4 +88,4 @@ def preview_andor(num=0, backend='cv', slice=None, zoom=1.0, TriggerMode=None, e
                 cam.SimplePreAmpGainControl.setString('16-bit (low noise & high well capacity)')
             else:
                 raise ValueError('Only 12-bits or 16-bits')
-            cam.preview(backend, slice, zoom)
+            cam.preview(backend, slice, zoom, rotate)

@@ -95,15 +95,15 @@ class Camera:
         if hasattr(self, 'preview_generator'):
             self.preview_generator = None
 
-    def preview(self, backend='cv', slice_=None, zoom=0.5):
+    def preview(self, backend='cv', slice_=None, zoom=0.5, rotate=0):
         if backend == 'cv':
-            self.preview_cv(slice_, zoom)
+            self.preview_cv(slice_, zoom, rotate)
         elif backend == 'qt':
-            self.preview_qt(slice_, zoom)
+            self.preview_qt(slice_, zoom, None, rotate)
         else:
             raise RuntimeError('Unknown backend "' + backend + '"')
 
-    async def preview_async_cv(self, slice_, zoom, name):
+    async def preview_async_cv(self, slice_, zoom, name, rotate=0):
         minimum = None
         maximum = None
         cv2.namedWindow(name)
@@ -116,6 +116,8 @@ class Camera:
                     maximum = np.max(im)
                     #print('min, max:', minimum, maximum)
                 maxint = np.iinfo(im.dtype).max
+                if rotate == 90.0:
+                    im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 if slice_:
                     img = (maxint//(maximum-minimum))*(im[slice_[0]:slice_[1],
                                                           slice_[2]:slice_[3]]-minimum)
@@ -136,9 +138,9 @@ class Camera:
         finally:
             cv2.destroyAllWindows()
 
-    def preview_cv(self, slice_, zoom):
+    def preview_cv(self, slice_, zoom, rotate=0):
         return synchronize_function(self.preview_async_cv, slice_, zoom,
-                                    name="Preview")
+                                    name="Preview", rotate=rotate)
 
     def preview_exitHandler(self):
         """
@@ -151,7 +153,7 @@ class Camera:
         if not clean:
             print("Generator not cleaned")
 
-    def preview_qt(self, slice, zoom, app=None):
+    def preview_qt(self, slice, zoom, app=None, rotate=0):
         if app:
             self.app = app
             just_started = False
@@ -183,6 +185,8 @@ class Camera:
         # for camera reading)
         img = next(self.preview_generator)
         if img is not None:
+            if rotate == 90.0:
+                img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
             self.image_view.setImage(img.T,
                                      autoRange=False, autoLevels=False,
                                      autoHistogramRange=False)
@@ -192,7 +196,7 @@ class Camera:
                 self.range_set = True
 
         # set timer for refreshing in 10 ms
-        QtCore.QTimer.singleShot(10, lambda: self.preview_qt(slice, zoom))
+        QtCore.QTimer.singleShot(10, lambda: self.preview_qt(slice, zoom, self.app, rotate))
 
         if just_started:
             QtGui.QApplication.instance().exec_()

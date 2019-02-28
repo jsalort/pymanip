@@ -134,6 +134,9 @@ parser_video.add_argument('-d', '--bitdepth',
 parser_video.add_argument('-f', '--framerate',
                           help='Acquisition framerate in Herz',
                           metavar='framerate', default=10.0, type=float, nargs=1)
+parser_video.add_argument('-r', '--rotate',
+                          help='Rotate image',
+                          metavar='angle', default=0.0, type=float, nargs=1)
                                      
 # Parse arguments
 args = parser.parse_args()
@@ -214,12 +217,17 @@ elif args.command == 'video':
         framerate = float(args.framerate[0])
     else:
         framerate = float(args.framerate)
+    if isinstance(args.rotate, list):
+        rotate = float(args.rotate[0])
+    else:
+        rotate = float(args.rotate)
     if args.camera_type.upper() == 'PCO':
-        preview_pco(board, tk, slice, zoom, Trigger, exposure_ms)
+        preview_pco(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
     elif args.camera_type.upper() == 'AVT':
-        preview_avt(board, tk, slice, zoom, Trigger, exposure_ms)
+        preview_avt(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
     elif args.camera_type.upper() == 'ANDOR':
-        preview_andor(board, tk, slice, zoom, Trigger, exposure_ms, bitdepth, framerate)
+        preview_andor(board, tk, slice, zoom, Trigger, exposure_ms,
+                      bitdepth, framerate, rotate=rotate)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:
