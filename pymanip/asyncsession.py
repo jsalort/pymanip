@@ -419,7 +419,8 @@ class AsyncSession:
 
             await self.sleep(delay_hours*3600, verbose=False)
 
-    async def plot(self, varnames=None, maxvalues=1000, yscale=None, *, x=None, y=None):
+    async def plot(self, varnames=None, maxvalues=1000, yscale=None, *,
+                   x=None, y=None, fixed_ylim=None):
         """
         if x, y is specified instead of varnames, plot var y against var x
         """
@@ -470,11 +471,12 @@ class AsyncSession:
                         p.set_xdata(xx)
                         p.set_ydata(yy)
                         xlim = ax.get_xlim()
-                        ylim = ax.get_ylim()
                         if xlim[1] < np.max(xx) or xlim[0] > np.min(xx):
                             ax.set_xlim((np.min(xx), np.max(xx)))
-                        if ylim[1] < np.max(yy) or ylim[0] > np.min(yy):
-                            ax.set_ylim((np.min(yy), np.max(yy)))
+                        if fixed_ylim is None:
+                            ylim = ax.get_ylim()
+                            if ylim[1] < np.max(yy) or ylim[0] > np.min(yy):
+                                ax.set_ylim((np.min(yy), np.max(yy)))
                     else:
                         p, = ax.plot(vs_x, vs_y, 's-')
                         line_objects[y] = p
@@ -482,8 +484,11 @@ class AsyncSession:
                         ax.set_ylabel(y)
                         if np.min(vs_x) != np.max(vs_x):
                             ax.set_xlim((np.min(vs_x), np.max(vs_x)))
-                        if np.min(vs_y) != np.max(vs_y):
-                            ax.set_ylim((np.min(vs_y), np.max(vs_y)))
+                        if fixed_ylim is None:
+                            if np.min(vs_y) != np.max(vs_y):
+                                ax.set_ylim((np.min(vs_y), np.max(vs_y)))
+                        else:
+                            ax.set_ylim(fixed_ylim)
                         fig.show()
                     last_update[x] = ts_x[-1]
                     last_update[y] = ts_y[-1]
@@ -501,13 +506,14 @@ class AsyncSession:
                                 y = y[-maxvalues:]
                             p.set_xdata(x)
                             p.set_ydata(y)
-                            ylim = ax.get_ylim()
                             if x[0] != x[-1]:
                                 ax.set_xlim((x[0], x[-1]))
-                            if ylim[1] < np.max(y) or ylim[0] > np.min(y):
-                                ylim = (min((ylim[0], np.min(y))),
-                                        max((ylim[1], np.max(y))))
-                                ax.set_ylim(ylim)
+                            if fixed_ylim is None:
+                                ylim = ax.get_ylim()
+                                if ylim[1] < np.max(y) or ylim[0] > np.min(y):
+                                    ylim = (min((ylim[0], np.min(y))),
+                                            max((ylim[1], np.max(y))))
+                                    ax.set_ylim(ylim)
                         else:
                             #print('initial plot')
                             x = (ts-ts0)/3600
@@ -522,6 +528,8 @@ class AsyncSession:
                                 ax.set_xlim((x[0], x[-1]))
                             if yscale:
                                 ax.set_yscale(yscale)
+                            if fixed_ylim is not None:
+                                ax.set_ylim(fixed_ylim)
                             ax.legend()
                             fig.show()
                         last_update[name] = ts[-1]
