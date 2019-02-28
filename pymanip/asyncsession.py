@@ -420,7 +420,7 @@ class AsyncSession:
             await self.sleep(delay_hours*3600, verbose=False)
 
     async def plot(self, varnames=None, maxvalues=1000, yscale=None, *,
-                   x=None, y=None, fixed_ylim=None):
+                   x=None, y=None, fixed_ylim=None, fixed_xlim=None):
         """
         if x, y is specified instead of varnames, plot var y against var x
         """
@@ -470,9 +470,10 @@ class AsyncSession:
                         yy = np.hstack((p.get_ydata(), vs_y))
                         p.set_xdata(xx)
                         p.set_ydata(yy)
-                        xlim = ax.get_xlim()
-                        if xlim[1] < np.max(xx) or xlim[0] > np.min(xx):
-                            ax.set_xlim((np.min(xx), np.max(xx)))
+                        if fixed_xlim is None:
+                            xlim = ax.get_xlim()
+                            if xlim[1] < np.max(xx) or xlim[0] > np.min(xx):
+                                ax.set_xlim((np.min(xx), np.max(xx)))
                         if fixed_ylim is None:
                             ylim = ax.get_ylim()
                             if ylim[1] < np.max(yy) or ylim[0] > np.min(yy):
@@ -482,8 +483,11 @@ class AsyncSession:
                         line_objects[y] = p
                         ax.set_xlabel(x)
                         ax.set_ylabel(y)
-                        if np.min(vs_x) != np.max(vs_x):
-                            ax.set_xlim((np.min(vs_x), np.max(vs_x)))
+                        if fixed_xlim is None:
+                            if np.min(vs_x) != np.max(vs_x):
+                                ax.set_xlim((np.min(vs_x), np.max(vs_x)))
+                        else:
+                            ax.set_xlim(fixed_xlim)
                         if fixed_ylim is None:
                             if np.min(vs_y) != np.max(vs_y):
                                 ax.set_ylim((np.min(vs_y), np.max(vs_y)))
@@ -681,6 +685,31 @@ class AsyncSession:
         loop.run_until_complete(asyncio.gather(webserver,
                                                self.figure_gui_update(),
                                                *tasks_final))
+
+    def save_remote_data(self, data):
+        """
+        Save data from RemoteObserver object as datasets and parameters
+        """
+        for k, v in data.items():
+            #print(k,type(v),v)
+            try:
+                v[0]
+                # we are iterable
+                self.add_dataset(**{k: v})
+            except (TypeError, KeyError):
+                # we are not iterable
+                if isinstance(v, dict):
+                    # non reduced data, v is a dictionnary with two keys, 't' and 'value'
+                    self.add_dataset(**{k: v['value']})
+                    self.add_dataset(**{k + '_time': v['t']})
+                else:
+                    try:
+                        # data must be a scalar
+                        float(v)
+                    except TypeError:
+                        print('skipping', k, type(v))
+                        continue
+                    self.save_parameter(**{k: data})
 
 
 class RemoteObserver:
