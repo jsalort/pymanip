@@ -50,6 +50,9 @@ class AsyncSession:
         if session_name is None:
             self.conn = sqlite3.connect(':memory:')
         else:
+            session_name = str(session_name)  # in case it is a Path object
+            if session_name.endswith('.db'):
+                session_name = session_name[:-3]
             self.conn = sqlite3.connect(session_name + '.db')
         with self.conn as c:
             tables = list(c.execute("SELECT name FROM sqlite_master;"))

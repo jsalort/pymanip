@@ -4,6 +4,7 @@
 *.swp
 MANIFEST
 __pycache__
+.ipynb_checkpoints
 
 # Metadata
 .DS_Store
