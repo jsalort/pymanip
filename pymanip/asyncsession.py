@@ -272,7 +272,10 @@ class AsyncSession:
             t = np.array([v[0] for v in it])
         return t
 
-    def dataset(self, name, ts):
+    def dataset(self, name, ts=None):
+        if ts is None:
+            ts, data = self.dataset_last_data(name)
+            return data
         with self.conn as conn:
             c = conn.cursor()
             c.execute("""SELECT data FROM dataset
