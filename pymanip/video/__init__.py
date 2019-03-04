@@ -16,6 +16,7 @@ import numpy as np
 try:
     import pyqtgraph as pg
     from pyqtgraph.Qt import QtCore, QtGui
+    from PyQt5.QtWidgets import QMainWindow, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QApplication, QLabel
     has_qtgraph = True
 except ModuleNotFoundError:
     has_qtgraph = False
@@ -152,7 +153,18 @@ class Camera:
         clean = self.preview_generator.send(True)
         if not clean:
             print("Generator not cleaned")
-
+            
+    def display_crosshair(self):
+        # add a centered crosshair for self-reflection
+        if self.crosshair_chkbox.isChecked():
+            self.vLine = pg.InfiniteLine(pos=(self.camera.Width/2, 0), angle=90, movable=False)
+            self.hLine = pg.InfiniteLine(pos=(0, self.camera.Height/2), angle=0, movable=False)
+            self.image_view.addItem(self.vLine, ignoreBounds=True)
+            self.image_view.addItem(self.hLine, ignoreBounds=True)
+        else:
+            self.image_view.removeItem(self.vLine)
+            self.image_view.removeItem(self.hLine)
+            
     def preview_qt(self, slice, zoom, app=None, rotate=0):
         if app:
             self.app = app
@@ -167,7 +179,6 @@ class Camera:
         # create window if it does not already exists
         if not hasattr(self, 'window'):
             self.window = QtGui.QMainWindow()
-            self.window.show()
             #self.window.resize(*self.resolution)
             self.window.resize(800, 600)
             self.window.setWindowTitle(self.name)
@@ -175,11 +186,56 @@ class Camera:
             self.window.setCentralWidget(self.image_view)
             self.range_set = False
 
+            # adding widget for controlling the background subtraction
+            # and a crosshair overlay
+            self.central_widget = QWidget()
+            self.tools_widget = QWidget()
+            self.central_layout = QVBoxLayout(self.central_widget)
+            self.tools_layout = QHBoxLayout(self.tools_widget)
+            
+            self.crosshair_chkbox = QtGui.QCheckBox("Crosshair", self.tools_widget)
+            self.subtraction_chkbox = QtGui.QCheckBox("Background subtraction", self.tools_widget)
+            self.learning_label = QLabel("Learning rate  [0, 1] :", parent=self.tools_widget)
+            self.spnbx_learning = QtGui.QDoubleSpinBox(parent=self.tools_widget, value=0.05)
+            self.spnbx_learning.setRange(0, 1)
+            self.spnbx_learning.setSingleStep(0.01)
+            self.spnbx_learning.setDecimals(3)
+            self.acq_btn = QtGui.QPushButton("Acquisition", self.tools_widget)
+            self.exposure_label = QLabel("Exposure time (s) :", parent=self.tools_widget)
+            self.spnbox_exposure = QtGui.QDoubleSpinBox(parent=self.tools_widget, value=0.001)
+            self.spnbox_exposure.setRange(0.000033, 67.108895)
+            self.spnbox_exposure.setSingleStep(0.0001)
+            self.spnbox_exposure.setDecimals(4)
+
+            self.tools_layout.addWidget(self.crosshair_chkbox)
+            self.tools_layout.addWidget(self.subtraction_chkbox)
+            self.tools_layout.addWidget(self.learning_label)
+            self.tools_layout.addWidget(self.spnbx_learning)
+            self.tools_layout.addWidget(self.exposure_label)
+            self.tools_layout.addWidget(self.spnbox_exposure)
+            self.tools_layout.addWidget(self.acq_btn)
+            
+            self.central_layout.addWidget(self.image_view)
+            self.central_layout.addWidget(self.tools_widget)
+            
+            self.window.setCentralWidget(self.central_widget)
+            
+            self.crosshair_chkbox.stateChanged.connect(self.display_crosshair)
+             
+            # hide useless buttons
+            self.image_view.ui.roiBtn.hide()
+            self.image_view.ui.menuBtn.hide()
+            
+            self.window.show()
+            
         # instantiate generator
         if not hasattr(self, 'preview_generator'):
             self.preview_generator = self.acquisition(timeout=5,
                                                       raise_on_timeout=False)
 
+        if just_started:
+            self.bkgrd = None
+            
         # update view with latest image if it is ready
         # do nothing otherwise (to allow GUI interaction while waiting
         # for camera reading)
@@ -187,6 +243,21 @@ class Camera:
         if img is not None:
             if rotate == 90.0:
                 img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            
+            info = np.iinfo(img.dtype)
+             
+            if self.subtraction_chkbox.isChecked():
+                if self.bkgrd is None:
+                    self.bkgrd = img
+                    self.range_set = False
+                learning_rate = self.spnbx_learning.value()
+                self.bkgrd = (1 - learning_rate) * self.bkgrd + learning_rate * img
+            
+                self.bkgrd = self.bkgrd.astype(np.int32)
+                img = img - self.bkgrd #self.bkgrd - img
+                img[img < 0] = 0
+                img = img.astype(np.uint16)
+            
             self.image_view.setImage(img.T,
                                      autoRange=False, autoLevels=False,
                                      autoHistogramRange=False)
