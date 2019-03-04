@@ -43,9 +43,7 @@ __all__ = ['AsyncSession']
 class AsyncSession:
     database_version = 3
 
-    def __init__(self, session_name=None, variable_list=None, verbose=True):
-        if variable_list is None:
-            variable_list = []
+    def __init__(self, session_name=None, verbose=True):
         self.session_name = session_name
         if session_name is None:
             self.conn = sqlite3.connect(':memory:')
@@ -642,7 +640,7 @@ class AsyncSession:
             await corofunc(self)
         print('Task finished', corofunc)
 
-    def run(self, *tasks):
+    def run(self, *tasks, server_port=6913):
         loop = asyncio.get_event_loop()
 
         # signal handling
@@ -656,26 +654,27 @@ class AsyncSession:
                                         self.ask_exit)
 
         # web server
-        app = web.Application(loop=loop)
-        aiohttp_jinja2.setup(app, loader=self.jinja2_loader)
-        app.router.add_routes([web.get('/',
-                                       self.server_main_page),
-                               web.get('/api/logged_last_values',
-                                       self.server_logged_last_values),
-                               web.get('/plot/{name}',
-                                       self.server_plot_page),
-                               web.static('/static',
-                                          self.static_dir),
-                               web.post('/api/data_from_ts',
-                                        self.server_data_from_ts),
-                               web.get('/api/server_current_ts',
-                                       self.server_current_ts),
-                               web.get('/api/get_parameters',
-                                       self.server_get_parameters),
-                               ])
+        if server_port:
+            app = web.Application(loop=loop)
+            aiohttp_jinja2.setup(app, loader=self.jinja2_loader)
+            app.router.add_routes([web.get('/',
+                                           self.server_main_page),
+                                   web.get('/api/logged_last_values',
+                                           self.server_logged_last_values),
+                                   web.get('/plot/{name}',
+                                           self.server_plot_page),
+                                   web.static('/static',
+                                              self.static_dir),
+                                   web.post('/api/data_from_ts',
+                                            self.server_data_from_ts),
+                                   web.get('/api/server_current_ts',
+                                           self.server_current_ts),
+                                   web.get('/api/get_parameters',
+                                           self.server_get_parameters),
+                                   ])
 
-        webserver = loop.create_server(app.make_handler(),
-                                       host=None, port=6913)
+            webserver = loop.create_server(app.make_handler(),
+                                           host=None, port=server_port)
 
         # if any of the tasks submitted are coroutinefunctions instead of
         # coroutines, then assume they take only one argument (self)
@@ -688,9 +687,13 @@ class AsyncSession:
             else:
                 raise TypeError('Coroutine or Coroutinefunction is expected')
         print('Starting event loop')
-        loop.run_until_complete(asyncio.gather(webserver,
-                                               self.figure_gui_update(),
-                                               *tasks_final))
+        if server_port:
+            loop.run_until_complete(asyncio.gather(webserver,
+                                                   self.figure_gui_update(),
+                                                   *tasks_final))
+        else:
+            loop.run_until_complete(asyncio.gather(self.figure_gui_update(),
+                                                   *tasks_final))
 
     def save_remote_data(self, data):
         """
