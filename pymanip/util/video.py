@@ -22,11 +22,11 @@ except Exception:
 from contextlib import ExitStack
 import asyncio
 
-def preview_pco(board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=20, rotate=0):
+def preview_pco(interface='all', board=0, backend='cv', slice=None, zoom=0.5, TriggerMode=None, exposure_ms=20, rotate=0):
     if not has_pco:
         print('PCO bindings are not available.')
     else:
-        with PCO_Camera(board) as cam:
+        with PCO_Camera(interface, board) as cam:
             if TriggerMode:
                 cam.set_trigger_mode(TriggerMode)
             else:

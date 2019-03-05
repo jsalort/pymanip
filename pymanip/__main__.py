@@ -110,6 +110,13 @@ parser_video = subparsers.add_parser("video",
 parser_video.add_argument('camera_type',
                           help='Camera type: PCO, AVT, DC1394',
                           metavar="camera_type")
+parser_video.add_argument('-l', '--list',
+                          help='List available cameras',
+                          action='store_true')
+parser_video.add_argument('-i', '--interface',
+                          help='Specify interface',
+                          metavar='interface',
+                          default="", type=str)
 parser_video.add_argument('-b', '--board',
                           help='Camera board address',
                           metavar='board', default=0, type=int, nargs='+')
@@ -222,12 +229,25 @@ elif args.command == 'video':
     else:
         rotate = float(args.rotate)
     if args.camera_type.upper() == 'PCO':
-        preview_pco(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
+        if args.list:
+            from pymanip.video.pco import print_available_pco_cameras
+            print_available_pco_cameras()
+        else:
+            interface = str(args.interface)
+            if not interface:
+                interface = 'all'
+            preview_pco(interface, board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
     elif args.camera_type.upper() == 'AVT':
-        preview_avt(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
+        if args.list:
+            print('Listing cameras not implemented for AVT')
+        else:
+            preview_avt(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
     elif args.camera_type.upper() == 'ANDOR':
-        preview_andor(board, tk, slice, zoom, Trigger, exposure_ms,
-                      bitdepth, framerate, rotate=rotate)
+        if args.list:
+            print('Listing cameras not implemented for Andor')
+        else:
+            preview_andor(board, tk, slice, zoom, Trigger, exposure_ms,
+                          bitdepth, framerate, rotate=rotate)
     else:
         print('Unknown camera type: ', args.camera_type)
 else:

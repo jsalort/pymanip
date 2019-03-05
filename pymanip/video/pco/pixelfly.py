@@ -636,9 +636,47 @@ class PCO_METADATA(ctypes.Structure):
                                                    bcd_to_int(IMAGE_TIME_US_BCD))
                                                   
         return data
-          
+
+class PCO_Openstruct(ctypes.Structure):
+    _fields_ = [('wSize', ctypes.wintypes.WORD),
+                ('wInterfaceType', ctypes.wintypes.WORD),
+                ('wCameraNumber', ctypes.wintypes.WORD),
+                ('wCameraNumAtInterface', ctypes.wintypes.WORD),
+                ('wOpenFlags', ctypes.wintypes.WORD*10),
+                ('dwOpenFlags', ctypes.wintypes.DWORD*5),
+                ('wOpenPtr', ctypes.c_void_p*6),
+                ('zzwDummy', ctypes.wintypes.WORD*8)]
+                
+    def __init__(self, interface_type=0xFFFF, camera_number=0):
+        self.wSize = ctypes.sizeof(PCO_Openstruct)
+        inters = {'FireWire': 1,
+                  'Camera Link Matrox': 2,
+                  'Camera Link Silicon Software mE III': 3,
+                  'Camera Link National Instruments': 4,
+                  'GigE': 5,
+                  'USB 2.0': 6,
+                  'Camera Link Silicon Software mE IV': 7,
+                  'USB 3.0': 8,
+                  'Reserved for WLAN': 9,
+                  'Camera Link serial port only': 10,
+                  'Camera Link HS': 11,
+                  'all': 0xFFFF}
+        if interface_type in inters:
+            interface_type = inters[interface_type]
+        else:
+            interface_type = int(interface_type)
+        self.wInterfaceType = interface_type
+        self.wCameraNumber = camera_number
+        self.wCameraNumAtInterface = 0
+        for i in range(10):
+            self.wOpenFlags[i] = 0
+        for i in range(5):
+            self.dwOpenFlags[i] = 0
+        for i in range(6):
+            self.wOpenPtr[i] = 0
+        
 # Pixelfly API functions                    
-def PCO_OpenCamera(board=0):
+def PCO_OpenCamera():
     """
     Open a camera device and attach it to a handle, which will be returned by the parameter ph. This
     function scans for the next available camera. If you want to access a distinct camera please use
@@ -650,10 +688,37 @@ def PCO_OpenCamera(board=0):
     f.argtypes = (ctypes.POINTER(ctypes.wintypes.HANDLE), ctypes.wintypes.WORD)
     f.restype = ctypes.c_int
     h = ctypes.wintypes.HANDLE(0)
-    ret_code = f(ctypes.byref(h), board)
-    PCO_manage_error(ret_code)
+    ret_code = f(ctypes.byref(h), 0)  # the argument is ignored.
+    PCO_manage_error(ret_code)        # PCO_OpenCamera must be called multiple times
     return h
 
+def PCO_OpenCameraEx(interface_type, camera_number):
+    """
+    Open a distinct camera, e.g. a camera which is connected to a specific interface port.
+    Possible interfaces:
+      'FireWire': 1,
+      'Camera Link Matrox': 2,
+      'Camera Link Silicon Software mE III': 3,
+      'Camera Link National Instruments': 4,
+      'GigE': 5,
+      'USB 2.0': 6,
+      'Camera Link Silicon Software mE IV': 7,
+      'USB 3.0': 8,
+      'Reserved for WLAN': 9,
+      'Camera Link serial port only': 10,
+      'Camera Link HS': 11,
+      'all': 0xFFFF
+    """
+    
+    f = pixelfly_dll.PCO_OpenCameraEx
+    f.argtypes = (ctypes.POINTER(ctypes.wintypes.HANDLE), ctypes.POINTER(PCO_Openstruct))
+    f.restype = ctypes.c_int
+    h = ctypes.wintypes.HANDLE(0)
+    strOpenStruct = PCO_Openstruct(interface_type, camera_number)
+    ret_code = f(ctypes.byref(h), ctypes.byref(strOpenStruct))
+    PCO_manage_error(ret_code)
+    return h
+    
 def PCO_CloseCamera(handle):
     """
     Close a camera device

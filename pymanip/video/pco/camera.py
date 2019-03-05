@@ -86,7 +86,8 @@ class PCO_Buffer:
 class PCO_Camera(Camera):
 
     # Open/Close camera
-    def __init__(self, board=0, metadata_mode=False, timestamp_mode=True):
+    def __init__(self, interface='all', camera_num=0, *,
+                 metadata_mode=False, timestamp_mode=True):
         """
         pco.sdk_manual page 10:
         First step is to PCO_OpenCamera
@@ -94,15 +95,17 @@ class PCO_Camera(Camera):
         by calling PCO_GetCameraDescription and PCO_GetCameraHealthStatus
         """
         
-        self.handle = pf.PCO_OpenCamera(board)
+        print('interface =', interface)
+        print('camera_num =', camera_num)
+        
+        self.handle = pf.PCO_OpenCameraEx(interface, camera_num)
         self.camera_description = pf.PCO_GetCameraDescription(self.handle)
         warn, err, status = self.health_status()
         if warn or err:
             print('Warning bits :', warn)
             print('Error bits :', err)
         else:
-            print('Connected to camera on board', board)
-            #print(str(self.camera_description))
+            print('Connected to',  pf.PCO_GetInfoString(self.handle))
             print('Status bits :', status)
         pf.PCO_SetBitAlignment(self.handle, sys.byteorder == 'little')
         self.metadata_mode = metadata_mode
@@ -350,24 +353,9 @@ class PCO_Camera(Camera):
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
         if stop_signal:
-            yield True
-
-
-if __name__ == '__main__':
-    #import matplotlib.pyplot as plt
-    #with PCO_Camera() as cam:
-    #    array = cam.acquisition_oneshot()
-    #plt.imshow(array, origin='lower')
-    #plt.colorbar()
+            yield True        
     
-    #with PCO_Camera() as cam:
-    #    for ii, im in enumerate(cam.acquisition(50)):
-    #        plt.clf()
-    #        plt.imshow(im, origin='lower')
-    #        dt_str = im.metadata['timestamp'].strftime('%A %d %B %Y - %X')
-    #        plt.title('img {:} - {:}'.format(im.metadata['counter'], dt_str))
-    #        plt.colorbar()
-    #        plt.pause(0.1)
-    #plt.show()
-    with PCO_Camera() as cam:
-        cam.preview()
+if __name__ == '__main__':
+    h = pf.PCO_OpenCameraEx('USB 3.0', 0)
+    pf.PCO_GetInfoString(h)
+    pf.PCO_CloseCamera(h)
