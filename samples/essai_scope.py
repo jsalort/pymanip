@@ -40,5 +40,7 @@ for rsrc in ('PXI2::15::INSTR',
     status, vi = niScope_init(rsrc)
     print(status)
     if status == visa.VisaStatus.VI_SUCCESS:
+        status, val = visa.viGetAttribute_String(vi, visa.VisaAttribute.IVI_ATTR_LOGICAL_NAME)
+        print(status, val)
         status = niScope_close(vi)
 

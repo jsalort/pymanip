@@ -6,6 +6,8 @@ _VI_ERROR = -2147483648
 IVI_STATUS_CODE_BASE = 0x3FFA0000
 IVI_ERROR_BASE = _VI_ERROR + IVI_STATUS_CODE_BASE
 IVI_SPECIFIC_ERROR_BASE = IVI_ERROR_BASE + 0x4000
+IVI_ATTR_BASE = 1000000
+IVI_ENGINE_PUBLIC_ATTR_BASE = IVI_ATTR_BASE + 50000
 
 class VisaStatus(IntEnum):
     VI_SUCCESS = 0
@@ -36,6 +38,8 @@ class VisaAttribute(IntEnum):
     VI_ATTR_MODEL_NAME = 0xBFFF0077
     VI_ATTR_PXI_SLOTPATH = 0xBFFF0207
     VI_ATTR_RSRC_NAME = 0xBFFF0002
+    IVI_ATTR_LOGICAL_NAME = IVI_ENGINE_PUBLIC_ATTR_BASE + 305
+    IVI_ATTR_IO_RESOURCE_DESCRIPTOR = IVI_ENGINE_PUBLIC_ATTR_BASE + 304
     
 possible_paths = [Path('/usr/local/vxipnp/linux/bin/libvisa.so.7'),
                   Path(r'C:\Windows\system32\visa64.dll')]
@@ -145,10 +149,13 @@ def describe(rm, instrDesc):
                     print(attr, status)
             for attr in (VisaAttribute.VI_ATTR_INTF_INST_NAME,
                          VisaAttribute.VI_ATTR_MODEL_NAME,
-                         VisaAttribute.VI_ATTR_RSRC_NAME):
+                         VisaAttribute.VI_ATTR_RSRC_NAME,
+                         VisaAttribute.IVI_ATTR_IO_RESOURCE_DESCRIPTOR):
                 status, val = viGetAttribute_String(vi, attr)
                 if status == VisaStatus.VI_SUCCESS:
                     print(attr, val)
+                else:
+                    print(attr, status)
         finally:
             viClose(vi)
     else:
