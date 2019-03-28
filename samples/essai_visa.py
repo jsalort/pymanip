@@ -158,7 +158,7 @@ if status == VisaStatus.VI_SUCCESS:
         status = viSetAttribute(rm, VisaAttribute.VI_ATTR_FIND_RSRC_MODE, 32792)
         print(status)
         
-        status, findList, retcnt, instrDesc = viFindRsrc(rm, "PXI?*")
+        status, findList, retcnt, instrDesc = viFindRsrc(rm, "PXI?*::INSTR")
         if status == VisaStatus.VI_SUCCESS:
             try:
                 print(instrDesc)
