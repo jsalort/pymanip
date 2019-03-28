@@ -3,6 +3,9 @@ from enum import IntEnum
 from pathlib import Path
 
 _VI_ERROR = -2147483648
+IVI_STATUS_CODE_BASE = 0x3FFA0000
+IVI_ERROR_BASE = _VI_ERROR + IVI_STATUS_CODE_BASE
+IVI_SPECIFIC_ERROR_BASE = IVI_ERROR_BASE + 0x4000
 
 class VisaStatus(IntEnum):
     VI_SUCCESS = 0
@@ -17,6 +20,7 @@ class VisaStatus(IntEnum):
     VI_ERROR_RSRC_LOCKED = _VI_ERROR+0x3FFF000F
     VI_WARN_NULL_OBJECT = 0x3FFF0082
     VI_WARN_NSUP_ATTR_STATE = 0x3FFF0084
+    NISCOPE_ERROR_NOT_A_SCOPE = IVI_SPECIFIC_ERROR_BASE+0x022
 
 
 class VisaAttribute(IntEnum):
@@ -52,6 +56,7 @@ ViStatus = ctypes.c_int32
 ViAttr = ctypes.c_uint32
 ViAttrState = ctypes.c_uint64
 ViAccessMode = ctypes.c_uint32
+ViBoolean = ctypes.c_uint16
 VI_NULL = 0
 
 def viOpenDefaultRM():
@@ -150,31 +155,35 @@ def describe(rm, instrDesc):
         print(status)
     
 
-status, rm = viOpenDefaultRM()
-if status == VisaStatus.VI_SUCCESS:
-    try:
-        status, val = viGetAttribute_UInt16(rm, VisaAttribute.VI_ATTR_FIND_RSRC_MODE)
-        print('FIND_RSRC_MODE', status, val)
-        status = viSetAttribute(rm, VisaAttribute.VI_ATTR_FIND_RSRC_MODE, 32792)
-        print(status)
-        
-        status, findList, retcnt, instrDesc = viFindRsrc(rm, "PXI?*::INSTR")
-        if status == VisaStatus.VI_SUCCESS:
-            try:
-                print(instrDesc)
-                describe(rm, instrDesc)
-                for _ in range(retcnt-1):
-                    status, instrDesc = viFindNext(rm, findList)
-                    if status == VisaStatus.VI_SUCCESS:
-                        print(instrDesc)
-                        describe(rm, instrDesc)
-                    else:
-                        print(status)
-            finally:
-                status = viClose(findList)
-                if status != VisaStatus.VI_SUCCESS:
-                    print(status)
-    finally:
-        status = viClose(rm)
-        if status != VisaStatus.VI_SUCCESS:
+def lookup():
+    status, rm = viOpenDefaultRM()
+    if status == VisaStatus.VI_SUCCESS:
+        try:
+            status, val = viGetAttribute_UInt16(rm, VisaAttribute.VI_ATTR_FIND_RSRC_MODE)
+            print('FIND_RSRC_MODE', status, val)
+            status = viSetAttribute(rm, VisaAttribute.VI_ATTR_FIND_RSRC_MODE, 32792)
             print(status)
+            
+            status, findList, retcnt, instrDesc = viFindRsrc(rm, "PXI?*::INSTR")
+            if status == VisaStatus.VI_SUCCESS:
+                try:
+                    print(instrDesc)
+                    describe(rm, instrDesc)
+                    for _ in range(retcnt-1):
+                        status, instrDesc = viFindNext(rm, findList)
+                        if status == VisaStatus.VI_SUCCESS:
+                            print(instrDesc)
+                            describe(rm, instrDesc)
+                        else:
+                            print(status)
+                finally:
+                    status = viClose(findList)
+                    if status != VisaStatus.VI_SUCCESS:
+                        print(status)
+        finally:
+            status = viClose(rm)
+            if status != VisaStatus.VI_SUCCESS:
+                print(status)
+
+if __name__ == '__main__':
+    lookup()
