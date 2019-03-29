@@ -43,11 +43,12 @@ class DAQmxSystem(AcquisitionCard):
 
     def add_channel(self, channel_name, terminal_config, voltage_range):
         tc = ConcreteTerminalConfig[terminal_config]
-        ai_chan = self.task.ai_channels.add_ai_voltage(channel_name,
-                                                       terminal_config=tc,
-                                                       min_val=-voltage_range,
-                                                       max_val=voltage_range)
+        ai_chan = self.task.ai_channels.add_ai_voltage_chan(channel_name,
+                                                            terminal_config=tc,
+                                                            min_val=-voltage_range,
+                                                            max_val=voltage_range)
         self.channels.append(ai_chan)
+        self.actual_ranges.append(ai_chan.ai_max)
 
     def configure_clock(self, sample_rate, samples_per_chan):
         self.task.timing.cfg_samp_clk_timing(sample_rate,
@@ -63,8 +64,9 @@ class DAQmxSystem(AcquisitionCard):
             st.disable_start_trig()
         else:
             if trigger_config != TriggerConfig.EdgeRising:
-                raise NotImplementedError()
-            st.cfg_anlg_edge_start_trig(trigger_source, trigger_level)
+                raise NotImplementedError()   # TODO
+            st.cfg_anlg_edge_start_trig(trigger_source,
+                                        trigger_level=trigger_level)
 
     def start(self):
         self.task.start()

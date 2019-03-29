@@ -25,6 +25,7 @@ class AcquisitionCard:
 
     def __init__(self):
         self.channels = []
+        self.actual_ranges = []
         self.running = False
         self.last_read = 0
         self.sample_rate = None

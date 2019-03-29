@@ -47,6 +47,7 @@ class ScopeSystem(AcquisitionCard):
             self.scope.ConfigureVertical(channelList=channel_name,
                                          voltageRange=voltage_range)
             actual_range = self.scope.ActualVoltageRange(channel_name)
+            self.actual_ranges.append(actual_range)
             if actual_range != voltage_range:
                 warnings.warn(f'Actual range is {actual_range:} '
                               f'for chan {channel_name:}.',

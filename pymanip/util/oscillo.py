@@ -56,7 +56,7 @@ class Oscillo:
         self.power_spectrum = True
         self.spectrum_unit = 1.0
         self.spectrum_unit_str = 'V^2/Hz'
-        self.task = None
+        self.system = None
         self.saved_spectra = list()
 
         self.fig_stats = None
@@ -220,7 +220,7 @@ class Oscillo:
         self.clean_spectrum()
         self.figure_t_axis()
         try:
-            self.system.configure_clock(self.sampling, samps_per_chan=self.N)
+            self.system.configure_clock(self.sampling, self.N)
         except Exception as e:
             print(e)
             self.N = old_N
@@ -283,7 +283,7 @@ class Oscillo:
     async def sampling_change(self):
         await self.pause_acqui()
         try:
-            self.system.configure_clock(self.sampling, samps_per_chan=self.N)
+            self.system.configure_clock(self.sampling, self.N)
         except Exception:
             print('Invalid sampling frequency')
             self.ask_sampling_change(self.system.samp_clk_max_rate)
@@ -361,7 +361,7 @@ class Oscillo:
         self.clean_spectrum()
         self.create_system()
         await self.restart_acqui()
-        actual_range = self.ai_channels[0].ai_max
+        actual_range = self.system.actual_ranges[0]
         print('actual_range =', actual_range)
         self.ignore_voltrange_submit = True
         self.textbox_voltrange.set_val(f'{actual_range:.1f}')
