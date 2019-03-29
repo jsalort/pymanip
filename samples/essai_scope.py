@@ -12,7 +12,7 @@ else:
 lib = find_library(libname)
 if os.name=='posix':
     libniScope = ctypes.cdll.LoadLibrary(lib)
-if os.name=='nt':
+elif os.name=='nt':
     libniScope = ctypes.windll.LoadLibrary(lib)
 
 def niScope_init(rsrcName, IDQuery=True, resetDevice=False):
