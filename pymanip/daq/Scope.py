@@ -4,7 +4,6 @@ This module implements handy wrappers around the NI-Scope API
 
 from __future__ import print_function, unicode_literals, division
 
-import numpy as np
 from niScope import Scope
 from platform import platform
 import time

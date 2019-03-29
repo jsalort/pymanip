@@ -10,7 +10,8 @@ from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
 from pymanip.util.video import preview_pco, preview_avt, preview_andor
 try:
-    from pymanip.util.oscillo import Oscillo, ChannelSelector
+    from pymanip.util.oscillo import Oscillo
+    from pymanip.util.channel_selector import ChannelSelector
 except ModuleNotFoundError:
     has_oscillo = False
 has_video = True
@@ -102,7 +103,10 @@ parser_oscillo.add_argument('-T', '--trigsource',
                             help='Trigger source index',
                             metavar='0',
                             default=0)
-
+parser_oscillo.add_argument('-b', '--backend',
+                            help='Choose daqmx or scope backend',
+                            metavar='daqmx',
+                            default='daqmx')
 
 # Create parser for "video"
 parser_video = subparsers.add_parser("video",
@@ -184,8 +188,9 @@ elif args.command == 'oscillo':
     else:
         range_ = 10.0
     oscillo = Oscillo(channel, sampling,
-                     range_, trigger, 
-                     int(args.trigsource))
+                      range_, trigger,
+                      int(args.trigsource),
+                      backend=args.backend)
     oscillo.run()
 elif args.command == 'video':
     if not has_video:
