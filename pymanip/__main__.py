@@ -174,11 +174,13 @@ elif args.command == 'oscillo':
         trigger = float(args.trigger)
     else:
         trigger = None
+    if args.backend is not None:
+        backend = args.backend
     if args.channel:
         channel = args.channel
     else:
         chansel = ChannelSelector()
-        channel = chansel.gui_select()
+        backend, channel = chansel.gui_select()
     if args.sampling:
         sampling = float(args.sampling)
     else:
@@ -190,7 +192,7 @@ elif args.command == 'oscillo':
     oscillo = Oscillo(channel, sampling,
                       range_, trigger,
                       int(args.trigsource),
-                      backend=args.backend)
+                      backend=backend)
     oscillo.run()
 elif args.command == 'video':
     if not has_video:

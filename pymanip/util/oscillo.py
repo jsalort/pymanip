@@ -378,6 +378,7 @@ class Oscillo:
                                               voltage_range=self.volt_range)
             self.ai_channels.append(ai_chan)
         self.system.configure_clock(self.sampling, self.N)
+        self.textbox_sampling.set_val(f'{self.system.sample_rate:.1e}')
         if self.trigger_level is not None:
             trigger_source = self.channel_list[self.trigger_source]
             self.system.configure_trigger(trigger_source,

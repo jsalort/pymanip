@@ -13,6 +13,7 @@ from nidaqmx import Task
 from nidaqmx.constants import READ_ALL_AVAILABLE
 from nidaqmx.errors import DaqError
 from nidaqmx.constants import TerminalConfiguration
+from nidaqmx.system import system, device
 
 from pymanip.aiodaq import TerminalConfig, TriggerConfig, AcquisitionCard
 
@@ -100,3 +101,21 @@ class DAQmxSystem(AcquisitionCard):
             data = None
         self.reading = False
         return data
+
+
+def get_device_list():
+    sys = system.System()
+    device_list = dict()
+    for devname in sys.devices.device_names:
+        dev = device.Device(devname)
+        description = dev.product_type
+        if description.startswith('PXI'):
+            description = f'PXI {dev.pxi_chassis_num:d} ' \
+                          f'Slot {dev.pxi_slot_num:d} ' \
+                          f'({dev.product_type:})'
+        elif description.startswith('PCI'):
+            description = f'{dev.product_type:} ' \
+                          f'({dev.pci_bus_num:} ' \
+                          f'{dev.pci_dev_num:})'
+        device_list[description] = dev.ai_physical_chans.channel_names
+    return device_list
