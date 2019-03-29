@@ -31,6 +31,7 @@ class ScopeSystem(AcquisitionCard):
             self.scope = Scope(scope_name)
         else:
             self.scope = None
+        self.trigger_set = False
 
     @property
     def samp_clk_max_rate(self):
@@ -78,6 +79,7 @@ class ScopeSystem(AcquisitionCard):
     def configure_trigger(self, trigger_source=None, trigger_level=0,
                           trigger_config=TriggerConfig.EdgeRising):
         if trigger_source is None:
+            print('Setting trigger to Immediate')
             self.scope.ConfigureTrigger('Immediate')
         else:
             trigger_source = str(trigger_source)
@@ -85,14 +87,17 @@ class ScopeSystem(AcquisitionCard):
                 scope_name, trigger_source = trigger_source.split('/')
                 if scope_name != self.scope_name:
                     raise ValueError('Wrong trigger source')
+            print('Setting trigger_source to', trigger_source)
             self.scope.ConfigureTrigger('Edge', 
                                         triggerSource=trigger_source.encode('ascii'),
                                         slope=SLOPE.POSITIVE,
                                         level=float(trigger_level))
+        self.trigger_set = True
                                        
 
     def start(self):
-        self.scope.ConfigureTrigger('Immediate')
+        if not self.trigger_set:
+            self.configure_trigger()
         self.scope.InitiateAcquisition()
         self.running = True
 
