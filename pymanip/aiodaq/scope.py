@@ -21,7 +21,7 @@ except ImportError:
 try:
     from pymanip.nisyscfg import scope_devices
     has_nisyscfg = True
-except ImportError:
+except (ImportError, OSError):
     has_nisyscfg = False
 
 possible_sample_rates = [60e6/n for n in range(4, 1201)]
