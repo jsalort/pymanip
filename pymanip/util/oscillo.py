@@ -17,19 +17,25 @@ from matplotlib.widgets import Button, TextBox, CheckButtons, RadioButtons
 import h5py
 
 from pymanip.aiodaq import TerminalConfig as TC
-from pymanip.aiodaq.daqmx import DAQmxSystem
-from pymanip.aiodaq.scope import ScopeSystem
-
-Backends = {'daqmx': DAQmxSystem,
-            'scope': ScopeSystem}
-
+Backends = dict()
+try:
+    from pymanip.aiodaq.daqmx import DAQmxSystem
+    Backends['daqmx'] = DAQmxSystem
+except ImportError:
+    pass
+try:
+    from pymanip.aiodaq.scope import ScopeSystem
+    Backends['scope'] = ScopeSystem
+except ImportError:
+    pass
+    
 
 class Oscillo:
 
     def __init__(self, channel_list, sampling=5e3, volt_range=10.0,
                  trigger_level=None, trigsource=0, backend='daqmx'):
         if backend not in Backends:
-            raise ValueError('Invalid backend')
+            raise ValueError(f'Backend {backend:} is not available.')
         self.backend = backend
         self.channel_list = channel_list
         self.sampling = sampling

@@ -1,15 +1,29 @@
 import tkinter
 
-from pymanip.aiodaq.daqmx import get_device_list as daqmx_get_devices
-from pymanip.aiodaq.scope import get_device_list as scope_get_devices
-
+try:
+    from pymanip.aiodaq.daqmx import get_device_list as daqmx_get_devices
+    has_daqmx = True
+except ImportError:
+    has_daqmx = False
+try:
+    from pymanip.aiodaq.scope import get_device_list as scope_get_devices
+    has_scope = True
+except ImportError:
+    has_scope = False
+    
 class ChannelSelector:
 
     def __init__(self):
-        self.daqmx_device_list = daqmx_get_devices()
-        self.scope_device_list = scope_get_devices(self.daqmx_device_list)
+        if has_daqmx:
+            self.daqmx_device_list = daqmx_get_devices()
+        else:
+            self.daqmx_device_list = dict()
         self.device_list = self.daqmx_device_list.copy()
-        self.device_list.update(self.scope_device_list)
+        if has_scope:
+            self.scope_device_list = scope_get_devices(self.daqmx_device_list)
+            self.device_list.update(self.scope_device_list)
+        else:
+            self.scope_device_list = dict()
         self.channel_backend = dict()
         for name, devlist in self.daqmx_device_list.items():
             for dev in devlist:
