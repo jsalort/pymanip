@@ -18,6 +18,11 @@ try:
     has_daqmx = True
 except ImportError:
     has_daqmx = False
+try:
+    from pymanip.nisyscfg import scope_devices
+    has_nisyscfg = True
+except ImportError:
+    has_nisyscfg = False
 
 possible_sample_rates = [60e6/n for n in range(4, 1201)]
 
@@ -125,42 +130,46 @@ class ScopeSystem(AcquisitionCard):
 
 
 def get_device_list(daqmx_devices=None, verbose=False):
-    # NI-Scope backend
-    # In principle, use nisyscfg, see essai_nisyscfg.py (does not work
-    # on old Linux where NI System Configuration is too old.)
-    # Workaround: call nilsdev. Any device not previously found by the
-    # DAQmx backend is a NI-Scope (presumably)
-    # (Only works on Linux, because there is no nilsdev on Windows) 
+    if has_nisyscfg:
+        return {f'{devname:} (scope)': [f'{devname:}/{ii:d}' for ii in range(2)]
+                for devname in scope_devices()}
+    else:
+        # NI-Scope backend
+        # In principle, use nisyscfg, see essai_nisyscfg.py (does not work
+        # on old Linux where NI System Configuration is too old.)
+        # Workaround: call nilsdev. Any device not previously found by the
+        # DAQmx backend is a NI-Scope (presumably)
+        # (Only works on Linux, because there is no nilsdev on Windows) 
 
-    raw_data = sp.run('/usr/local/bin/nilsdev', capture_output=True)
-    boards = dict()
-    for line in raw_data.stdout.decode('ascii').split('\n'):
-        line = line.strip()
-        if "[Not Present]" in line:
-            continue
-        if not line:
-            continue
-        board_type, desc = line.split(':')
-        desc = desc.strip()
-        board_type = board_type.strip()
-        if desc.startswith('"') and desc.endswith('"'):
-            devname = desc[1:-1]
-            boards[devname] = board_type
-        else:
-            print('Wrong format', desc)
-    if daqmx_devices is None:
-        if has_daqmx:
-            daqmx_devices = daqmx_get_devices()
-        else:
-            print("Could not make sure boards are NI-Scope and not DAQmx")
-            daqmx_devices = dict()
-    for daqmx_board_desc, daqmx_devlist in daqmx_devices.items():
-        board, devnum = daqmx_devlist[0].split('/')
-        if verbose:
-            print('DAQmx board:', board)
-        if board in boards:
-            del boards[board]
+        raw_data = sp.run('/usr/local/bin/nilsdev', capture_output=True)
+        boards = dict()
+        for line in raw_data.stdout.decode('ascii').split('\n'):
+            line = line.strip()
+            if "[Not Present]" in line:
+                continue
+            if not line:
+                continue
+            board_type, desc = line.split(':')
+            desc = desc.strip()
+            board_type = board_type.strip()
+            if desc.startswith('"') and desc.endswith('"'):
+                devname = desc[1:-1]
+                boards[devname] = board_type
+            else:
+                print('Wrong format', desc)
+        if daqmx_devices is None:
+            if has_daqmx:
+                daqmx_devices = daqmx_get_devices()
+            else:
+                print("Could not make sure boards are NI-Scope and not DAQmx")
+                daqmx_devices = dict()
+        for daqmx_board_desc, daqmx_devlist in daqmx_devices.items():
+            board, devnum = daqmx_devlist[0].split('/')
             if verbose:
-                print(f'Removing board {board:} from NI-Scope list.')
-    return {f'{devname:} ({board_type:})': [f'{devname:}/{ii:d}' for ii in range(2)] 
-            for devname, board_type in boards.items()}
+                print('DAQmx board:', board)
+            if board in boards:
+                del boards[board]
+                if verbose:
+                    print(f'Removing board {board:} from NI-Scope list.')
+        return {f'{devname:} ({board_type:})': [f'{devname:}/{ii:d}' for ii in range(2)] 
+                for devname, board_type in boards.items()}

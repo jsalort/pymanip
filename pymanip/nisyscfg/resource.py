@@ -3,8 +3,14 @@ import warnings
 from .session import NISysCfgSession
 from ._lib.session import NISysCfgFindHardware, NISysCfgCloseHandle, NISysCfgNextResource
 from ._lib.properties import NISysCfgGetResourceProperty, NISysCfgGetResourceIndexedProperty
-from ._lib.constants import NISysCfgResourceProperty
+from ._lib.constants import NISysCfgResourceProperty, NISysCfgStatus
 
+class NISysCfgResourceAttributeError(AttributeError):
+
+    def __init__(self, description, status):
+        self.status = status
+        super(NISysCfgResourceAttributeError, self).__init__(description)
+        
 class NISysCfgResource:
 
     def __init__(self, resourceHandle):
@@ -13,8 +19,8 @@ class NISysCfgResource:
     def close(self):
         if self.resourceHandle:
             status = NISysCfgCloseHandle(self.resourceHandle)
-            if status != 0:
-                raise RuntimeError('NISysCfgCloseHandle failed.')
+            if status != NISysCfgStatus.OK:
+                raise RuntimeError(f'NISysCfgCloseHandle failed. Status: {str(status):}.')
             self.resourceHandle = None
         else:
             warnings.warn('close was called twice on NISysCfgResource!')
@@ -27,10 +33,12 @@ class NISysCfgResource:
     def __getattr__(self, key):
         status, val = NISysCfgGetResourceProperty(self.resourceHandle, 
                                                   getattr(NISysCfgResourceProperty, key))
-        if status == 0:
+        if status == NISysCfgStatus.OK:
             return val
-        raise AttributeError(f'NISysCfgGetResourceProperty returned {status:}')
+        raise NISysCfgResourceAttributeError(f'NISysCfgGetResourceProperty returned {str(status):}.', status)
     
+    def indexed_properties(self):
+        return NISysCfgGetResourceIndexedProperty(self.resourceHandle)
             
 class _NISysCfgHardwareEnumerator:
     
@@ -40,20 +48,20 @@ class _NISysCfgHardwareEnumerator:
         
     def __enter__(self):
         status, resourceEnumHandle = NISysCfgFindHardware(self.sesn.sessionHandle)
-        if status != 0:
-            raise RuntimeError('NISysCfgFindHardware failed.')
+        if status != NISysCfgStatus.OK:
+            raise RuntimeError(f'NISysCfgFindHardware failed. Status: {str(status):}.')
         self.resourceEnumHandle = resourceEnumHandle
         return self
         
     def __exit__(self, type_, value, cb):
         if self.resourceEnumHandle:
             status = NISysCfgCloseHandle(self.resourceEnumHandle)
-            if status != 0:
-                raise RuntimeError('NISysCfgCloseHandle failed.')
+            if status != NISysCfgStatus.OK:
+                raise RuntimeError(f'NISysCfgCloseHandle failed. Status: {str(status):}.')
                 
     def next_resource(self):
         status, resourceHandle = NISysCfgNextResource(self.sesn.sessionHandle, self.resourceEnumHandle)
-        if status == 0 and resourceHandle:
+        if status == NISysCfgStatus.OK and resourceHandle:
             return NISysCfgResource(resourceHandle)
         else:
             return None

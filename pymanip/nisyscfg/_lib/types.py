@@ -10,7 +10,6 @@ from pymanip.nisyscfg._lib.constants import NISYSCFG_SIMPLE_STRING_LENGTH
 
 NISysCfgEnumExpertHandle = ctypes.c_void_p
 NISysCfgSessionHandle = ctypes.c_void_p
-NISysCfgStatus = ctypes.c_uint64
 NISysCfgBool = ctypes.c_int
 NISysCfgBusType = ctypes.c_int
 NISysCfgHasDriverType = ctypes.c_int

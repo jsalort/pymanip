@@ -1,4 +1,4 @@
-from ._lib.constants import NISysCfgLocale
+from ._lib.constants import NISysCfgLocale, NISysCfgStatus
 from ._lib.session import NISysCfgInitializeSession, NISysCfgCloseHandle
 
 class NISysCfgSession:
@@ -17,8 +17,8 @@ class NISysCfgSession:
         
     def __enter__(self):
         status, expertHandle, sessionHandle = NISysCfgInitializeSession()
-        if status != 0:
-            raise RuntimeError('NISysCfgInitializeSession failed.')
+        if status != NISysCfgStatus.OK:
+            raise RuntimeError(f'NISysCfgInitializeSession failed. Status: {str(status):}.')
         self.expertHandle = expertHandle
         self.sessionHandle = sessionHandle
         return self
@@ -26,9 +26,9 @@ class NISysCfgSession:
     def __exit__(self, type_, value, cb):
         if self.expertHandle:
             status = NISysCfgCloseHandle(self.expertHandle)
-            if status != 0:
-                raise RuntimeError('NISysCfgCloseHandle failed.')
+            if status != NISysCfgStatus.OK:
+                raise RuntimeError(f'NISysCfgCloseHandle failed. Status: {str(status):}.')
         if self.sessionHandle:
             status = NISysCfgCloseHandle(self.sessionHandle)
-            if status != 0:
-                raise RuntimeError('NISysCfgCloseHandle failed.')
+            if status != NISysCfgStatus.OK:
+                raise RuntimeError(f'NISysCfgCloseHandle failed. Status: {str(status):}.')
