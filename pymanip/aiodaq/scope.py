@@ -10,9 +10,9 @@ import time
 import warnings
 import subprocess as sp
 
-from niScope import Scope, SLOPE
+from niScope import Scope, SLOPE, TRIGGER_SOURCE, ScopeException
 
-from pymanip.aiodaq import TriggerConfig, AcquisitionCard
+from pymanip.aiodaq import TriggerConfig, AcquisitionCard, TimeoutException
 try:
     from pymanip.aiodaq.daqmx import get_device_list as daqmx_get_devices
     has_daqmx = True
@@ -41,6 +41,9 @@ class ScopeSystem(AcquisitionCard):
     @property
     def samp_clk_max_rate(self):
         return max(possible_sample_rates)
+
+    def possible_trigger_channels(self):
+        return ['Ext'] + self.channels
 
     def close(self):
         if self.scope:
@@ -92,9 +95,15 @@ class ScopeSystem(AcquisitionCard):
                 scope_name, trigger_source = trigger_source.split('/')
                 if scope_name != self.scope_name:
                     raise ValueError('Wrong trigger source')
-            print('Setting trigger_source to', trigger_source)
+            print('Setting trigger_source to', trigger_source, 'level to', trigger_level)
+            if trigger_source == 'Ext':
+                trigger_source = TRIGGER_SOURCE.EXTERNAL
+            try:
+                trigger_source = trigger_source.encode('ascii')
+            except AttributeError:
+                pass
             self.scope.ConfigureTrigger('Edge', 
-                                        triggerSource=trigger_source.encode('ascii'),
+                                        triggerSource=trigger_source,
                                         slope=SLOPE.POSITIVE,
                                         level=float(trigger_level))
         self.trigger_set = True
@@ -107,25 +116,34 @@ class ScopeSystem(AcquisitionCard):
         self.running = True
 
     async def stop(self):
-        self.running = False
-        while self.reading:
-            await asyncio.sleep(1.0)
-        self.scope.Abort()
+        if self.running:
+            self.running = False
+            while self.reading:
+                await asyncio.sleep(1.0)
+            self.scope.Abort()
 
-    async def read(self):
+    async def read(self, tmo=None):
         self.reading = True
-        tmo = int(self.samples_per_chan/self.sample_rate)*2
-        if tmo < 1:
-            tmo = 1
-        data = await self.loop.run_in_executor(None,
-                                               self.scope.Fetch,
-                                               ",".join(self.channels),
-                                               None,
-                                               tmo)
-        self.last_read = time.monotonic()
+        start = time.monotonic()
+        data = None
+        while self.running:
+            try:
+                data = await self.loop.run_in_executor(None,
+                                                       self.scope.Fetch,
+                                                       ",".join(self.channels),
+                                                       None,
+                                                       1.0)
+                break
+            except ScopeException:
+                if tmo and time.monotonic()-start > tmo:
+                    raise TimeoutException()
+                else:
+                    continue
+        if data is not None:
+            self.last_read = time.monotonic()
+            if len(self.channels) > 1:
+                data = data.T
         self.reading = False
-        if len(self.channels) > 1:
-            data = data.T
         return data
 
 

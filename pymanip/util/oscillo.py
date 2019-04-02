@@ -33,7 +33,7 @@ except ImportError:
 class Oscillo:
 
     def __init__(self, channel_list, sampling=5e3, volt_range=10.0,
-                 trigger_level=None, trigsource=0, backend='daqmx'):
+                 trigger_level=None, trigsource=None, backend='daqmx'):
         if backend not in Backends:
             raise ValueError(f'Backend {backend:} is not available.')
         self.backend = backend
@@ -68,18 +68,26 @@ class Oscillo:
         self.fig_stats = None
 
         # Configure widgets
-        ax_sampling = self.fig.add_axes([0.825, 0.825, 0.15, 0.075])
+        left, bottom = 0.825, 0.825
+        width, height = 0.15, 0.075
+        vpad = 0.02
+
+        ax_sampling = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height*1.25+2*vpad
         self.textbox_sampling = TextBox(ax_sampling, label='',
                                         initial=f'{sampling:.1e}')
         self.textbox_sampling.on_submit(self.ask_sampling_change)
         _ = ax_sampling.text(0, 1.25, 'Sampling')
 
-        ax_enable_trigger = self.fig.add_axes([0.825, 0.72, 0.15, 0.075])
-        self.checkbox_trigger = CheckButtons(ax_enable_trigger, ['Trigger'],
-                                             [trigger_level is not None])
-        self.checkbox_trigger.on_clicked(self.ask_trigger_change)
+        ax_enable_trigger = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height*1.25+2*vpad
+        self.textbox_triggersource = TextBox(ax_enable_trigger, label='',
+                                             initial='None')
+        self.textbox_triggersource.on_submit(self.ask_trigger_change)
+        _ = ax_enable_trigger.text(0, 1.25, 'Trigger')
 
-        ax_triggerlevel = self.fig.add_axes([0.825, 0.58, 0.15, 0.075])
+        ax_triggerlevel = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height*1.25+2*vpad
         if trigger_level is not None:
             initial_value = f'{trigger_level:.2f}'
         else:
@@ -89,23 +97,27 @@ class Oscillo:
         self.textbox_triggerlevel.on_submit(self.ask_trigger_change)
         _ = ax_triggerlevel.text(0, 1.25, 'Level')
 
-        ax_winsize = self.fig.add_axes([0.825, 0.44, 0.15, 0.075])
+        ax_winsize = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height*1.25+2*vpad
         self.textbox_winsize = TextBox(ax_winsize, label='',
                                        initial=f'{self.N:d}')
         self.textbox_winsize.on_submit(self.ask_winsize_change)
         _ = ax_winsize.text(0, 1.25, 'Win size')
 
-        ax_voltrange = self.fig.add_axes([0.825, 0.31, 0.15, 0.075])
+        ax_voltrange = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height*1.25+2*vpad
         self.textbox_voltrange = TextBox(ax_voltrange, label='',
                                          initial=f'{self.volt_range:.1f}')
         self.textbox_voltrange.on_submit(self.ask_voltrange_change)
         _ = ax_voltrange.text(0, 1.25, 'Range')
 
-        ax_start_stats = self.fig.add_axes([0.825, 0.2, 0.15, 0.075])
+        ax_start_stats = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height+vpad
         self.btn_start_stats = Button(ax_start_stats, label='Stats')
         self.btn_start_stats.on_clicked(self.start_stats)
 
-        ax_start_spectrum = self.fig.add_axes([0.825, 0.08, 0.15, 0.075])
+        ax_start_spectrum = self.fig.add_axes([left, bottom, width, height])
+        bottom-=height+vpad
         self.btn_start_spectrum = Button(ax_start_spectrum, label='FFT')
         self.btn_start_spectrum.on_clicked(self.start_spectrum)
 
@@ -243,30 +255,35 @@ class Oscillo:
 
     def ask_trigger_change(self, label):
         changed = False
-        trigger_enable, = self.checkbox_trigger.get_status()
-        if trigger_enable:
-            if self.trigger_level is None:
-                changed = True
+        trigger_source = self.textbox_triggersource.text
+        possible_trigger_source = self.system.possible_trigger_channels()
+        if trigger_source not in possible_trigger_source:
+            print(f'{trigger_source:} is not an acceptable trigger source')
+            print('Possible values:', possible_trigger_source)
+            trigger_source = None
+            self.textbox_triggersource.set_val('None')
+        if trigger_source == 'None':
+            trigger_source = None
+        if self.trigger_source != trigger_source:
+            self.trigger_source = trigger_source
+            changed = True
+        if self.trigger_source is not None:
             try:
-                self.trigger_level = float(self.textbox_triggerlevel.text)
-                changed = True
+                trigger_level = float(self.textbox_triggerlevel.text)
             except ValueError:
-                if self.trigger_level is not None:
-                    val_str = f'{self.trigger_level:.2f}'
-                    self.textbox_triggerlevel.set_val(val_str)
-                else:
-                    self.textbox_triggerlevel.set_val('1.0')
-                    changed = True
-        else:
-            if self.trigger_level is not None:
+                trigger_level = self.trigger_level
+            val_str = f'{trigger_level:.2f}'
+            self.textbox_triggerlevel.set_val(val_str)
+            if trigger_level != self.trigger_level:
+                self.trigger_level = trigger_level
                 changed = True
-            self.trigger_level = None
         if changed:
             loop = asyncio.get_event_loop()
             asyncio.ensure_future(self.trigger_change(), loop=loop)
 
     async def pause_acqui(self):
         self.ask_pause_acqui = True
+        await self.system.stop()
         while not self.paused:
             await asyncio.sleep(0.5)
 
@@ -276,9 +293,11 @@ class Oscillo:
             await asyncio.sleep(0.5)
 
     async def trigger_change(self):
+        print('Awaiting pause')
         await self.pause_acqui()
+        print('Acquisition paused')
         if self.trigger_level is not None:
-            trigger_source = self.channel_list[self.trigger_source]
+            trigger_source = self.trigger_source
             trigger_level = self.trigger_level
             self.system.configure_trigger(trigger_source, trigger_level)
         else:
@@ -400,25 +419,22 @@ class Oscillo:
                 while self.ask_pause_acqui and self.running:
                     self.paused = True
                     await asyncio.sleep(0.5)
-                #if self.paused:
-                #    print('Exiting pause loop')
-                #    print('self.t.shape =', self.t.shape)
                 self.paused = False
                 if not self.running:
                     break
                 self.system.start()
                 data = await self.system.read()
-                self.last_trigged = self.system.last_read
                 await self.system.stop()
                 if data is None:
                     continue
+                self.last_trigged = self.system.last_read
                 self.ax.cla()
                 if len(self.channel_list) == 1:
                     self.ax.plot(self.t, data, '-')
                 elif len(self.channel_list) > 1:
                     for d in data:
                         self.ax.plot(self.t, d, '-')
-                if self.trigger_level is not None:
+                if self.trigger_source not in (None, 'Ext'):
                     self.ax.plot([self.t[0], self.t[-1]],
                                  [self.trigger_level]*2, 'g--')
                 self.ax.set_xlim([self.t[0], self.t[-1]])

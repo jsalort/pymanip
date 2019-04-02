@@ -21,6 +21,10 @@ class TriggerConfig(IntEnum):
     EdgeRising = 0
 
 
+class TimeoutException(Exception):
+    pass
+
+
 class AcquisitionCard:
 
     def __init__(self):
@@ -35,6 +39,9 @@ class AcquisitionCard:
     @property
     def samp_clk_max_rate(self):
         return 0
+
+    def possible_trigger_channels(self):
+        return self.channels
 
     def close(self):
         raise NotImplementedError()
@@ -58,5 +65,5 @@ class AcquisitionCard:
     async def stop(self):
         raise NotImplementedError()
 
-    async def read(self):
+    async def read(self, tmo=None):
         raise NotImplementedError()

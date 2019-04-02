@@ -15,7 +15,7 @@ from nidaqmx.errors import DaqError
 from nidaqmx.constants import TerminalConfiguration
 from nidaqmx.system import system, device
 
-from pymanip.aiodaq import TerminalConfig, TriggerConfig, AcquisitionCard
+from pymanip.aiodaq import TerminalConfig, TriggerConfig, AcquisitionCard, TimeoutException
 
 ConcreteTerminalConfig = {
     TerminalConfig.RSE: TerminalConfiguration.RSE,
@@ -31,10 +31,15 @@ class DAQmxSystem(AcquisitionCard):
         super(DAQmxSystem, self).__init__()
         self.task = Task()
         self.reading = False
+        self.stop_lock = asyncio.Lock()
+        self.read_lock = asyncio.Lock()
 
     @property
     def samp_clk_max_rate(self):
         return self.task.timing.samp_clk_max_rate
+
+    def possible_trigger_channels(self):
+        return [chan.name for chan in self.channels]
 
     def close(self):
         if self.task:
@@ -62,10 +67,12 @@ class DAQmxSystem(AcquisitionCard):
 
         st = self.task.triggers.start_trigger
         if trigger_source is None:
+            print('disable_start_trig')
             st.disable_start_trig()
         else:
             if trigger_config != TriggerConfig.EdgeRising:
                 raise NotImplementedError()   # TODO
+            print(f'cfg_anlg_edge_start_trig({trigger_source:}, {trigger_level:})')
             st.cfg_anlg_edge_start_trig(trigger_source,
                                         trigger_level=trigger_level)
 
@@ -74,33 +81,40 @@ class DAQmxSystem(AcquisitionCard):
         self.running = True
 
     async def stop(self):
-        self.running = False
-        while self.reading:
-            await asyncio.sleep(1.0)
-        self.task.stop()
+        async with self.stop_lock:
+            if self.running:
+                self.running = False
+                while self.reading:
+                    await asyncio.sleep(1.0)
+                self.task.stop()
 
-    async def read(self):
-        self.reading = True
-        done = False
-        while self.running:
-            try:
-                await self.loop.run_in_executor(None,
-                                                self.task.wait_until_done,
-                                                1.0)
-            except DaqError:
-                continue
-            done = True
-            break
-        if done and self.running:
-            data = await self.loop.run_in_executor(None,
-                                                   self.task.read,
-                                                   READ_ALL_AVAILABLE)
-            self.last_read = time.monotonic()
-            data = np.array(data)
-        else:
-            data = None
-        self.reading = False
-        return data
+    async def read(self, tmo=None):
+        async with self.read_lock:
+            self.reading = True
+            done = False
+            start = time.monotonic()
+            while self.running:
+                try:
+                    await self.loop.run_in_executor(None,
+                                                    self.task.wait_until_done,
+                                                    1.0)
+                except DaqError:
+                    if tmo and time.monotonic()-start > tmo:
+                        raise TimeoutException()
+                    else:
+                        continue
+                done = True
+                break
+            if done and self.running:
+                data = await self.loop.run_in_executor(None,
+                                                       self.task.read,
+                                                       READ_ALL_AVAILABLE)
+                self.last_read = time.monotonic()
+                data = np.array(data)
+            else:
+                data = None
+            self.reading = False
+            return data
 
 
 def get_device_list():
