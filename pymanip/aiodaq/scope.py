@@ -68,15 +68,19 @@ class ScopeSystem(AcquisitionCard):
             if actual_range != voltage_range:
                 warnings.warn(f'Actual range is {actual_range:} '
                               f'for chan {cn:}.',
-                              ValueError)
+                              RuntimeWarning)
 
     def configure_clock(self, sample_rate, samples_per_chan):
         if sample_rate not in possible_sample_rates:
+            initial_sample_rate = sample_rate
             chosen = possible_sample_rates[0]
             for pos in possible_sample_rates:
                 if abs(sample_rate-pos) < abs(chosen-pos):
                     chosen = pos
-            sample_rate = pos
+            sample_rate = chosen
+            warnings.warn(f'{initial_sample_rate:} is not possible. '
+                          f'Closest sample rate is {sample_rate:}',
+                          RuntimeWarning)
         self.scope.ConfigureHorizontalTiming(sampleRate=sample_rate,
                                              numPts=samples_per_chan)
         self.scope.NumRecords = 1

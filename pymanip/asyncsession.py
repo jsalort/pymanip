@@ -45,6 +45,7 @@ class AsyncSession:
 
     def __init__(self, session_name=None, verbose=True):
         self.session_name = session_name
+        self.custom_figures = None
         if session_name is None:
             self.conn = sqlite3.connect(':memory:')
         else:
@@ -557,7 +558,10 @@ class AsyncSession:
             warnings.filterwarnings("ignore",
                                     category=MatplotlibDeprecationWarning)
             while self.running:
-                if self.figure_list:
+                figure_list = self.figure_list
+                if self.custom_figures:
+                    figure_list = figure_list + self.custom_figures
+                if figure_list:
                     for fig in self.figure_list:
                         fig.canvas.start_event_loop(0.7/len(self.figure_list))
                         await asyncio.sleep(0.3/len(self.figure_list))
@@ -640,8 +644,10 @@ class AsyncSession:
             await corofunc(self)
         print('Task finished', corofunc)
 
-    def run(self, *tasks, server_port=6913):
+    def run(self, *tasks, server_port=6913,
+            custom_routes=None, custom_figures=None):
         loop = asyncio.get_event_loop()
+        self.custom_figures = custom_figures
 
         # signal handling
         self.running = True
@@ -672,6 +678,8 @@ class AsyncSession:
                                    web.get('/api/get_parameters',
                                            self.server_get_parameters),
                                    ])
+            if custom_routes:
+                app.router.add_routes(custom_routes)
 
             webserver = loop.create_server(app.make_handler(),
                                            host=None, port=server_port)
