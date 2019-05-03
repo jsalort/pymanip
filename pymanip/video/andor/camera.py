@@ -18,6 +18,7 @@ import AndorNeo.SDK3 as SDK3
 MODE_CONTINUOUS = 1
 MODE_SINGLE_SHOT = 0
 
+import struct
 
 validROIS = [(2592, 2160, 1, 1),
              (2544, 2160, 1, 25),
@@ -33,7 +34,7 @@ validROIS = [(2592, 2160, 1, 1),
 def parse_metadata(buf, verbose=False):
     """
     Parse metadata at the end of buffer, happened when EnableMetadata boolean
-    feature is true.
+    feature is true.(page 77 doc SDK3 manual)
 
     Metadata format: Frame data; CID; Length
     FrameData (CID=0), FPGA Ticks (CID=1), FrameInfo (CID=7)
@@ -49,16 +50,15 @@ def parse_metadata(buf, verbose=False):
         #if verbose:
         #    print('length =', length)
         #    print('cid =', cid)
-        length = length[0]+(2**8)*length[1]+(2**16)*length[2]+\
-                 (2**32)*length[3]-CID_FIELD_SIZE
-        cid = cid[0]+(2**8)*cid[1]+(2**16)*cid[2]+(2**32)*cid[3]
+        length=struct.unpack('<L',length)[0]-CID_FIELD_SIZE
+        cid=struct.unpack('<L',cid)[0]
         data = buf[n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE+length):n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE)]
         if verbose:
             print('length =', length)
             print('cid =', cid)
             print('data =', data)
         if cid == 1:
-            return sum([(256**i)*b for i, b in enumerate(data)])
+            return struct.unpack('<Q',data)[0]
 
         n -= CID_FIELD_SIZE+LENGTH_FIELD_SIZE+length
 

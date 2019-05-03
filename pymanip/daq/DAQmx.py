@@ -11,8 +11,8 @@ except ImportError:
         return string
  
 import ctypes
-import fluidlab.instruments.daq.daqmx as daqmx
-from fluidlab.instruments.daq.daqmx import write_analog
+import fluidlab.daq.daqmx as daqmx
+from fluidlab.daq.daqmx import write_analog
 import six
 
 class DAQDevice(object):
