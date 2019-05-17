@@ -8,8 +8,11 @@ from pymanip.legacy_session import OctSession
 import os
 import six
 
+
 class Manip(object):
-    def __init__(self, session_name, nickname=None, directory=None, verbose=True, **kwargs):
+    def __init__(
+        self, session_name, nickname=None, directory=None, verbose=True, **kwargs
+    ):
         self.properties = dict()
         for key in kwargs:
             self.properties[key] = kwargs[key]
@@ -24,7 +27,6 @@ class Manip(object):
         self.cached = self.MI.cached
         self.cachedvalue = self.MI.cachedvalue
         self.cache = self.MI.cache
-        
 
     def __str__(self):
         return self.nickname
@@ -37,9 +39,9 @@ class Manip(object):
         """
 
         value = None
-        if name == 'basename' or name == 'session_name':
+        if name == "basename" or name == "session_name":
             value = self.session_name
-        elif name == 'nickname':
+        elif name == "nickname":
             value = self.nickname
         elif name in self.properties:
             value = self.properties[name]
@@ -51,8 +53,8 @@ class Manip(object):
             elif self.MI.has_parameter(name):
                 value = self.MI.parameter(name)
             else:
-                raise KeyError('Key not found {:s}'.format(name))
-                
+                raise KeyError("Key not found {:s}".format(name))
+
         return value
 
     def dataset(self, name):
@@ -66,7 +68,7 @@ class Manip(object):
 
     @property
     def MI(self):
-        if not hasattr(self, '_MI'):
+        if not hasattr(self, "_MI"):
             if self.directory:
                 name = os.path.join(self.directory, self.session_name)
             else:
@@ -74,46 +76,48 @@ class Manip(object):
             try:
                 self._MI = SavedSession(name, verbose=self.verbose)
             except IOError as a:
-                try: 
+                try:
                     self._MI = OctSession(name, verbose=self.verbose)
                 except IOError as b:
                     print("None of the possible files can be found:")
                     print(" 1. {:}".format(a.filename))
                     print(" 2. {:}".format(b.filename))
                     raise IOError('Cannot open session "{:}" for reading'.format(name))
-                #print('OctMI legacy mode')
+                # print('OctMI legacy mode')
 
         return self._MI
+
 
 class ManipCollection(Manip):
     def __init__(self, basename, nickname=None, **kwargs):
         self.basename = basename
-        self.num = kwargs.pop('num', 1)
-        self.verbose = kwargs.pop('verbose', True)
+        self.num = kwargs.pop("num", 1)
+        self.verbose = kwargs.pop("verbose", True)
 
-        super(ManipCollection, self).__init__(session_name=basename, nickname=nickname, 
-                                              verbose=self.verbose, **kwargs)
-        
+        super(ManipCollection, self).__init__(
+            session_name=basename, nickname=nickname, verbose=self.verbose, **kwargs
+        )
+
     def __getitem__(self, key):
         if isinstance(key, six.string_types):
             return super(ManipCollection, self).__getitem__(key)
         else:
             try:
                 if self.directory:
-                    name = os.path.join(self.directory, self.basename + '_' + str(key))
+                    name = os.path.join(self.directory, self.basename + "_" + str(key))
                 else:
-                    name = self.basename + '_' + str(key)
+                    name = self.basename + "_" + str(key)
                 MI = SavedSession(name, verbose=self.verbose)
             except IOError as e:
                 print('Unable to read file "' + str(e.filename) + "'.")
-                print('Errno = ' + str(e.errno))
-                print('Message: ' + str(e.message))
+                print("Errno = " + str(e.errno))
+                print("Message: " + str(e.message))
                 raise IndexError
             return MI
 
     @property
     def MI(self):
-        if hasattr(self, 'current_acq'):
+        if hasattr(self, "current_acq"):
             return self[self.current_acq]
         return self[1]
 
@@ -123,20 +127,21 @@ class ManipCollection(Manip):
         return self
 
     def __iter__(self):
-        if hasattr(self, 'custom_start'):
+        if hasattr(self, "custom_start"):
             self.current_acq = self.custom_start
-            delattr(self, 'custom_start')
+            delattr(self, "custom_start")
         else:
             self.current_acq = 1
         return self
 
     def __next__(self):
         c = self.current_acq
-        self.current_acq = c+1
+        self.current_acq = c + 1
         if c > self.num:
             raise StopIteration
         else:
             return self.__getitem__(c)
+
 
 class ManipList(object):
     def __init__(self, *args):

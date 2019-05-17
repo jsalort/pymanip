@@ -39,81 +39,85 @@ def PCO_get_binary_timestamp(image):
     Pixel 13: µs * 100            00..99
     Pixel 14: µs                  00..90
     """
-    counter = pf.bcd_to_int(image[:4], endianess='big')
-    year = pf.bcd_to_int(image[4:6], endianess='big')
+    counter = pf.bcd_to_int(image[:4], endianess="big")
+    year = pf.bcd_to_int(image[4:6], endianess="big")
     month = pf.bcd_to_int(image[6])
     day = pf.bcd_to_int(image[7])
     hour = pf.bcd_to_int(image[8])
     minutes = pf.bcd_to_int(image[9])
     seconds = pf.bcd_to_int(image[10])
-    microseconds = pf.bcd_to_int(image[11:], endianess='big')
-    return counter, datetime.datetime(year, month, day, hour,
-                                      minutes, seconds, microseconds)
+    microseconds = pf.bcd_to_int(image[11:], endianess="big")
+    return (
+        counter,
+        datetime.datetime(year, month, day, hour, minutes, seconds, microseconds),
+    )
 
 
 class PCO_Buffer:
-
     def __init__(self, cam_handle, XResAct, YResAct):
         self.cam_handle = cam_handle
         self.XResAct = XResAct
         self.YResAct = YResAct
-        bufSizeInBytes = XResAct*YResAct*ctypes.sizeof(ctypes.wintypes.WORD)
-        
+        bufSizeInBytes = XResAct * YResAct * ctypes.sizeof(ctypes.wintypes.WORD)
+
         self.bufPtr = ctypes.POINTER(ctypes.wintypes.WORD)()
-        num, event = pf.PCO_AllocateBuffer(cam_handle, -1, bufSizeInBytes, 
-                                           self.bufPtr)
+        num, event = pf.PCO_AllocateBuffer(cam_handle, -1, bufSizeInBytes, self.bufPtr)
         self.bufNr = num
         self.event_handle = event
-    
+
     def free(self):
         pf.PCO_FreeBuffer(self.cam_handle, self.bufNr)
         self.bufPtr = None
-        
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, type_, value, cb):
         self.free()
-    
+
     def as_array(self):
         return np.ctypeslib.as_array(self.bufPtr, shape=(self.YResAct, self.XResAct))
-    
+
     def bytes(self):
-        nval = self.XResAct*self.YResAct
-        bufType = ctypes.wintypes.WORD*nval
+        nval = self.XResAct * self.YResAct
+        bufType = ctypes.wintypes.WORD * nval
         return bytearray(bufType.from_address(ctypes.addressof(self.bufPtr.contents)))
-                    
+
+
 class PCO_Camera(Camera):
 
     # Open/Close camera
-    def __init__(self, interface='all', camera_num=0, *,
-                 metadata_mode=False, timestamp_mode=True):
+    def __init__(
+        self, interface="all", camera_num=0, *, metadata_mode=False, timestamp_mode=True
+    ):
         """
         pco.sdk_manual page 10:
         First step is to PCO_OpenCamera
         As next step camera description and status should be queried
         by calling PCO_GetCameraDescription and PCO_GetCameraHealthStatus
         """
-        
-        print('interface =', interface)
-        print('camera_num =', camera_num)
-        
+
+        print("interface =", interface)
+        print("camera_num =", camera_num)
+
         self.handle = pf.PCO_OpenCameraEx(interface, camera_num)
         self.camera_description = pf.PCO_GetCameraDescription(self.handle)
         warn, err, status = self.health_status()
         if warn or err:
-            print('Warning bits :', warn)
-            print('Error bits :', err)
+            print("Warning bits :", warn)
+            print("Error bits :", err)
         else:
-            print('Connected to',  pf.PCO_GetInfoString(self.handle))
-            print('Status bits :', status)
-        pf.PCO_SetBitAlignment(self.handle, sys.byteorder == 'little')
+            print("Connected to", pf.PCO_GetInfoString(self.handle))
+            print("Status bits :", status)
+        pf.PCO_SetBitAlignment(self.handle, sys.byteorder == "little")
         self.metadata_mode = metadata_mode
         self.timestamp_mode = timestamp_mode
         if timestamp_mode:
             # Timestamp is supported by all cameras but the information
             # is written on the first 14 pixels of the transfered image
-            pf.PCO_SetTimestampMode(self.handle, 0x0001) # binary mode (BCD coded in the first 14 px)
+            pf.PCO_SetTimestampMode(
+                self.handle, 0x0001
+            )  # binary mode (BCD coded in the first 14 px)
         else:
             pf.PCO_SetTimestampMode(self.handle, 0x0000)
         if metadata_mode:
@@ -121,21 +125,21 @@ class PCO_Camera(Camera):
             MetaDataSize, MetaDataVersion = pf.PCO_SetMetaDataMode(self.handle, True)
             self.MetaDataSize = MetaDataSize
             self.MetaDataVersion = MetaDataVersion
-    
+
     def close(self):
         pf.PCO_CloseCamera(self.handle)
         self.handle = None
-        print('Connection to camera closed.')
-        
+        print("Connection to camera closed.")
+
     def __exit__(self, type_, value, cb):
         super(PCO_Camera, self).__exit__(type_, value, cb)
         self.close()
-    
+
     # Query states
     def health_status(self):
         warn, err, status = pf.PCO_GetCameraHealthStatus(self.handle)
         return warn, err, status
-    
+
     # Set camera settings
     def set_adc_operating_mode(self, mode):
         """
@@ -144,18 +148,17 @@ class PCO_Camera(Camera):
         Dual mode allows higher frame rates.
         """
         if mode not in (0x0001, 0x0002):
-            shortcut = {'single': 0x0001,
-                        'dual': 0x0002}
+            shortcut = {"single": 0x0001, "dual": 0x0002}
             mode = shortcut[mode]
         pf.PCO_SetADCOperation(self.handle, mode)
-    
+
     def set_pixel_rate(self, rate):
         """
         Select pixel rate for sensor readout (in Hz)
         For PCO.1600: 10 Mhz or 40 MHz
         """
         pf.PCO_SetPixelRate(self.handle, int(rate))
-    
+
     def set_trigger_mode(self, mode):
         if mode in pf.PCO_TriggerModeDescription:
             pf.PCO_SetTriggerMode(self.handle, mode)
@@ -164,79 +167,86 @@ class PCO_Camera(Camera):
                 if val == mode:
                     break
             else:
-                raise ValueError('Unknown trigger mode : ' + str(mode))
+                raise ValueError("Unknown trigger mode : " + str(mode))
             pf.PCO_SetTriggerMode(self.handle, key)
-    
+
     def set_delay_exposuretime(self, delay=None, exposuretime=None):
         """
         delay and exposuretime in seconds
         """
         if delay is None or exposuretime is None:
-            delay_current, exposure_current, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(self.handle)
+            delay_current, exposure_current, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(
+                self.handle
+            )
         if delay is None:
             delay = delay_current
         else:
-            delay = delay*1000
+            delay = delay * 1000
             tb_delay = 0x0002
             if delay < 1.0:
-                delay = delay*1000
+                delay = delay * 1000
                 tb_delay = 0x0001
                 if delay < 1.0:
-                    delay = delay*1000
+                    delay = delay * 1000
                     tb_delay = 0x0000
         if exposuretime is None:
             exposuretime = exposure_current
         else:
-            exposuretime = exposuretime*1000
+            exposuretime = exposuretime * 1000
             tb_exposure = 0x0002
             if exposuretime < 1.0:
-                exposuretime = exposuretime*1000
+                exposuretime = exposuretime * 1000
                 tb_exposure = 0x0001
                 if exposuretime < 1.0:
-                    exposuretime = exposuretime*1000
+                    exposuretime = exposuretime * 1000
                     tb_exposure = 0x0000
-        units = {0x0000: 'ns',
-                 0x0001: 'µs',
-                 0x0002: 'ms'}
-        print('Setting delay to', int(delay), units[tb_delay])
-        print('Setting exposure time to', int(exposuretime), units[tb_exposure])
-        pf.PCO_SetDelayExposureTime(self.handle, int(delay), int(exposuretime), tb_delay, tb_exposure)
-        
+        units = {0x0000: "ns", 0x0001: "µs", 0x0002: "ms"}
+        print("Setting delay to", int(delay), units[tb_delay])
+        print("Setting exposure time to", int(exposuretime), units[tb_exposure])
+        pf.PCO_SetDelayExposureTime(
+            self.handle, int(delay), int(exposuretime), tb_delay, tb_exposure
+        )
+
     # Properties
     @property
     def resolution(self):
         return self.camera_description.maximum_resolution_std
-    
+
     @property
     def name(self):
-        #if hasattr(self, '_name'):
+        # if hasattr(self, '_name'):
         #    return self._name
         # PCO_GetCameraName is not supported by pco.1600
-        #self._name = pf.PCO_GetCameraName(self.handle)
-        #return self._name
-        return 'PCO Camera'
-    
+        # self._name = pf.PCO_GetCameraName(self.handle)
+        # return self._name
+        return "PCO Camera"
+
     @property
     def bitdepth(self):
         return 16
-        
+
     def current_delay_exposure_time(self):
         """
         returns current delay and exposure time in seconds
         """
-        
-        delay, exposure, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(self.handle)
-        return delay*pf.PCO_Timebases[tb_delay], exposure*pf.PCO_Timebases[tb_exposure]
-    
+
+        delay, exposure, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(
+            self.handle
+        )
+        return (
+            delay * pf.PCO_Timebases[tb_delay],
+            exposure * pf.PCO_Timebases[tb_exposure],
+        )
+
     def current_trigger_mode_description(self):
         return pf.PCO_TriggerModeDescription[pf.PCO_GetTriggerMode(self.handle)]
-        
+
     def current_adc_operation(self):
         return pf.PCO_ADCOperation(self.handle)
-    
+
     def current_pixel_rate(self):
         return pf.PCO_GetPixelRate(self.handle)
-        
+
     # Image acquisition
     def acquisition_oneshot(self):
         """
@@ -249,10 +259,16 @@ class PCO_Camera(Camera):
 
         with PCO_Buffer(self.handle, XResAct, YResAct) as buffer:
             try:
-                pf.PCO_SetImageParameters(self.handle, XResAct, YResAct,
-                                          pf.IMAGEPARAMETERS_READ_WHILE_RECORDING)
+                pf.PCO_SetImageParameters(
+                    self.handle,
+                    XResAct,
+                    YResAct,
+                    pf.IMAGEPARAMETERS_READ_WHILE_RECORDING,
+                )
                 pf.PCO_SetRecordingState(self.handle, True)
-                pf.PCO_GetImageEx(self.handle, 1, 0, 0, buffer.bufNr, XResAct, YResAct, 16)
+                pf.PCO_GetImageEx(
+                    self.handle, 1, 0, 0, buffer.bufNr, XResAct, YResAct, 16
+                )
                 array = buffer.as_array().copy()
             finally:
                 pf.PCO_SetRecordingState(self.handle, False)
@@ -260,11 +276,18 @@ class PCO_Camera(Camera):
         return array
 
     def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
-        yield from synchronize_generator(self.acquisition_async,
-                                         num, timeout, raw, None, raise_on_timeout)
+        yield from synchronize_generator(
+            self.acquisition_async, num, timeout, raw, None, raise_on_timeout
+        )
 
-    async def acquisition_async(self, num=np.inf, timeout=None, raw=False,
-                                initialising_cams=None, raise_on_timeout=True):
+    async def acquisition_async(
+        self,
+        num=np.inf,
+        timeout=None,
+        raw=False,
+        initialising_cams=None,
+        raise_on_timeout=True,
+    ):
         """
         Multiple image acquisition
         yields a shared memory numpy array valid only
@@ -272,10 +295,10 @@ class PCO_Camera(Camera):
         """
 
         loop = asyncio.get_event_loop()
-        
+
         if timeout is None:
             delay, exposure = self.current_delay_exposure_time()
-            timeout = int(max((2000*exposure, 1000)))
+            timeout = int(max((2000 * exposure, 1000)))
 
         # Arm camera
         if pf.PCO_GetRecordingState(self.handle):
@@ -283,32 +306,43 @@ class PCO_Camera(Camera):
         pf.PCO_ArmCamera(self.handle)
         warn, err, status = self.health_status()
         if err != 0:
-            raise RuntimeError('Camera has error status!')
+            raise RuntimeError("Camera has error status!")
         XResAct, YResAct, XResMax, YResMax = pf.PCO_GetSizes(self.handle)
 
-        with PCO_Buffer(self.handle, XResAct, YResAct) as buf1, \
-             PCO_Buffer(self.handle, XResAct, YResAct) as buf2, \
-             PCO_Buffer(self.handle, XResAct, YResAct) as buf3, \
-             PCO_Buffer(self.handle, XResAct, YResAct) as buf4:
+        with PCO_Buffer(self.handle, XResAct, YResAct) as buf1, PCO_Buffer(
+            self.handle, XResAct, YResAct
+        ) as buf2, PCO_Buffer(self.handle, XResAct, YResAct) as buf3, PCO_Buffer(
+            self.handle, XResAct, YResAct
+        ) as buf4:
 
             buffers = (buf1, buf2, buf3, buf4)
             try:
-                pf.PCO_SetImageParameters(self.handle, XResAct, YResAct,
-                                          pf.IMAGEPARAMETERS_READ_WHILE_RECORDING)
+                pf.PCO_SetImageParameters(
+                    self.handle,
+                    XResAct,
+                    YResAct,
+                    pf.IMAGEPARAMETERS_READ_WHILE_RECORDING,
+                )
                 pf.PCO_SetRecordingState(self.handle, True)
                 for buffer in buffers:
-                    pf.PCO_AddBufferEx(self.handle, 0, 0, buffer.bufNr, XResAct, YResAct, 16)
+                    pf.PCO_AddBufferEx(
+                        self.handle, 0, 0, buffer.bufNr, XResAct, YResAct, 16
+                    )
                 count = 0
                 buffer_ring = itertools.cycle(buffers)
                 while count < num:
-                    #waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
+                    # waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
                     #                                             0, timeout)
-                    waitstat = await loop.run_in_executor(None, 
-                                                          win32event.WaitForMultipleObjects,
-                                                          [buffer.event_handle for buffer in buffers], 0, timeout)                                           
+                    waitstat = await loop.run_in_executor(
+                        None,
+                        win32event.WaitForMultipleObjects,
+                        [buffer.event_handle for buffer in buffers],
+                        0,
+                        timeout,
+                    )
                     if waitstat == win32event.WAIT_TIMEOUT:
                         if raise_on_timeout:
-                            raise CameraTimeout(f'Timeout ({timeout:})')
+                            raise CameraTimeout(f"Timeout ({timeout:})")
                         else:
                             stop_signal = yield None
                             if not stop_signal:
@@ -316,33 +350,51 @@ class PCO_Camera(Camera):
                             else:
                                 break
                     for ii, buffer in zip(range(4), buffer_ring):
-                        waitstat = await loop.run_in_executor(None,
-                                                              win32event.WaitForSingleObject,
-                                                              buffer.event_handle, 0)
+                        waitstat = await loop.run_in_executor(
+                            None, win32event.WaitForSingleObject, buffer.event_handle, 0
+                        )
                         if waitstat == win32event.WAIT_OBJECT_0:
                             win32event.ResetEvent(buffer.event_handle)
-                            statusDLL, statusDrv = pf.PCO_GetBufferStatus(self.handle, buffer.bufNr)
+                            statusDLL, statusDrv = pf.PCO_GetBufferStatus(
+                                self.handle, buffer.bufNr
+                            )
                             if statusDrv != 0:
-                                raise RuntimeError('buffer {:} error status {:}'.format(buffer.bufNr, statusDrv))
+                                raise RuntimeError(
+                                    "buffer {:} error status {:}".format(
+                                        buffer.bufNr, statusDrv
+                                    )
+                                )
                             if raw:
                                 data = {"buffer": buffer.bytes()}
                                 if self.timestamp_mode:
-                                    counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
-                                    data['counter'] = counter
-                                    data['timestamp'] = dt
+                                    counter, dt = PCO_get_binary_timestamp(
+                                        buffer.bufPtr[:14]
+                                    )
+                                    data["counter"] = counter
+                                    data["timestamp"] = dt
                                 stop_signal = yield data
                             else:
                                 if self.metadata_mode:
-                                    metadata = pf.PCO_GetMetaData(self.handle, buffer.bufNr)
-                                    stop_signal = yield MetadataArray(buffer.as_array(), metadata=metadata)
+                                    metadata = pf.PCO_GetMetaData(
+                                        self.handle, buffer.bufNr
+                                    )
+                                    stop_signal = yield MetadataArray(
+                                        buffer.as_array(), metadata=metadata
+                                    )
                                 elif self.timestamp_mode:
-                                    counter, dt = PCO_get_binary_timestamp(buffer.bufPtr[:14])
-                                    stop_signal = yield MetadataArray(buffer.as_array(), metadata={'counter': counter, 'timestamp': dt})
+                                    counter, dt = PCO_get_binary_timestamp(
+                                        buffer.bufPtr[:14]
+                                    )
+                                    stop_signal = yield MetadataArray(
+                                        buffer.as_array(),
+                                        metadata={"counter": counter, "timestamp": dt},
+                                    )
                                 else:
                                     stop_signal = yield buffer.as_array()
                             count += 1
-                            pf.PCO_AddBufferEx(self.handle, 0, 0, buffer.bufNr,
-                                               XResAct, YResAct, 16)
+                            pf.PCO_AddBufferEx(
+                                self.handle, 0, 0, buffer.bufNr, XResAct, YResAct, 16
+                            )
                         else:
                             break
                         if stop_signal:
@@ -353,9 +405,10 @@ class PCO_Camera(Camera):
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
         if stop_signal:
-            yield True        
-    
-if __name__ == '__main__':
-    h = pf.PCO_OpenCameraEx('USB 3.0', 0)
+            yield True
+
+
+if __name__ == "__main__":
+    h = pf.PCO_OpenCameraEx("USB 3.0", 0)
     pf.PCO_GetInfoString(h)
     pf.PCO_CloseCamera(h)

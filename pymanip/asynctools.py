@@ -11,6 +11,7 @@ def synchronize_generator(async_generator, *args, **kwargs):
     async def consume_generator(stop_signal):
         r = await ag.asend(stop_signal)
         return r
+
     loop = asyncio.new_event_loop()
     try:
         stop_signal = None
@@ -42,11 +43,11 @@ def synchronize_function(async_func, *args, **kwargs):
     return r
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     async def spam(n):
         for i in range(n):
-            yield i**n
+            yield i ** n
             await asyncio.sleep(1.0)
 
     for x in synchronize_generator(spam, 3):

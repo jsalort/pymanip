@@ -28,7 +28,6 @@ class TimeoutException(Exception):
 
 
 class AcquisitionCard:
-
     def __init__(self):
         self.channels = []
         self.actual_ranges = []
@@ -60,8 +59,12 @@ class AcquisitionCard:
     def configure_clock(self, sample_rate, samples_per_chan):
         raise NotImplementedError()
 
-    def configure_trigger(self, trigger_source=None, trigger_level=0,
-                          trigger_config=TriggerConfig.EdgeRising):
+    def configure_trigger(
+        self,
+        trigger_source=None,
+        trigger_level=0,
+        trigger_config=TriggerConfig.EdgeRising,
+    ):
         """
         If trigger_source is None, switch to Immediate trigger
         """
@@ -87,11 +90,19 @@ class AcquisitionCard:
         data = loop.run_until_complete(self.start_read_stop(tmo))
         return data
 
-    async def read_analog(self, resource_names, terminal_config, 
-                          volt_min=None, volt_max=None,
-                          samples_per_chan=1, sample_rate=1, coupling_types='DC',
-                          output_filename=None, verbose=True):
-        
+    async def read_analog(
+        self,
+        resource_names,
+        terminal_config,
+        volt_min=None,
+        volt_max=None,
+        samples_per_chan=1,
+        sample_rate=1,
+        coupling_types="DC",
+        output_filename=None,
+        verbose=True,
+    ):
+
         if isinstance(resource_names, str):
             resource_names = [resource_names]
         if isinstance(terminal_config, str):
@@ -109,10 +120,9 @@ class AcquisitionCard:
         except TypeError:
             volt_max = [volt_max]
 
-        for chan_name, chan_tc, chan_vmin, chan_vmax in zip(resource_names, 
-                                                            terminal_config,
-                                                            volt_min,
-                                                            volt_max):
+        for chan_name, chan_tc, chan_vmin, chan_vmax in zip(
+            resource_names, terminal_config, volt_min, volt_max
+        ):
             volt_range = max([abs(chan_vmin), abs(chan_vmax)])
             self.add_channel(chan_name, chan_tc, volt_range)
         self.configure_clock(sample_rate, int(samples_per_chan))
@@ -124,4 +134,3 @@ class AcquisitionCard:
         loop = asyncio.get_event_loop()
         data = loop.run_until_complete(self.read_analog(*args, **kwargs))
         return data
-

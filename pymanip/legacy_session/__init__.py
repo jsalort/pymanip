@@ -7,26 +7,38 @@ use by the collection classes.
 
 """
 
-from __future__ import print_function
-
-from .octmi_binary import read_OctMI_session
 import os.path
+import inspect
 import h5py
 
+from clint.textui import colored
+
+from .octmi_binary import read_OctMI_session
+
+
 class OctSession(object):
-    def __init__(self, session_name, cache_override=False, cache_location='.', verbose=False):
+    def __init__(
+        self, session_name, cache_override=False, cache_location=".", verbose=False
+    ):
         self.session_name = session_name
         self.variables = read_OctMI_session(session_name, verbose=verbose)
-        self.time = self.variables.pop('t')
-        self.cachestorename = os.path.join(os.path.realpath(cache_location), 'cache',  os.path.basename(self.session_name)) + '.hdf5'
+        self.time = self.variables.pop("t")
+        self.cachestorename = (
+            os.path.join(
+                os.path.realpath(cache_location),
+                "cache",
+                os.path.basename(self.session_name),
+            )
+            + ".hdf5"
+        )
         if cache_override:
-            self.cachemode = 'w'
+            self.cachemode = "w"
         else:
-            self.cachemode = 'r+'
+            self.cachemode = "r+"
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
             if verbose:
-                print(colored.yellow('*** Cache store found at ' + self.cachestorename))
+                print(colored.yellow("*** Cache store found at " + self.cachestorename))
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False
@@ -37,13 +49,13 @@ class OctSession(object):
 
     def describe(self):
         if len(self.variables) > 0:
-            print('List of saved variables: (%d lines)' % len(self.time))
+            print("List of saved variables: (%d lines)" % len(self.time))
             for key, var in self.variables.items():
-                print(' ' + key)
+                print(" " + key)
 
     def has_dataset(self, name):
         return False
-    
+
     def dataset(self, name):
         return None
 
@@ -54,30 +66,29 @@ class OctSession(object):
         return None
 
     def has_log(self, name):
-        if name in ['Time', 'time', 't']:
+        if name in ["Time", "time", "t"]:
             return True
-        return (name in self.variables.keys())
+        return name in self.variables.keys()
 
     def log_variable_list(self):
         return self.variables.keys()
 
     def log(self, varname):
-        if varname in ['Time', 'time', 't']:
+        if varname in ["Time", "time", "t"]:
             return self.time
-        elif varname == '?':
+        elif varname == "?":
             print(self.log_variable_list())
         elif varname in self.variables:
             return self.variables[varname]
         else:
-            print(colored.red('Variable is not defined: ' + varname))
+            print(colored.red("Variable is not defined: " + varname))
 
     def __getitem__(self, key):
         return self.log(key)
 
-
     @property
     def cachedvars(self):
-        if not hasattr(self, 'has_cachestore'):
+        if not hasattr(self, "has_cachestore"):
             return []
         if self.has_cachestore:
             return self.cachestore.keys()
@@ -96,18 +107,18 @@ class OctSession(object):
             name = args[0]
         else:
             name = [a for a in args]
-        if isinstance(name, str) or isinstance(name, unicode):
-            return (name in self.cachedvars)
+        if isinstance(name, str):
+            return name in self.cachedvars
         else:
             return all([(n in self.cachedvars) for n in name])
 
     def cachedvalue(self, varname):
         if self.has_cachestore:
-            print(colored.yellow('Retriving ' + varname + ' from cache'))
+            print(colored.yellow("Retriving " + varname + " from cache"))
             return self.cachestore[varname].value
         else:
             return None
-        
+
     def cache(self, name, dict_caller=None):
         if dict_caller is None:
             stack = inspect.stack()
@@ -115,7 +126,7 @@ class OctSession(object):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if (not isinstance(name, str)) and (not isinstance(name, unicode)):
+        if not isinstance(name, str):
             for var in name:
                 self.cache(var, dict_caller)
             return
@@ -125,17 +136,19 @@ class OctSession(object):
             except OSError:
                 pass
             try:
-                self.cachestore = h5py.File(self.cachestorename, 'w')
+                self.cachestore = h5py.File(self.cachestorename, "w")
                 self.has_cachestore = True
-                print(colored.yellow('*** Cache store created at ' + self.cachestorename))
+                print(
+                    colored.yellow("*** Cache store created at " + self.cachestorename)
+                )
             except IOError as ioe:
                 self.has_cachestore = False
-                print(colored.red('Cannot create cache store'))
+                print(colored.red("Cannot create cache store"))
                 print(colored.red(ioe.message))
                 pass
-        
+
         if self.has_cachestore:
-            print(colored.yellow('Saving ' + name + ' in cache'))
+            print(colored.yellow("Saving " + name + " in cache"))
             try:
                 new_length = len(dict_caller[name])
             except TypeError:
@@ -143,15 +156,19 @@ class OctSession(object):
                 pass
             if name in self.cachestore.keys():
                 if len(self.cachestore[name]) != new_length:
-                    self.cachestore[name].resize( (new_length, ))
+                    self.cachestore[name].resize((new_length,))
                 self.cachestore[name][:] = dict_caller[name]
             else:
                 if new_length > 1:
-                    self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), data=dict_caller[name])
+                    self.cachestore.create_dataset(
+                        name, chunks=True, maxshape=(None,), data=dict_caller[name]
+                    )
                 else:
-                    self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
+                    self.cachestore.create_dataset(
+                        name, chunks=True, maxshape=(None,), shape=(new_length,)
+                    )
                     self.cachestore[name][:] = dict_caller[name]
-         
+
     def __del__(self):
-        if hasattr(self, 'has_cachestore') and self.has_cachestore:
+        if hasattr(self, "has_cachestore") and self.has_cachestore:
             self.cachestore.close()
