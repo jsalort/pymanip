@@ -15,6 +15,7 @@ import time
 import inspect
 import matplotlib.pyplot as plt
 import warnings
+
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning)
     import h5py
@@ -22,54 +23,56 @@ import smtplib
 import base64
 import quopri
 import tempfile
+
 try:
     from clint.textui import colored
 except ImportError:
-    print('Clint is not available: no color support')
+    print("Clint is not available: no color support")
+
     class Colored(object):
         def blue(self, txt):
             return txt
+
         def red(self, txt):
             return txt
+
     colored = Colored()
 
 from datetime import datetime
+
 try:
     from convbox.myplot import ColorGenerator
 except ImportError:
     import itertools
+
     def ColorGenerator():
-        return itertools.cycle(['b', 'r', 'g', 'k', 'm', 'c'])
+        return itertools.cycle(["b", "r", "g", "k", "m", "c"])
+
+
 import pymanip.mytime as mytime
+
 try:
     from pathlib import Path
+
     has_pathlib = True
 except ImportError:
     has_pathlib = False
 from pymanip.mytime import dateformat
 
-__all__ = ['makeAcqName', 'SavedSession', 'Session', 'NameGenerator']
+__all__ = ["makeAcqName", "SavedSession", "Session", "NameGenerator"]
 
-## I am commenting out this because it should be in the caller's script
-## when necessary only
-## Ensure stdout and stderr are UTF-8
-## Otherwise print may fail if non-ascii character
-#if six.PY3:
-#    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-#    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
-#else:
-#    sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
-#    sys.stderr = codecs.getwriter("utf-8")(sys.stderr)
 
 def NameGenerator(prefix=None, postfix=None):
     acquisition_clock = datetime.now()
     acquisition_number = 1
-    name = "%d-%02d-%02d_%02d-%02d-%02d" % (acquisition_clock.year,
-                                            acquisition_clock.month,
-                                            acquisition_clock.day,
-                                            acquisition_clock.hour,
-                                            acquisition_clock.minute,
-                                            acquisition_clock.second)
+    name = "%d-%02d-%02d_%02d-%02d-%02d" % (
+        acquisition_clock.year,
+        acquisition_clock.month,
+        acquisition_clock.day,
+        acquisition_clock.hour,
+        acquisition_clock.minute,
+        acquisition_clock.second,
+    )
     if prefix:
         name = prefix + "_" + name
     if postfix:
@@ -80,17 +83,25 @@ def NameGenerator(prefix=None, postfix=None):
         yield name_numbered
         acquisition_number = acquisition_number + 1
 
+
 defaultGenerator = None
+
 
 def makeAcqName(comment=None):
     global defaultGenerator
 
-    if (defaultGenerator is None) or (comment == "reset") or (defaultGenerator.gi_frame.f_locals["postfix"] != comment):
+    if (
+        (defaultGenerator is None)
+        or (comment == "reset")
+        or (defaultGenerator.gi_frame.f_locals["postfix"] != comment)
+    ):
         defaultGenerator = NameGenerator(postfix=comment)
     return next(defaultGenerator)
 
+
 def boldface(string):
     return "\x1b[1;1m" + string + "\x1b[0;0m"
+
 
 class BaseSession(object):
     def __init__(self, session_name=None):
@@ -98,7 +109,7 @@ class BaseSession(object):
             session_name = makeAcqName()
 
         self.session_name = session_name
-        self.storename = session_name + '.hdf5'
+        self.storename = session_name + ".hdf5"
         self.session_opening_time = time.time()
         self.opened = False
         self.parameters_defined = False
@@ -112,35 +123,43 @@ class BaseSession(object):
         # Logged variables
         if len(self.grp_variables.keys()) > 0:
             num_lines = self.dset_time.len()
-            print('List of saved variables: (%d lines)' % num_lines)
+            print("List of saved variables: (%d lines)" % num_lines)
             for var in self.grp_variables.keys():
-                print(' ' + var)
+                print(" " + var)
         # Datasets
         if self.grp_datasets_defined:
-            print('List of saved datasets:')
+            print("List of saved datasets:")
             for dataname in self.grp_datasets.keys():
                 size = self.grp_datasets[dataname].size
-                print(' ' + dataname + (' (%d points)' % size))
+                print(" " + dataname + (" (%d points)" % size))
         # Parameters
         if self.parameters_defined:
             if len(self.parameters.keys()) > 0:
-                print('List of saved parameters:')
+                print("List of saved parameters:")
                 for name in self.parameters.keys():
                     value = self.parameters[name]
-                    #print(type(value))
+                    # print(type(value))
                     if isinstance(value, np.ndarray) and len(value) == 1:
                         value = value[0]
-                    if name == 'email_lastSent':
+                    if name == "email_lastSent":
                         theDateStr = time.strftime(dateformat, time.localtime(value))
                         if six.PY2:
-                            theDateStr = theDateStr.decode('utf-8')
-                        print(' ' + name + ' = ' + theDateStr )
+                            theDateStr = theDateStr.decode("utf-8")
+                        print(" " + name + " = " + theDateStr)
                     else:
-                        print(' ' + name + ' = ' + str(value) + ' (' + str(type(value)) + ')')
+                        print(
+                            " "
+                            + name
+                            + " = "
+                            + str(value)
+                            + " ("
+                            + str(type(value))
+                            + ")"
+                        )
 
     def has_dataset(self, name):
         if self.grp_datasets_defined:
-            return (name in self.grp_datasets.keys())
+            return name in self.grp_datasets.keys()
         else:
             return False
 
@@ -153,7 +172,7 @@ class BaseSession(object):
 
     def has_parameter(self, name):
         if self.parameters_defined:
-            return (name in self.parameters.keys())
+            return name in self.parameters.keys()
         else:
             return False
 
@@ -162,27 +181,27 @@ class BaseSession(object):
             return self.parameters[name]
 
     def has_log(self, name):
-        if name == 'Time' or name == 'time' or name == 't':
+        if name == "Time" or name == "time" or name == "t":
             return True
-        return (name in self.grp_variables.keys())
+        return name in self.grp_variables.keys()
 
     def log_variable_list(self):
         return self.grp_variables.keys()
 
     def log(self, varname):
         if self.opened:
-            if varname == 'Time' or varname == 'time' or varname == 't':
+            if varname == "Time" or varname == "time" or varname == "t":
                 return self.dset_time.value
-            elif varname == '?':
-                print('List of saved variables:')
+            elif varname == "?":
+                print("List of saved variables:")
                 for var in self.grp_variables.keys():
                     print(var)
             elif varname in self.grp_variables.keys():
                 return self.grp_variables[varname].value
             else:
-                print(colored.red('Variable is not defined: ') + varname)
+                print(colored.red("Variable is not defined: ") + varname)
         else:
-            print(colored.red('Session is not opened'))
+            print(colored.red("Session is not opened"))
 
     def __getitem__(self, key):
         if self.has_log(key):
@@ -200,7 +219,7 @@ class BaseSession(object):
             plt.clf()
             plt.ion()
             plt.show()
-            t = self.log('t')
+            t = self.log("t")
             if len(t) > maxvalues:
                 debut = len(t) - 1000
                 fin = len(t)
@@ -209,57 +228,89 @@ class BaseSession(object):
                 fin = len(t)
             if t[debut] > self.session_opening_time:
                 # tous les points sont nouveaux
-                olddebut=None
-                oldfin=None
-                newdebut=debut
-                newfin=fin
+                olddebut = None
+                oldfin = None
+                newdebut = debut
+                newfin = fin
             elif t[-1] > self.session_opening_time:
                 # certains points sont nouveaux
-                bb = (t > self.session_opening_time)
-                olddebut=debut
+                bb = t > self.session_opening_time
+                olddebut = debut
                 oldfin = np.min(bb.argmax())
                 newdebut = oldfin
-                newfin=fin
+                newfin = fin
             else:
                 # les points sont tous anciens
-                olddebut=debut
-                oldfin=fin
-                newdebut=None
-                newfin=None
-            if t[-1]-t[0] < 3600:
-                t = (t-t[0])/60.0
-                xlab = 't [min]'
+                olddebut = debut
+                oldfin = fin
+                newdebut = None
+                newfin = None
+            if t[-1] - t[0] < 3600:
+                t = (t - t[0]) / 60.0
+                xlab = "t [min]"
             else:
-                t = (t-t[0])/3600.
-                xlab = 't [h]'
-            #print(olddebut, oldfin, newdebut, newfin)
+                t = (t - t[0]) / 3600.0
+                xlab = "t [h]"
+            # print(olddebut, oldfin, newdebut, newfin)
 
             if isinstance(varlist, six.string_types):
                 lab = varlist
-                col = (0,0,1)
-                if newdebut != None:
-                    plt.plot(t[newdebut:newfin], self.log(varlist)[newdebut:newfin], 'o-', color=col, mec=col, mfc=col, label=lab)
-                    lab=None
-                if olddebut != None:
-                    plt.plot(t[olddebut:oldfin], self.log(varlist)[olddebut:oldfin], 'o-', mfc='none', mec=col, color=col, label=lab)
-                
+                col = (0, 0, 1)
+                if newdebut is not None:
+                    plt.plot(
+                        t[newdebut:newfin],
+                        self.log(varlist)[newdebut:newfin],
+                        "o-",
+                        color=col,
+                        mec=col,
+                        mfc=col,
+                        label=lab,
+                    )
+                    lab = None
+                if olddebut is not None:
+                    plt.plot(
+                        t[olddebut:oldfin],
+                        self.log(varlist)[olddebut:oldfin],
+                        "o-",
+                        mfc="none",
+                        mec=col,
+                        color=col,
+                        label=lab,
+                    )
+
             else:
                 for var, coul in zip(varlist, ColorGenerator()):
                     lab = var
-                    if newdebut != None:
-                        plotfunc(t[newdebut:newfin], self.log(var)[newdebut:newfin], 'o-', mfc=coul, mec=coul, color=coul, label=lab)
+                    if newdebut is not None:
+                        plotfunc(
+                            t[newdebut:newfin],
+                            self.log(var)[newdebut:newfin],
+                            "o-",
+                            mfc=coul,
+                            mec=coul,
+                            color=coul,
+                            label=lab,
+                        )
                         lab = None
-                    if olddebut != None:
-                        plotfunc(t[olddebut:oldfin], self.log(var)[olddebut:oldfin], 'o-', mfc='none', mec=coul, color=coul, label=lab)
-                    
+                    if olddebut is not None:
+                        plotfunc(
+                            t[olddebut:oldfin],
+                            self.log(var)[olddebut:oldfin],
+                            "o-",
+                            mfc="none",
+                            mec=coul,
+                            color=coul,
+                            label=lab,
+                        )
+
             plt.xlabel(xlab)
-            plt.legend(loc='upper left')
+            plt.legend(loc="upper left")
             plt.draw()
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 plt.pause(0.0001)
         else:
-            print(colored.red('Session is not opened'))
+            print(colored.red("Session is not opened"))
 
     def sleep(self, duration):
         mytime.sleep(duration)
@@ -273,10 +324,11 @@ class BaseSession(object):
 
 
 class SavedSession(BaseSession):
-    def __init__(self, session_name, cache_override=False, cache_location='.',
-                 verbose=True):
+    def __init__(
+        self, session_name, cache_override=False, cache_location=".", verbose=True
+    ):
         super(SavedSession, self).__init__(session_name)
-        self.store = h5py.File(self.storename, 'r')
+        self.store = h5py.File(self.storename, "r")
         try:
             self.dset_time = self.store["time"]
         except KeyError:
@@ -298,38 +350,42 @@ class SavedSession(BaseSession):
             pass
         self.opened = True
         if verbose:
-            print('Loading saved session from file', self.storename)
+            print("Loading saved session from file", self.storename)
         total_size = self.dset_time.len()
         if total_size > 0:
             start_t = self.dset_time[0]
-            end_t = self.dset_time[total_size-1]
+            end_t = self.dset_time[total_size - 1]
             start_string = time.strftime(dateformat, time.localtime(start_t))
             if six.PY2:
-                start_string = start_string.decode('utf-8')
+                start_string = start_string.decode("utf-8")
             end_string = time.strftime(dateformat, time.localtime(end_t))
             if six.PY2:
-                end_string = end_string.decode('utf-8')
+                end_string = end_string.decode("utf-8")
             if verbose:
-                print(colored.blue('*** Start date: ' + start_string))
-                print(colored.blue('***   End date: ' + end_string))
+                print(colored.blue("*** Start date: " + start_string))
+                print(colored.blue("***   End date: " + end_string))
         elif not self.grp_datasets_defined:
             if verbose:
-                print(colored.red('No logged variables'))
+                print(colored.red("No logged variables"))
         if self.grp_datasets_defined:
-            timestamp_string = time.strftime(dateformat, time.localtime(self.grp_datasets.attrs['timestamp']))
+            timestamp_string = time.strftime(
+                dateformat, time.localtime(self.grp_datasets.attrs["timestamp"])
+            )
             if six.PY2:
-                timestamp_string = timestamp_string.decode('utf-8')
+                timestamp_string = timestamp_string.decode("utf-8")
             if verbose:
-                print(colored.blue('*** Acquisition timestamp ' + timestamp_string))
-        self.cachestorename = os.path.join(os.path.realpath(cache_location), 'cache',  os.path.basename(self.storename))
+                print(colored.blue("*** Acquisition timestamp " + timestamp_string))
+        self.cachestorename = os.path.join(
+            os.path.realpath(cache_location), "cache", os.path.basename(self.storename)
+        )
         if cache_override:
-            self.cachemode = 'w'
+            self.cachemode = "w"
         else:
-            self.cachemode = 'r+'
+            self.cachemode = "r+"
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
             if verbose:
-                print(colored.yellow('*** Cache store found at ' + self.cachestorename))
+                print(colored.yellow("*** Cache store found at " + self.cachestorename))
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False
@@ -337,7 +393,7 @@ class SavedSession(BaseSession):
 
     @property
     def cachedvars(self):
-        if not hasattr(self, 'has_cachestore'):
+        if not hasattr(self, "has_cachestore"):
             return []
         if self.has_cachestore:
             return self.cachestore.keys()
@@ -357,30 +413,30 @@ class SavedSession(BaseSession):
         else:
             name = [a for a in args]
         if isinstance(name, six.string_types):
-            return (name in self.cachedvars)
+            return name in self.cachedvars
         else:
             return all([(n in self.cachedvars) for n in name])
 
     def cachedvalue(self, varname):
         if self.has_cachestore:
             if self.verbose:
-                print(colored.yellow('Retrieving ' + varname + ' from cache'))
+                print(colored.yellow("Retrieving " + varname + " from cache"))
             content = self.cachestore[varname]
-            if hasattr(content, "value"): 
+            if hasattr(content, "value"):
                 return content.value
             else:
                 result = list()
-                i=0
+                i = 0
                 while True:
                     try:
                         result.append(content[str(i)].value)
-                        i=i+1
+                        i = i + 1
                     except KeyError:
                         break
                 return result
         else:
             return None
-        
+
     def cache(self, name, dict_caller=None):
         if dict_caller is None:
             stack = inspect.stack()
@@ -388,28 +444,30 @@ class SavedSession(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if (not isinstance(name, six.string_types)):
+        if not isinstance(name, six.string_types):
             for var in name:
                 self.cache(var, dict_caller)
             return
-            
+
         if not self.has_cachestore:
             try:
                 os.mkdir(os.path.dirname(self.cachestorename))
             except OSError:
                 pass
             try:
-                self.cachestore = h5py.File(self.cachestorename, 'w')
+                self.cachestore = h5py.File(self.cachestorename, "w")
                 self.has_cachestore = True
-                print(colored.yellow('*** Cache store created at ' + self.cachestorename))
+                print(
+                    colored.yellow("*** Cache store created at " + self.cachestorename)
+                )
             except IOError as ioe:
                 self.has_cachestore = False
-                print(colored.red('Cannot create cache store'))
+                print(colored.red("Cannot create cache store"))
                 print(colored.red(ioe.message))
                 pass
-        
+
         if self.has_cachestore:
-            print(colored.yellow('Saving ' + name + ' in cache'))
+            print(colored.yellow("Saving " + name + " in cache"))
 
             if isinstance(dict_caller[name], list):
                 # Sauvegarde d'une liste d'objets
@@ -421,8 +479,10 @@ class SavedSession(BaseSession):
                     pass
                 grp = self.cachestore.create_group(name)
                 for itemnum, item in enumerate(dict_caller[name]):
-                    if not isinstance(item, (six.integer_types, float) ):
-                        grp.create_dataset(str(itemnum), chunks=True, data=item, compression='gzip')
+                    if not isinstance(item, (six.integer_types, float)):
+                        grp.create_dataset(
+                            str(itemnum), chunks=True, data=item, compression="gzip"
+                        )
                     else:
                         grp.create_dataset(str(itemnum), data=item)
             else:
@@ -434,15 +494,19 @@ class SavedSession(BaseSession):
                     pass
                 if name in self.cachestore.keys():
                     if len(self.cachestore[name]) != new_length:
-                        self.cachestore[name].resize( (new_length, ))
+                        self.cachestore[name].resize((new_length,))
                     self.cachestore[name][:] = dict_caller[name]
                 else:
                     if new_length > 1:
-                        self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), data=dict_caller[name])
+                        self.cachestore.create_dataset(
+                            name, chunks=True, maxshape=(None,), data=dict_caller[name]
+                        )
                     else:
-                        self.cachestore.create_dataset(name, chunks=True, maxshape=(None,), shape=(new_length,))
+                        self.cachestore.create_dataset(
+                            name, chunks=True, maxshape=(None,), shape=(new_length,)
+                        )
                         self.cachestore[name][:] = dict_caller[name]
-	
+
     def __exit__(self, type, value, cb):
         """ Previous versions used __del__ which is bad
             practise because the gc triggering mechanism is
@@ -454,7 +518,7 @@ class SavedSession(BaseSession):
         self.store.close()
         self.store = None
         self.opened = False
-        if hasattr(self, 'has_cachestore') and self.has_cachestore and self.cachestore:
+        if hasattr(self, "has_cachestore") and self.has_cachestore and self.cachestore:
             self.cachestore.close()
             self.has_cachestore = False
             self.cachestore = None
@@ -467,25 +531,27 @@ class Session(BaseSession):
             if isinstance(session_name, Path):
                 session_name = session_name.as_posix()
         super(Session, self).__init__(session_name)
-        self.datname = session_name + '.dat'
-        self.logname = session_name + '.log'
-        self.datfile = open(self.datname, 'a')
-        self.logfile = open(self.logname, 'a')
+        self.datname = session_name + ".dat"
+        self.logname = session_name + ".log"
+        self.datfile = open(self.datname, "a")
+        self.logfile = open(self.logname, "a")
         self.allow_override_datasets = allow_override_datasets
 
-        date_string = time.strftime(dateformat, time.localtime(self.session_opening_time))
+        date_string = time.strftime(
+            dateformat, time.localtime(self.session_opening_time)
+        )
         if six.PY2:
             # en PY3 strftime renvoie directement une str
             # en PY2, il faut decode pour convertir en unicode
-            date_string = date_string.decode('utf-8')
-            self.logfile.write( ("Session opened on " + date_string).encode('utf-8') )
+            date_string = date_string.decode("utf-8")
+            self.logfile.write(("Session opened on " + date_string).encode("utf-8"))
         else:
             # en PY3 write prend une str
             self.logfile.write("Session opened on " + date_string)
 
         self.logfile.flush()
         try:
-            self.store = h5py.File(self.storename, 'r+')
+            self.store = h5py.File(self.storename, "r+")
             self.dset_time = self.store["time"]
             self.grp_variables = self.store["variables"]
             self.parameters = self.store.attrs
@@ -493,42 +559,49 @@ class Session(BaseSession):
             try:
                 self.grp_datasets = self.store["datasets"]
                 self.grp_datasets_defined = True
-            except:
+            except Exception:
                 self.grp_datasets_defined = False
-            pass
             original_size = self.dset_time.len()
-            arr = np.zeros( (original_size,) )
+            arr = np.zeros((original_size,))
             new_headers = False
             if len(variable_list) != len(self.grp_variables.keys()):
                 new_headers = True
             for var in variable_list:
                 if var not in self.grp_variables.keys():
-                    self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), data=arr)
+                    self.grp_variables.create_dataset(
+                        var, chunks=True, maxshape=(None,), data=arr
+                    )
                     new_headers = True
-            print(colored.blue(boldface("Session reloaded from file ") + self.storename))
+            print(
+                colored.blue(boldface("Session reloaded from file ") + self.storename)
+            )
             if original_size > 0:
-                last_t = self.dset_time[original_size-1]
+                last_t = self.dset_time[original_size - 1]
                 date_string = time.strftime(dateformat, time.localtime(last_t))
                 if six.PY2:
-                    date_string = date_string.decode('utf-8')
+                    date_string = date_string.decode("utf-8")
                 print(boldface("Last point recorded:") + " " + date_string)
         except IOError:
-            self.store = h5py.File(self.storename, 'w')
-            self.dset_time = self.store.create_dataset("time", chunks=True, maxshape=(None,), shape=(0,), dtype=float)
+            self.store = h5py.File(self.storename, "w")
+            self.dset_time = self.store.create_dataset(
+                "time", chunks=True, maxshape=(None,), shape=(0,), dtype=float
+            )
             self.grp_variables = self.store.create_group("variables")
             self.parameters = self.store.attrs
             self.parameters_defined = True
-            self.parameters['email_lastSent'] = 0.0
+            self.parameters["email_lastSent"] = 0.0
             new_headers = True
             for var in variable_list:
-                self.grp_variables.create_dataset(var, chunks=True, maxshape=(None,), shape=(0,), dtype=float)
+                self.grp_variables.create_dataset(
+                    var, chunks=True, maxshape=(None,), shape=(0,), dtype=float
+                )
         if new_headers:
-            self.datfile.write('Time')
+            self.datfile.write("Time")
             # attention: ne pas utiliser variable_list ici car
             # dans log_addline on utilise self.grp_variable.keys()
             # et l'ordre n'est pas le même
             for var in self.grp_variables.keys():
-                self.datfile.write(' ' + var)
+                self.datfile.write(" " + var)
             self.datfile.write("\n")
         self.opened = True
         self.email_started = False
@@ -536,11 +609,11 @@ class Session(BaseSession):
     def disp(self, texte):
         print(texte)
         if self.email_started:
-            self.email_body = self.email_body + texte + '<br />\n'
+            self.email_body = self.email_body + texte + "<br />\n"
         if not texte.endswith("\n"):
             texte = texte + "\n"
         if six.PY2:
-            self.logfile.write(texte.encode('utf-8'))
+            self.logfile.write(texte.encode("utf-8"))
         else:
             self.logfile.write(texte)
         self.logfile.flush()
@@ -552,21 +625,21 @@ class Session(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        newsize = self.dset_time.len()+1
-        self.dset_time.resize( (newsize,) )
+        newsize = self.dset_time.len() + 1
+        self.dset_time.resize((newsize,))
         if not timestamp:
             timestamp = time.time()
-        self.dset_time[newsize-1] = timestamp
-        self.datfile.write("%f" % self.dset_time[newsize-1])
+        self.dset_time[newsize - 1] = timestamp
+        self.datfile.write("%f" % self.dset_time[newsize - 1])
         for varname in self.grp_variables.keys():
             d = self.grp_variables[varname]
-            d.resize( (newsize,) )
+            d.resize((newsize,))
             try:
-                d[newsize-1] = dict_caller[varname]
+                d[newsize - 1] = dict_caller[varname]
                 self.datfile.write(" %f" % dict_caller[varname])
-            except:
-                print(colored.red('Variable is not defined: ') + varname)
-                d[newsize-1] = 0.
+            except Exception:
+                print(colored.red("Variable is not defined: ") + varname)
+                d[newsize - 1] = 0.0
                 pass
         self.datfile.write("\n")
         self.datfile.flush()
@@ -577,7 +650,7 @@ class Session(BaseSession):
         Save data from RemoteObserver object as datasets and parameters
         """
         for k, v in data.items():
-            #print(k,type(v),v)
+            # print(k,type(v),v)
             try:
                 v[0]
                 # we are iterable
@@ -586,14 +659,14 @@ class Session(BaseSession):
                 # we are not iterable
                 if isinstance(v, dict):
                     # non reduced data, v is a dictionnary with two keys, 't' and 'value'
-                    self.save_dataset(k, {k: v['value']})
-                    self.save_dataset(k + '_time', {k + '_time': v['t']})
+                    self.save_dataset(k, {k: v["value"]})
+                    self.save_dataset(k + "_time", {k + "_time": v["t"]})
                 else:
                     try:
                         # data must be a scalar
                         float(v)
                     except TypeError:
-                        print('skipping', k, type(v))
+                        print("skipping", k, type(v))
                         continue
                     self.save_parameter(k, data)
 
@@ -609,12 +682,12 @@ class Session(BaseSession):
                 value = dict_caller[parameter_name]
                 self.parameters[parameter_name] = value
             except TypeError:
-                print(f'Failed to save parameter {parameter_name:}')
+                print(f"Failed to save parameter {parameter_name:}")
                 print(type(value))
                 print(value)
                 raise
         elif isinstance(parameter_name, dict):
-            for k,v in parameter_name.items():
+            for k, v in parameter_name.items():
                 self.parameters[k] = v
         else:
             for var in parameter_name:
@@ -629,7 +702,7 @@ class Session(BaseSession):
         """
 
         if isinstance(parameter_list, dict):
-            for k,v in parameter_list.items():
+            for k, v in parameter_list.items():
                 self.parameters[k] = v
         else:
             stack = inspect.stack()
@@ -650,17 +723,21 @@ class Session(BaseSession):
             self.grp_datasets = self.store.create_group("datasets")
             self.grp_datasets_defined = True
         if data_name not in self.grp_datasets.keys():
-            self.grp_datasets.attrs['timestamp'] = time.time()
-            self.grp_datasets.create_dataset(data_name, chunks=True, maxshape=(None,), data=dict_caller[data_name])
+            self.grp_datasets.attrs["timestamp"] = time.time()
+            self.grp_datasets.create_dataset(
+                data_name, chunks=True, maxshape=(None,), data=dict_caller[data_name]
+            )
         elif self.allow_override_datasets:
             new_length = len(dict_caller[data_name])
             if len(self.grp_datasets[data_name]) != new_length:
-                self.grp_datasets[data_name].resize( (new_length,) )
+                self.grp_datasets[data_name].resize((new_length,))
             self.grp_datasets[data_name][:] = dict_caller[data_name]
-            self.grp_datasets.attrs['timestamp'] = time.time()
-            print(colored.red('Warning: overriding existing dataset'))
+            self.grp_datasets.attrs["timestamp"] = time.time()
+            print(colored.red("Warning: overriding existing dataset"))
         else:
-            raise NameError('Dataset is already defined. Use allow_override_datasets to allow override of existing saved datasets.')
+            raise NameError(
+                "Dataset is already defined. Use allow_override_datasets to allow override of existing saved datasets."
+            )
 
     def save_datasets(self, data_list):
         stack = inspect.stack()
@@ -678,12 +755,18 @@ class Session(BaseSession):
         self.email_to_addrs = to_addrs
         date_string = time.strftime(dateformat, time.localtime(time.time()))
         if six.PY2:
-            date_string = date_string.decode('utf-8')
-        if subject != None:
+            date_string = date_string.decode("utf-8")
+        if subject is not None:
             self.email_subject = subject
         else:
             self.email_subject = self.session_name
-        self.email_body = "<html><body>\n<strong>**************************************************</strong><br />\n<strong>" + date_string + "</strong><br />\n" + self.session_name + "<br />\n<strong>**************************************************</strong><br /><br />\n\n"
+        self.email_body = (
+            "<html><body>\n<strong>**************************************************</strong><br />\n<strong>"
+            + date_string
+            + "</strong><br />\n"
+            + self.session_name
+            + "<br />\n<strong>**************************************************</strong><br /><br />\n\n"
+        )
         self.email_figlist = []
         self.email_started = True
 
@@ -699,113 +782,127 @@ class Session(BaseSession):
         if len(self.email_figlist) > 0:
             useMime = True
 
-        mime_boundary = 'pymanip-MIME-delimiter'
+        mime_boundary = "pymanip-MIME-delimiter"
         if useMime:
-            email_header = 'Content-type: multipart/mixed; boundary="' + mime_boundary + '"\n'
-            email_header = email_header + 'MIME-version: 1.0\n'
+            email_header = (
+                'Content-type: multipart/mixed; boundary="' + mime_boundary + '"\n'
+            )
+            email_header = email_header + "MIME-version: 1.0\n"
         else:
-            email_header = 'Content-Type: text/html\n'
-            email_header = email_header + 'Content-Transfer-Encoding: quoted-printable\n'
-        email_header = email_header + 'User-Agent: pymanip\n'
-        email_header = email_header + 'To: '
+            email_header = "Content-Type: text/html\n"
+            email_header = (
+                email_header + "Content-Transfer-Encoding: quoted-printable\n"
+            )
+        email_header = email_header + "User-Agent: pymanip\n"
+        email_header = email_header + "To: "
         if isinstance(self.email_to_addrs, six.string_types):
-            email_header = email_header + self.email_to_addrs + '\n'
+            email_header = email_header + self.email_to_addrs + "\n"
         elif isinstance(self.email_to_addrs, tuple):
             for addr in self.email_to_addrs[:-1]:
-                email_header = email_header + addr + ', '
-            email_header = email_header + self.email_to_addrs[-1] + '\n'
+                email_header = email_header + addr + ", "
+            email_header = email_header + self.email_to_addrs[-1] + "\n"
         else:
-            raise ValueError('Adress list should be a string or a tuple')
-        email_header = email_header + 'Subject: ' + self.email_subject
+            raise ValueError("Adress list should be a string or a tuple")
+        email_header = email_header + "Subject: " + self.email_subject
 
         if useMime:
             body = "This is a multi-part message in MIME format.\n"
             # Add text/html MIME part
-            body = body + '--' + mime_boundary + '\n'
-            body = body + 'Content-Type: text/html; charset=UTF-8\n'
-            body = body + 'Content-Transfer-Encoding: quoted-printable\n\n'
-            body = body + quopri.encodestring(self.email_body.encode('utf-8')).decode('utf-8') + '\n'
+            body = body + "--" + mime_boundary + "\n"
+            body = body + "Content-Type: text/html; charset=UTF-8\n"
+            body = body + "Content-Transfer-Encoding: quoted-printable\n\n"
+            body = (
+                body
+                + quopri.encodestring(self.email_body.encode("utf-8")).decode("utf-8")
+                + "\n"
+            )
 
             # Add figures
             for fig in self.email_figlist:
                 plt.figure(fig)
-                (fd, fname) = tempfile.mkstemp(suffix='.png')
-                f_png = os.fdopen(fd, 'wb')
+                (fd, fname) = tempfile.mkstemp(suffix=".png")
+                f_png = os.fdopen(fd, "wb")
                 plt.savefig(f_png)
                 f_png.close()
-                with open(fname, 'rb') as image_file:
-                    encoded_figure = base64.b64encode(image_file.read()).decode('ascii')
+                with open(fname, "rb") as image_file:
+                    encoded_figure = base64.b64encode(image_file.read()).decode("ascii")
                 os.remove(fname)
                 # Add image/png MIME part
-                body = body + '--' + mime_boundary + '\n'
-                body = body + 'Content-Type: image/png\n'
-                body = body + 'Content-Disposition: inline\n'
-                body = body + 'Content-Transfer-Encoding: base64\n\n'
-                for i in range(0,len(encoded_figure),76):
+                body = body + "--" + mime_boundary + "\n"
+                body = body + "Content-Type: image/png\n"
+                body = body + "Content-Disposition: inline\n"
+                body = body + "Content-Transfer-Encoding: base64\n\n"
+                for i in range(0, len(encoded_figure), 76):
                     debut = i
                     fin = i + 75
                     if fin >= len(encoded_figure):
-                        fin = len(encoded_figure)-1
-                    body = body + encoded_figure[debut:(fin+1)] + '\n'
+                        fin = len(encoded_figure) - 1
+                    body = body + encoded_figure[debut : (fin + 1)] + "\n"
 
             # Send email
             try:
                 error_list = smtp.sendmail(
-                        self.email_from_addr,
-                        self.email_to_addrs,
-                        email_header + '\n' + body + '\n' + '--' + mime_boundary + '--\n')
+                    self.email_from_addr,
+                    self.email_to_addrs,
+                    email_header + "\n" + body + "\n" + "--" + mime_boundary + "--\n",
+                )
                 if len(error_list) == 0:
                     success = True
             except smtplib.SMTPHeloError:
-                print('SMTP Helo Error')
+                print("SMTP Helo Error")
                 pass
             except smtplib.SMTPRecipientsRefused:
-                print('Some recipients have been rejected by SMTP server')
+                print("Some recipients have been rejected by SMTP server")
                 pass
             except smtplib.SMTPSenderRefused:
-                print('SMTP server refused sender ' + self.email_from_addr)
+                print("SMTP server refused sender " + self.email_from_addr)
                 pass
             except smtplib.SMTPDataError:
-                print('SMTP Data Error')
+                print("SMTP Data Error")
                 pass
 
         else:
             try:
-                email_content = email_header.encode('utf-8') + b'\n' + quopri.encodestring(self.email_body.encode('utf-8'))
+                email_content = (
+                    email_header.encode("utf-8")
+                    + b"\n"
+                    + quopri.encodestring(self.email_body.encode("utf-8"))
+                )
                 error_list = smtp.sendmail(
-                        self.email_from_addr,
-                        self.email_to_addrs,
-                        email_content)
+                    self.email_from_addr, self.email_to_addrs, email_content
+                )
                 if len(error_list) == 0:
                     success = True
             except smtplib.SMTPHeloError:
-                print('SMTP Helo Error')
+                print("SMTP Helo Error")
                 pass
             except smtplib.SMTPRecipientsRefused:
-                print('Some recipients have been rejected by SMTP server')
+                print("Some recipients have been rejected by SMTP server")
                 pass
             except smtplib.SMTPSenderRefused:
-                print('SMTP server refused sender ' + self.email_from_addr)
+                print("SMTP server refused sender " + self.email_from_addr)
                 pass
             except smtplib.SMTPDataError:
-                print('SMTP Data Error')
+                print("SMTP Data Error")
                 pass
 
         smtp.quit()
-        self.email_body = ''
+        self.email_body = ""
         self.email_started = False
         self.email_figlist = []
         if success:
-            self.parameters['email_lastSent'] = time.time()
-            date_string = time.strftime(dateformat, time.localtime(self.parameters['email_lastSent']))
+            self.parameters["email_lastSent"] = time.time()
+            date_string = time.strftime(
+                dateformat, time.localtime(self.parameters["email_lastSent"])
+            )
             if six.PY2:
-                date_string = date_string.decode('utf-8')
-            print(date_string + ': Email successfully sent.')
+                date_string = date_string.decode("utf-8")
+            print(date_string + ": Email successfully sent.")
 
     def time_since_last_email(self):
         try:
-            last = self.parameters['email_lastSent']
-        except:
+            last = self.parameters["email_lastSent"]
+        except Exception:
             last = 0.0
             pass
         return time.time() - last
@@ -813,28 +910,28 @@ class Session(BaseSession):
     def Stop(self):
         if self.email_started:
             self.stop_email()
-            print('MI: email stopped.')
+            print("MI: email stopped.")
         if self.opened:
             self.store.close()
             self.datfile.close()
             date_string = time.strftime(dateformat, time.localtime(time.time()))
             if six.PY2:
-                date_string = date_string.decode('utf-8')
-                self.logfile.write( ("Session closed on " + date_string).encode('utf-8') )
+                date_string = date_string.decode("utf-8")
+                self.logfile.write(("Session closed on " + date_string).encode("utf-8"))
             else:
                 self.logfile.write("Session closed on " + date_string)
 
             self.logfile.flush()
             self.logfile.close()
             self.opened = False
-            print('MI: Successfully ended.')
+            print("MI: Successfully ended.")
 
     def __exit__(self, t, v, cb):
         self.Stop()
-        super(Session, self).__exit__(t,v,cb)
+        super(Session, self).__exit__(t, v, cb)
 
     def __del__(self):
-        if hasattr(self, 'exited'):
+        if hasattr(self, "exited"):
             # let __enter__/__exit__ call self.Stop()
             pass
         else:
