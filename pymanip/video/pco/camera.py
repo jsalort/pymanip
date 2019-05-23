@@ -207,6 +207,17 @@ class PCO_Camera(Camera):
             self.handle, int(delay), int(exposuretime), tb_delay, tb_exposure
         )
 
+    def set_roi(self, roiX0=0, roiY0=0, roiX1=0, roiY1=0):
+        """
+        Positions of the upper left corner (X0,Y0) and lower right
+        (X1,Y1) corner of the ROI (region of interest) in pixels.
+        """
+        if roiX0 >= roiX1 or roiY0 >= roiY1:        
+            roiX0, roiY0, roiX1, roiY1 = pf.PCO_GetROI(self.handle)
+        print('Setting the ROI to (X0,Y0,X1,Y1)',
+                int(roiX0), int(roiY0), int(roiX1), int(roiY1))
+        pf.PCO_SetROI(self.handle, int(roiX0), int(roiY0), int(roiX1), int(roiY1))
+        
     # Properties
     @property
     def resolution(self):
