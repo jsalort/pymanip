@@ -806,7 +806,7 @@ class AsyncSession:
                     except TypeError:
                         print("skipping", k, type(v))
                         continue
-                    self.save_parameter(**{k: data})
+                    self.save_parameter(**{k: v})
 
 
 class RemoteObserver:

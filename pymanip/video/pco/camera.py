@@ -342,6 +342,13 @@ class PCO_Camera(Camera):
                 count = 0
                 buffer_ring = itertools.cycle(buffers)
                 while count < num:
+                    if (
+                        count == 0
+                        and initialising_cams is not None
+                        and self in initialising_cams
+                    ):
+                        initialising_cams.remove(self)
+                
                     # waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
                     #                                             0, timeout)
                     waitstat = await loop.run_in_executor(
