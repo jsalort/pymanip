@@ -212,12 +212,17 @@ class PCO_Camera(Camera):
         Positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
-        if roiX0 >= roiX1 or roiY0 >= roiY1:        
+        if roiX0 >= roiX1 or roiY0 >= roiY1:
             roiX0, roiY0, roiX1, roiY1 = pf.PCO_GetROI(self.handle)
-        print('Setting the ROI to (X0,Y0,X1,Y1)',
-                int(roiX0), int(roiY0), int(roiX1), int(roiY1))
+        print(
+            "Setting the ROI to (X0,Y0,X1,Y1)",
+            int(roiX0),
+            int(roiY0),
+            int(roiX1),
+            int(roiY1),
+        )
         pf.PCO_SetROI(self.handle, int(roiX0), int(roiY0), int(roiX1), int(roiY1))
-        
+
     # Properties
     @property
     def resolution(self):
@@ -348,7 +353,7 @@ class PCO_Camera(Camera):
                         and self in initialising_cams
                     ):
                         initialising_cams.remove(self)
-                
+
                     # waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
                     #                                             0, timeout)
                     waitstat = await loop.run_in_executor(

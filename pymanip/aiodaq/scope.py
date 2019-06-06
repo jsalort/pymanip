@@ -158,7 +158,7 @@ class ScopeSystem(AcquisitionCard):
             if len(self.channels) > 1:
                 data = data.T
             else:
-                data = data[:,0]
+                data = data[:, 0]
         self.reading = False
         return data
 
