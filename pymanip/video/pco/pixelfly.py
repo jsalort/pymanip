@@ -915,6 +915,67 @@ def PCO_SetROI(
     PCO_manage_error(ret_code)
 
 
+def PCO_GetFrameRate(handle):
+    """
+    This function returns the current frame rate and exposure
+    time settings of the camera.Returned values are only
+    valid if last timing command was PCO_SetFrameRate.
+    """
+    f = pixelfly_dll.PCO_GetFrameRate
+    f.argtypes = (
+        ctypes.wintypes.HANDLE,
+        ctypes.POINTER(ctypes.wintypes.WORD),
+        ctypes.POINTER(ctypes.wintypes.DWORD),
+        ctypes.POINTER(ctypes.wintypes.DWORD),
+    )
+    f.restype = ctypes.c_int
+    FrameRateStatus = ctypes.wintypes.WORD()
+    FrameRate = ctypes.wintypes.DWORD()
+    FrameRateExposure = ctypes.wintypes.DWORD()
+    ret_code = f(
+        handle,
+        ctypes.byref(FrameRateStatus),
+        ctypes.byref(FrameRate),
+        ctypes.byref(FrameRateExposure),
+    )
+    PCO_manage_error(ret_code)
+    return FrameRateStatus.value, FrameRate.value, FrameRateExposure.value
+
+
+def PCO_SetFrameRate(
+    handle: int,
+    FrameRateMode: ctypes.wintypes.WORD,
+    FrameRate: ctypes.wintypes.DWORD,
+    FrameRateExposure: ctypes.wintypes.DWORD,
+):
+    """
+    Sets Frame rate (mHz) and exposure time (ns)
+    Frame rate status gives the limiting factors
+    if the condition are not met.
+    """
+    f = pixelfly_dll.PCO_SetFrameRate
+    f.argtypes = (
+        ctypes.wintypes.HANDLE,
+        ctypes.POINTER(ctypes.wintypes.WORD),
+        ctypes.wintypes.WORD,
+        ctypes.POINTER(ctypes.wintypes.DWORD),
+        ctypes.POINTER(ctypes.wintypes.DWORD),
+    )
+    f.restype = ctypes.c_int
+    FrameRateStatus = ctypes.wintypes.WORD()
+    dwFrameRate = ctypes.wintypes.DWORD(FrameRate)
+    dwFrameRateExposure = ctypes.wintypes.DWORD(FrameRateExposure)
+    ret_code = f(
+        handle,
+        ctypes.byref(FrameRateStatus),
+        FrameRateMode,
+        ctypes.byref(dwFrameRate),
+        ctypes.byref(dwFrameRateExposure),
+    )
+    PCO_manage_error(ret_code)
+    return FrameRateStatus.value, FrameRate.value, FrameRateExposure.value
+
+
 def PCO_GetCameraName(handle):
     """
     This function retrieves the name of the camera.
