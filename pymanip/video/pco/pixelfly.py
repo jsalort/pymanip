@@ -859,47 +859,61 @@ def PCO_GetInfoString(handle):
     PCO_manage_error(ret_code)
     return p.raw.decode("ascii")
 
+
 def PCO_GetROI(handle: int) -> Tuple[int, int, int, int]:
     """
     This function returns the current ROI
     (region of interest) setting in pixels.
-    (X0,Y0) is the upper left corner and 
+    (X0,Y0) is the upper left corner and
     (X1,Y1) the lower right one.
     """
     f = pixelfly_dll.PCO_GetROI
-    f.argtypes = (ctypes.wintypes.HANDLE,
-                ctypes.POINTER(ctypes.wintypes.WORD),
-                ctypes.POINTER(ctypes.wintypes.WORD),
-                ctypes.POINTER(ctypes.wintypes.WORD),
-                ctypes.POINTER(ctypes.wintypes.WORD))
+    f.argtypes = (
+        ctypes.wintypes.HANDLE,
+        ctypes.POINTER(ctypes.wintypes.WORD),
+        ctypes.POINTER(ctypes.wintypes.WORD),
+        ctypes.POINTER(ctypes.wintypes.WORD),
+        ctypes.POINTER(ctypes.wintypes.WORD),
+    )
     f.restype = ctypes.c_int
     RoiX0 = ctypes.wintypes.WORD()
     RoiY0 = ctypes.wintypes.WORD()
     RoiX1 = ctypes.wintypes.WORD()
     RoiY1 = ctypes.wintypes.WORD()
-    ret_code = f(handle, ctypes.byref(RoiX0), ctypes.byref(RoiY0),
-                         ctypes.byref(RoiX1), ctypes.byref(RoiY1))
+    ret_code = f(
+        handle,
+        ctypes.byref(RoiX0),
+        ctypes.byref(RoiY0),
+        ctypes.byref(RoiX1),
+        ctypes.byref(RoiY1),
+    )
     PCO_manage_error(ret_code)
-    return RoiX0.value, RoiY0.value, RoiX1.value, RoiY1.value               
+    return RoiX0.value, RoiY0.value, RoiX1.value, RoiY1.value
 
-def PCO_SetROI(handle: int, 
-                RoiX0: ctypes.wintypes.WORD,
-                RoiY0: ctypes.wintypes.WORD,
-                RoiX1: ctypes.wintypes.WORD,
-                RoiY1: ctypes.wintypes.WORD):
+
+def PCO_SetROI(
+    handle: int,
+    RoiX0: ctypes.wintypes.WORD,
+    RoiY0: ctypes.wintypes.WORD,
+    RoiX1: ctypes.wintypes.WORD,
+    RoiY1: ctypes.wintypes.WORD,
+):
     """
     This function does set a ROI
     (region of interest) area on the sensor of the camera.
     """
     f = pixelfly_dll.PCO_SetROI
-    f.argtypes = (ctypes.wintypes.HANDLE,
-                    ctypes.wintypes.WORD,
-                    ctypes.wintypes.WORD,
-                    ctypes.wintypes.WORD,
-                    ctypes.wintypes.WORD)
+    f.argtypes = (
+        ctypes.wintypes.HANDLE,
+        ctypes.wintypes.WORD,
+        ctypes.wintypes.WORD,
+        ctypes.wintypes.WORD,
+        ctypes.wintypes.WORD,
+    )
     f.restype = ctypes.c_int
     ret_code = f(handle, RoiX0, RoiY0, RoiX1, RoiY1)
     PCO_manage_error(ret_code)
+
 
 def PCO_GetCameraName(handle):
     """

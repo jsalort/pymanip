@@ -157,6 +157,8 @@ class ScopeSystem(AcquisitionCard):
             self.last_read = time.monotonic()
             if len(self.channels) > 1:
                 data = data.T
+            else:
+                data = data[:, 0]
         self.reading = False
         return data
 
