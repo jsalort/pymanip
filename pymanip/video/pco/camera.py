@@ -223,6 +223,35 @@ class PCO_Camera(Camera):
         )
         pf.PCO_SetROI(self.handle, int(roiX0), int(roiY0), int(roiX1), int(roiY1))
 
+    def set_frame_rate(self, Frameratemode, Framerate, Framerateexposure):
+        """
+        Sets Frame rate (mHz) and exposure time (ns)
+        Frame rate status gives the limiting factors
+        if the condition are not met.
+        Frame rate mode variable to set the frame rate mode:
+        • 0x0000= Auto mode (camera decides which parameter will be trimmed)
+        • 0x0001= Frame rate has priority, (exposure time will be trimmed)
+        • 0x0002= Exposure time has priority, (frame rate will be trimmed)
+        • 0x0003= Strict, function shall return with error if values are not possible.
+        Message returns:
+          0x0000= Settings consistent, all conditions met
+        • 0x0001= Frame rate trimmed, frame rate was limited by readout time
+        • 0x0002= Frame rate trimmed, frame rate was limited by exposure time
+        • 0x0004= Exposure time trimmed, exposure time cut to frame time
+        • 0x8000= Return values dwFrameRate and dwFrameRateExposure are not
+        yet validated. In that case, the values returned are the values passed
+        to the function
+        """
+        print(
+            "Setting the frame rate and the exposure time to",
+            Framerate,
+            Framerateexposure,
+        )
+        message, f, te = pf.PCO_SetFrameRate(
+            self.handle, Frameratemode, Framerate, Framerateexposure
+        )
+        return message, f, te
+
     # Properties
     @property
     def resolution(self):
@@ -262,6 +291,9 @@ class PCO_Camera(Camera):
 
     def current_pixel_rate(self):
         return pf.PCO_GetPixelRate(self.handle)
+
+    def current_frame_rate(self):
+        return pf.PCO_GetFrameRate(self.handle)
 
     # Image acquisition
     def acquisition_oneshot(self):
