@@ -275,6 +275,15 @@ class AsyncSession:
     def datasets(self, name):
         with self.conn as conn:
             c = conn.cursor()
+            try:
+                c.execute("SELECT name from dataset_names;")
+                data = c.fetchall()
+            except sqlite3.OperationalError:
+                data = set()
+            names = set([d[0] for d in data])
+            if name not in names:
+                print("Possible dataset names are", names)
+                raise ValueError(f'Bad dataset name "{name:}"')
             it = c.execute(
                 """SELECT timestamp, data FROM dataset
                               WHERE name='{:}'
@@ -500,7 +509,7 @@ class AsyncSession:
         x=None,
         y=None,
         fixed_ylim=None,
-        fixed_xlim=None
+        fixed_xlim=None,
     ):
         """
         if x, y is specified instead of varnames, plot var y against var x
@@ -791,9 +800,13 @@ class AsyncSession:
             # print(k,type(v),v)
             try:
                 v[0]
+                iterable = True
+            except (TypeError, KeyError):
+                iterable = False
+            if iterable:
                 # we are iterable
                 self.add_dataset(**{k: v})
-            except (TypeError, KeyError):
+            else:
                 # we are not iterable
                 if isinstance(v, dict):
                     # non reduced data, v is a dictionnary with two keys, 't' and 'value'

@@ -340,6 +340,8 @@ class PCO_Camera(Camera):
         Multiple image acquisition
         yields a shared memory numpy array valid only
         before generator object cleanup.
+
+        timeout in milliseconds
         """
 
         loop = asyncio.get_event_loop()
@@ -386,8 +388,6 @@ class PCO_Camera(Camera):
                     ):
                         initialising_cams.remove(self)
 
-                    # waitstat = win32event.WaitForMultipleObjects([buffer.event_handle for buffer in buffers],
-                    #                                             0, timeout)
                     waitstat = await loop.run_in_executor(
                         None,
                         win32event.WaitForMultipleObjects,
