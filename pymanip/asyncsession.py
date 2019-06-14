@@ -43,16 +43,32 @@ __all__ = ["AsyncSession"]
 class AsyncSession:
     database_version = 3
 
-    def __init__(self, session_name=None, verbose=True):
+    def __init__(self, session_name=None, verbose=True, delay_save=False):
         self.session_name = session_name
         self.custom_figures = None
-        if session_name is None:
-            self.conn = sqlite3.connect(":memory:")
-        else:
+        self.delay_save = delay_save
+        if session_name is not None:
             session_name = str(session_name)  # in case it is a Path object
             if session_name.endswith(".db"):
                 session_name = session_name[:-3]
+        elif delay_save:
+            raise ValueError("Cannot delay_save if session_name is not specified")
+        if session_name is None or delay_save:
+            # For no name session, or in case of delay_save=True, then
+            # the connection is in-memory
+            self.conn = sqlite3.connect(":memory:")
+        else:
+            # Otherwise, the connection is on the disk for immediate writing
             self.conn = sqlite3.connect(session_name + ".db")
+        if delay_save and os.path.exists(session_name + ".db"):
+            # Load existing database into in-memory database
+            disk_db = sqlite3.connect(session_name + ".db")
+            try:
+                with self.conn as c:
+                    for line in disk_db.iterdump():
+                        c.execute(line)
+            finally:
+                disk_db.close()
         with self.conn as c:
             tables = list(c.execute("SELECT name FROM sqlite_master;"))
             if not tables:
@@ -114,10 +130,31 @@ class AsyncSession:
         self.static_dir = os.path.join(os.path.dirname(__file__), "web_static")
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
 
+    def save_database(self):
+        """
+        If delay_save = True, the database is kept in-memory, and later
+        saved to disk when this function is called.
+        A new database file will be created with the content of the current
+        in-memory database
+        """
+        if self.delay_save:
+            try:
+                os.remove(self.session_name + ".db")
+            except FileNotFoundError:
+                pass
+            disk_db = sqlite3.connect(self.session_name + ".db")
+            try:
+                with disk_db as c:
+                    for line in self.conn.iterdump():
+                        c.execute(line)
+            finally:
+                disk_db.close()
+
     def __enter__(self):
         return self
 
     def __exit__(self, type_, value, cb):
+        self.save_database()
         self.conn.close()
 
     def get_version(self):
