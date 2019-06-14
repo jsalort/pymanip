@@ -212,8 +212,16 @@ class PCO_Camera(Camera):
         Positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
+        if (roiX0 - 1) % 32 != 0 or roiX1 % 32 != 0:
+            raise ValueError("X0 must be 1+32n, X1 must be 32m, n, m entiers")
+        if (roiY0 - 1) % 8 != 0 or roiY1 % 8 != 0:
+            raise ValueError("Y0 must be 1+8n, Y1 must be 8m, n, m entiers")
+        if roiX1 - roiX0 + 1 < 64 or roiY1 - roiY0 + 1 < 16:
+            raise ValueError("Minimum ROI is 64 x 16 pixels")
         if roiX0 >= roiX1 or roiY0 >= roiY1:
-            roiX0, roiY0, roiX1, roiY1 = pf.PCO_GetROI(self.handle)
+            raise ValueError(
+                "ROI expected xmin, ymin, xmax, ymax with xmax > xmin and ymax > ymin"
+            )
         print(
             "Setting the ROI to (X0,Y0,X1,Y1)",
             int(roiX0),

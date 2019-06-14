@@ -35,6 +35,7 @@ def preview_pco(
     TriggerMode=None,
     exposure_ms=20,
     rotate=0,
+    roi=None,
 ):
     if not has_pco:
         print("PCO bindings are not available.")
@@ -45,6 +46,10 @@ def preview_pco(
             else:
                 cam.set_trigger_mode("auto sequence")
             cam.set_delay_exposuretime(exposuretime=exposure_ms / 1000)
+            if roi is None:
+                res = cam.resolution
+                roi = (1, 1, res[0], res[1])
+            cam.set_roi(*roi)
             cam.preview(backend, slice, zoom, rotate)
 
 

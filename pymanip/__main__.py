@@ -221,6 +221,16 @@ parser_video.add_argument(
     nargs=1,
 )
 
+parser_video.add_argument(
+    "-R",
+    "--ROI",
+    help="Set Region of Interest xmin, ymin, xmax, ymax",
+    metavar="roi",
+    default=None,
+    type=int,
+    nargs=4,
+)
+
 # Parse arguments
 args = parser.parse_args()
 
@@ -307,6 +317,8 @@ elif args.command == "video":
         rotate = float(args.rotate[0])
     else:
         rotate = float(args.rotate)
+    if args.ROI is not None and len(args.ROI) != 4:
+        raise ValueError("ROI must be 4 integers xmin, ymin, xmax, ymax")
     if args.camera_type.upper() == "PCO":
         if args.list:
             from pymanip.video.pco import print_available_pco_cameras
@@ -317,7 +329,15 @@ elif args.command == "video":
             if not interface:
                 interface = "all"
             preview_pco(
-                interface, board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate
+                interface,
+                board,
+                tk,
+                slice,
+                zoom,
+                Trigger,
+                exposure_ms,
+                rotate=rotate,
+                roi=args.ROI,
             )
     elif args.camera_type.upper() == "AVT":
         if args.list:
