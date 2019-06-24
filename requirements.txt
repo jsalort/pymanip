@@ -1,1 +1,7 @@
+numpy
+h5py
+matplotlib
 pre-commit
+pytest
+pytest-cov
+coveralls
