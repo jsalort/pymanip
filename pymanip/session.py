@@ -18,6 +18,7 @@ import warnings
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning)
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
     import h5py
 import smtplib
 import base64
@@ -168,7 +169,9 @@ class BaseSession(object):
             return self.grp_datasets[name].value
 
     def dataset_names(self):
-        return self.grp_datasets.keys()
+        if hasattr(self, "grp_datasets"):
+            return self.grp_datasets.keys()
+        return []
 
     def has_parameter(self, name):
         if self.parameters_defined:
@@ -433,9 +436,9 @@ class SavedSession(BaseSession):
                         i = i + 1
                     except KeyError:
                         break
-                return result
+                return np.array(result)
         else:
-            return None
+            raise KeyError
 
     def cache(self, name, dict_caller=None):
         if dict_caller is None:
