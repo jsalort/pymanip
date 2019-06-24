@@ -1,6 +1,10 @@
 numpy
 h5py
 matplotlib
+aiohttp
+pyvisa
+pyvisa-py
+pydaqmx
 pre-commit
 pytest
 pytest-cov
