@@ -1,7 +1,8 @@
 import ctypes
 from ctypes.util import find_library
 
-cdll = ctypes.cdll.LoadLibrary(find_library('nidaqmx'))
+cdll = ctypes.cdll.LoadLibrary(find_library("nidaqmx"))
+
 
 def DAQmxGetSysDevNames():
     f = cdll.DAQmxGetSysDevNames
@@ -10,7 +11,8 @@ def DAQmxGetSysDevNames():
     bufsize = 1024
     buf = ctypes.create_string_buffer(bufsize)
     status = f(buf, bufsize)
-    return status, buf.value.decode('ascii')
+    return status, buf.value.decode("ascii")
+
 
 def DAQmxGetSysGlobalChans():
     f = cdll.DAQmxGetSysGlobalChans
@@ -19,8 +21,8 @@ def DAQmxGetSysGlobalChans():
     bufsize = 1024
     buf = ctypes.create_string_buffer(bufsize)
     status = f(buf, bufsize)
-    return status, buf.value.decode('ascii')
-    
+    return status, buf.value.decode("ascii")
+
 
 status, devnames = DAQmxGetSysDevNames()
 print(status)

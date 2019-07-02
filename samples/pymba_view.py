@@ -21,7 +21,7 @@ class CameraPlot:
         self.cameraIds = self.vimba.getCameraIds()
         self.init_win()
         self.init_camera()
-    
+
     def init_win(self):
         self.win = QtGui.QMainWindow()
         self.win.show()
@@ -36,45 +36,46 @@ class CameraPlot:
         self.cam = self.vimba.getCamera(self.cameraIds[0])
         self.cam.openCamera()
         info = self.cam.getInfo()
-        print('cameraName:', info.cameraName.decode('ascii'))
-        print('interfaceIdString:', info.interfaceIdString.decode('ascii'))
-        print('modelName:', info.modelName.decode('ascii'))
-       
+        print("cameraName:", info.cameraName.decode("ascii"))
+        print("interfaceIdString:", info.interfaceIdString.decode("ascii"))
+        print("modelName:", info.modelName.decode("ascii"))
+
     def start_camera(self):
-        self.cam.AcquisitionMode = 'Continuous'
-        self.cam.IIDCPhyspeed = 'S800'
-        self.cam.PixelFormat = 'Mono16'
-        self.cam.TriggerMode = 'Off'
+        self.cam.AcquisitionMode = "Continuous"
+        self.cam.IIDCPhyspeed = "S800"
+        self.cam.PixelFormat = "Mono16"
+        self.cam.TriggerMode = "Off"
         self.cam.AcquisitionFrameRate = 20.0
-        
+
         self.frame = self.cam.getFrame()
         self.frame.announceFrame()
         self.cam.startCapture()
-        self.cam.runFeatureCommand('AcquisitionStart')
+        self.cam.runFeatureCommand("AcquisitionStart")
 
     def process_images(self):
         QtCore.QTimer.singleShot(50, self.process_images)
         self.frame.queueFrameCapture()
         self.frame.waitFrameCapture()
         im = self.frame.getImage().T
-        self.img.setImage(im, autoRange=False, autoLevels=False,
-            autoHistogramRange=False)
+        self.img.setImage(
+            im, autoRange=False, autoLevels=False, autoHistogramRange=False
+        )
 
     def stop_camera(self):
-        self.cam.runFeatureCommand('AcquisitionStop')
+        self.cam.runFeatureCommand("AcquisitionStop")
         self.cam.endCapture()
         self.cam.revokeAllFrames()
-        
+
     def deinit_camera(self):
         self.vimba.shutdown()
 
-    
+
 if __name__ == "__main__":
     app = QtGui.QApplication([])
     cam = CameraPlot()
     try:
         cam.start_camera()
-        time.sleep(.5)
+        time.sleep(0.5)
         cam.process_images()
         cam.img.autoRange()
         cam.img.autoLevels()

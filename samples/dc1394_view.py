@@ -12,12 +12,13 @@ from pyqtgraph.Qt import QtCore, QtGui
 
 from pydc1394 import Camera
 
+
 class CameraPlot:
     def __init__(self, camera):
         self.camera = camera
         self.init_win()
         self.init_camera()
-    
+
     def init_win(self):
         self.win = QtGui.QMainWindow()
         self.win.show()
@@ -27,24 +28,28 @@ class CameraPlot:
         self.win.setCentralWidget(self.img)
 
     def init_camera(self):
-        print("Vendor:", self.camera.vendor.decode('ascii'))
-        print("Model:", self.camera.model.decode('ascii'))
+        print("Vendor:", self.camera.vendor.decode("ascii"))
+        print("Model:", self.camera.model.decode("ascii"))
         print("GUID:", self.camera.guid)
         print("Mode:", self.camera.mode)
         print("Framerate: ", self.camera.rate)
-        print("""\
+        print(
+            """\
         Available modes
-        ===============""")
+        ==============="""
+        )
         for mode in self.camera.modes:
             print(mode.name)
-        print("""\
+        print(
+            """\
         Available features
-        ==================""")
+        =================="""
+        )
         for key, val in self.camera.features.items():
-            print(key, ':', val)
-        #modes = self.camera.modes
-        #self.camera.mode = modes[0]
-       
+            print(key, ":", val)
+        # modes = self.camera.modes
+        # self.camera.mode = modes[0]
+
     def start_camera(self):
         self.camera.start_capture()
         self.camera.start_video()
@@ -64,23 +69,24 @@ class CameraPlot:
             return
         im = frame.copy().T
         frame.enqueue()
-        self.img.setImage(im, autoRange=False, autoLevels=False,
-            autoHistogramRange=False)
+        self.img.setImage(
+            im, autoRange=False, autoLevels=False, autoHistogramRange=False
+        )
 
     def stop_camera(self):
         self.camera.stop_video()
         self.camera.stop_capture()
-        
+
     def deinit_camera(self):
         pass
 
-    
+
 if __name__ == "__main__":
     app = QtGui.QApplication([])
     cam = CameraPlot(Camera())
     try:
         cam.start_camera()
-        time.sleep(.5)
+        time.sleep(0.5)
         cam.process_images()
         cam.img.autoRange()
         cam.img.autoLevels()
