@@ -27,6 +27,9 @@ def test_octmi_session():
     """
 
     Test reading from OctMI binary session file
+    We need to use isclose() for the cosine test, because the exact
+    result apparently depends on the platform (it would fail
+    on travis, but pass on the Mac).
 
     """
 
@@ -40,7 +43,7 @@ def test_octmi_session():
     assert "t" in data
     assert data["startTime"] == 1562334542.728428
     assert (data["A"] == np.arange(0.0, 5.1, 0.1)).all()
-    assert (data["B"] == np.cos(data["A"])).all()
+    assert np.isclose(data["B"], np.cos(data["A"])).all()
     assert data["t"].size == data["A"].size
     assert data["t"][0] > data["startTime"]
 
