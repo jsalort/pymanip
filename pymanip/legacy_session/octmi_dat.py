@@ -7,7 +7,7 @@ import numpy as np
 
 def load_octmi_dat(acquisitionName, basePath="."):
     # Vérification de l'existence du fichier
-    datFilePath = os.path.normpath(basePath) + "/" + acquisitionName + "_MI.dat"
+    datFilePath = os.path.join(os.path.normpath(basePath), acquisitionName + "_MI.dat")
     if not os.path.exists(datFilePath):
         print("Could not stat file", datFilePath)
         raise NameError("File does not exist")
