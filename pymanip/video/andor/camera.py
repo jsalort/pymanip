@@ -7,7 +7,6 @@ Implements the pymanip.video.Camera object using pyAndorNeo module
 import time
 import asyncio
 import ctypes
-import struct
 
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
@@ -19,17 +18,17 @@ import AndorNeo.SDK3 as SDK3
 MODE_CONTINUOUS = 1
 MODE_SINGLE_SHOT = 0
 
-validROIS = [
-    (2592, 2160, 1, 1),
-    (2544, 2160, 1, 25),
-    (2064, 2048, 57, 265),
-    (1776, 1760, 201, 409),
-    (1920, 1080, 537, 337),
-    (1392, 1040, 561, 601),
-    (528, 512, 825, 1033),
-    (240, 256, 953, 1177),
-    (144, 128, 1017, 1225),
-]
+import struct
+
+validROIS = [(2592, 2160, 1, 1),
+             (2544, 2160, 1, 25),
+             (2064, 2048, 57, 265),
+             (1776, 1760, 201, 409),
+             (1920, 1080, 537, 337),
+             (1392, 1040, 561, 601),
+             (528, 512, 825, 1033),
+             (240, 256, 953, 1177),
+             (144, 128, 1017, 1225)]
 
 
 def parse_metadata(buf, verbose=False):
@@ -42,33 +41,34 @@ def parse_metadata(buf, verbose=False):
     """
     LENGTH_FIELD_SIZE = 4
     CID_FIELD_SIZE = 4
-    # TIMESTAMP_FIELD_SIZE = 8
+    #TIMESTAMP_FIELD_SIZE = 8
 
     n = buf.size
     for ind in range(3):
-        length = buf[n - LENGTH_FIELD_SIZE : n]
-        cid = buf[n - (CID_FIELD_SIZE + LENGTH_FIELD_SIZE) : n - LENGTH_FIELD_SIZE]
-        # if verbose:
+        length = buf[n-LENGTH_FIELD_SIZE:n]
+        cid = buf[n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE):n-LENGTH_FIELD_SIZE]
+        #if verbose:
         #    print('length =', length)
         #    print('cid =', cid)
-        length = struct.unpack("<L", length)[0] - CID_FIELD_SIZE
-        cid = struct.unpack("<L", cid)[0]
-        data = buf[
-            n
-            - (CID_FIELD_SIZE + LENGTH_FIELD_SIZE + length) : n
-            - (CID_FIELD_SIZE + LENGTH_FIELD_SIZE)
-        ]
+        #length = length[0]+(2**8)*length[1]+(2**16)*length[2]+\
+                 #(2**32)*length[3]-CID_FIELD_SIZE
+        #cid = cid[0]+(2**8)*cid[1]+(2**16)*cid[2]+(2**32)*cid[3]
+        length=struct.unpack('<L',length)[0]-CID_FIELD_SIZE
+        cid=struct.unpack('<L',cid)[0]
+        data = buf[n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE+length):n-(CID_FIELD_SIZE+LENGTH_FIELD_SIZE)]
         if verbose:
-            print("length =", length)
-            print("cid =", cid)
-            print("data =", data)
+            print('length =', length)
+            print('cid =', cid)
+            print('data =', data)
         if cid == 1:
-            return struct.unpack("<Q", data)[0]
+            return struct.unpack('<Q',data)[0]
+            #return sum([(256**i)*b for i, b in enumerate(data)])
 
-        n -= CID_FIELD_SIZE + LENGTH_FIELD_SIZE + length
+        n -= CID_FIELD_SIZE+LENGTH_FIELD_SIZE+length
 
 
 class Andor_Camera(Camera):
+
     def __init__(self, camNum=0):
         self.camNum = camNum
 
@@ -140,17 +140,15 @@ class Andor_Camera(Camera):
             if isinstance(var, SDK3Cam.ATProperty):
                 var.connect(self.handle, name)
 
-        # set some initial parameters
-        # self.FrameCount.setValue(1) #only for fixed mode?
-        self.CycleMode.setString("Continuous")
-        self.SimplePreAmpGainControl.setString("11-bit (low noise)")
-        self.PixelEncoding.setString("Mono12Packed")  # Mono12Packed Mono16
+        #set some initial parameters
+        #self.FrameCount.setValue(1) #only for fixed mode?
+        self.CycleMode.setString('Continuous')
+        self.SimplePreAmpGainControl.setString('11-bit (low noise)')
+        self.PixelEncoding.setString('Mono12Packed')  # Mono12Packed Mono16
 
         # Camera object properties
         self.FrameRate.setValue(self.FrameRate.max())
-        self.name = (
-            "Andor " + self.CameraModel.getValue() + " " + self.SerialNumber.getValue()
-        )
+        self.name = 'Andor ' + self.CameraModel.getValue() + ' ' + self.SerialNumber.getValue()
         print(self.name)
 
     def close(self):
@@ -184,21 +182,21 @@ class Andor_Camera(Camera):
 
         # Init buffer & queue
         bufSize = self.ImageSizeBytes.getValue()
-        buf = np.empty(bufSize, "uint8")
-        SDK3.QueueBuffer(
-            self.handle, buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)), buf.nbytes
-        )
+        buf = np.empty(bufSize, 'uint8')
+        SDK3.QueueBuffer(self.handle,
+                         buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
+                         buf.nbytes)
 
         # Start acquisition
         self.AcquisitionStart()
-        print("Start acquisition at framerate:", self.FrameRate.getValue())
+        print('Start acquisition at framerate:', self.FrameRate.getValue())
 
         try:
             # Wait for buffer
-            exposure_ms = self.ExposureTime.getValue() * 1000
-            framerate_ms = 1000 / self.FrameRate.getValue()
-            timeout_ms = int(max((2 * exposure_ms, 2 * framerate_ms, 1000)))
-
+            exposure_ms = self.ExposureTime.getValue()*1000
+            framerate_ms = 1000/self.FrameRate.getValue()
+            timeout_ms = int(max((2*exposure_ms, 2*framerate_ms, 1000)))
+            
             pData, lData = SDK3.WaitBuffer(self.handle, timeout_ms)
 
             # Convert buffer into numpy image
@@ -208,31 +206,18 @@ class Andor_Camera(Camera):
             a_s = self.AOIStride.getValue()
             dt = self.PixelEncoding.getString()
             ticks = parse_metadata(buf)
-            ts = (ticks - timestamp_clock) / timestamp_frequency + pc_clock
-            SDK3.ConvertBuffer(
-                buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-                img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-                xs,
-                ys,
-                a_s,
-                dt,
-                "Mono16",
-            )
+            ts = (ticks-timestamp_clock)/timestamp_frequency+pc_clock
+            SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+                               img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+                               xs, ys, a_s, dt, 'Mono16')
         finally:
             self.AcquisitionStop()
 
-        return MetadataArray(
-            img.reshape((cbuf, rbuf), order="C"), metadata={"timestamp": ts}
-        )
+        return MetadataArray(img.reshape((cbuf, rbuf), order='C'),
+                             metadata={'timestamp': ts})
 
-    async def acquisition_async(
-        self,
-        num=np.inf,
-        timeout=None,
-        raw=False,
-        initialising_cams=None,
-        raise_on_timeout=True,
-    ):
+    async def acquisition_async(self, num=np.inf, timeout=None, raw=False,
+                                initialising_cams=None, raise_on_timeout=True):
         """
         Multiple image acquisition
         yields a shared memory numpy array
@@ -247,49 +232,47 @@ class Andor_Camera(Camera):
         self.buffer_queued = False
 
         # Set acquisition mode
-        self.CycleMode.setString("Continuous")
-        # self.FrameRate.setValue(float(framerate))
+        self.CycleMode.setString('Continuous')
+        #self.FrameRate.setValue(float(framerate))
         self.MetadataEnable.setValue(True)
         pc_clock = time.time()
         timestamp_clock = self.TimestampClock.getValue()
         timestamp_frequency = self.TimestampClockFrequency.getValue()
-        print("ts clock =", timestamp_clock)
-        print("ts freq =", timestamp_frequency)
+        print('ts clock =', timestamp_clock)
+        print('ts freq =', timestamp_frequency)
 
         # Init buffers
         bufSize = self.ImageSizeBytes.getValue()
-        buf = np.empty(bufSize, "uint8")
+        buf = np.empty(bufSize, 'uint8')
         rbuf, cbuf = self.AOIWidth.getValue(), self.AOIHeight.getValue()
         img = np.empty((rbuf, cbuf), np.uint16)
         xs, ys = img.shape[:2]
         a_s = self.AOIStride.getValue()
         dt = self.PixelEncoding.getString()
-        print("Original pixel encoding:", dt)
+        print('Original pixel encoding:', dt)
 
         # Start acquisition
         self.AcquisitionStart()
-        print("Started acquisition at framerate:", self.FrameRate.getValue())
-        print("Exposure time is {:.1f} ms".format(self.ExposureTime.getValue() * 1000))
+        print('Started acquisition at framerate:', self.FrameRate.getValue())
+        print('Exposure time is {:.1f} ms'.format(self.ExposureTime.getValue()*1000))
         if timeout is None:
-            exposure_ms = self.ExposureTime.getValue() * 1000
-            framerate_ms = 1000 / self.FrameRate.getValue()
-            timeout_ms = int(max((2 * exposure_ms, 2 * framerate_ms, 1000)))
+            exposure_ms = self.ExposureTime.getValue()*1000
+            framerate_ms = 1000/self.FrameRate.getValue()
+            timeout_ms = int(max((2*exposure_ms, 2*framerate_ms, 1000)))
             timeout = timeout_ms
-
+            
         try:
             count = 0
             while count < num:
                 if not self.buffer_queued:
-                    SDK3.QueueBuffer(
-                        self.handle,
-                        buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
-                        buf.nbytes,
-                    )
+                    SDK3.QueueBuffer(self.handle,
+                                     buf.ctypes.data_as(SDK3.POINTER(SDK3.AT_U8)),
+                                     buf.nbytes)
                     self.buffer_queued = True
                 try:
-                    pData, lData = await loop.run_in_executor(
-                        None, SDK3.WaitBuffer, self.handle, timeout
-                    )
+                    pData, lData = await loop.run_in_executor(None,
+                                                              SDK3.WaitBuffer,
+                                                              self.handle, timeout)
                 except Exception:
                     if raise_on_timeout:
                         raise CameraTimeout()
@@ -300,27 +283,20 @@ class Andor_Camera(Camera):
                         else:
                             continue
                 # Convert buffer and yield image
-                SDK3.ConvertBuffer(
-                    buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-                    img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-                    xs,
-                    ys,
-                    a_s,
-                    dt,
-                    "Mono16",
-                )
+                SDK3.ConvertBuffer(buf.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+                                   img.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+                                   xs, ys, a_s, dt, 'Mono16')
                 ticks = parse_metadata(buf)
-                ts = (ticks - timestamp_clock) / timestamp_frequency + pc_clock
-                # if count == 5:
+                ts = (ticks-timestamp_clock)/timestamp_frequency+pc_clock
+                #if count == 5:
                 #    print('image min max:', np.min(img), np.max(img))
-                # if count < 10:
+                #if count < 10:
                 #    print('FPGA ticks =', ticks)
                 #    print('Timestamp =', ts)
                 self.buffer_queued = False
-                stop_signal = yield MetadataArray(
-                    img.reshape((cbuf, rbuf), order="C"),
-                    metadata={"counter": count, "timestamp": ts},
-                )
+                stop_signal = yield MetadataArray(img.reshape((cbuf, rbuf), order='C'),
+                                                  metadata={'counter': count,
+                                                            'timestamp': ts})
                 count = count + 1
                 if stop_signal:
                     break
@@ -331,17 +307,15 @@ class Andor_Camera(Camera):
             yield True
 
     def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
-        yield from synchronize_generator(
-            self.acquisition_async, num, timeout, raw, None, raise_on_timeout
-        )
+        yield from synchronize_generator(self.acquisition_async,
+                                         num, timeout, raw, None, raise_on_timeout)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import matplotlib.pyplot as plt
-
     with Andor_Camera() as ac:
         ac.set_exposure_time(1e-3)
         img = ac.acquisition_oneshot()
     plt.figure()
-    plt.imshow(img, cmap="gray")
+    plt.imshow(img, cmap='gray')
     plt.show()
