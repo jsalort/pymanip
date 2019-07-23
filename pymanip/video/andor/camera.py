@@ -7,6 +7,7 @@ Implements the pymanip.video.Camera object using pyAndorNeo module
 import time
 import asyncio
 import ctypes
+import struct
 
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
@@ -17,8 +18,6 @@ import AndorNeo.SDK3 as SDK3
 
 MODE_CONTINUOUS = 1
 MODE_SINGLE_SHOT = 0
-
-import struct
 
 validROIS = [
     (2592, 2160, 1, 1),
@@ -52,9 +51,6 @@ def parse_metadata(buf, verbose=False):
         # if verbose:
         #    print('length =', length)
         #    print('cid =', cid)
-        # length = length[0]+(2**8)*length[1]+(2**16)*length[2]+\
-        # (2**32)*length[3]-CID_FIELD_SIZE
-        # cid = cid[0]+(2**8)*cid[1]+(2**16)*cid[2]+(2**32)*cid[3]
         length = struct.unpack("<L", length)[0] - CID_FIELD_SIZE
         cid = struct.unpack("<L", cid)[0]
         data = buf[
@@ -68,7 +64,6 @@ def parse_metadata(buf, verbose=False):
             print("data =", data)
         if cid == 1:
             return struct.unpack("<Q", data)[0]
-            # return sum([(256**i)*b for i, b in enumerate(data)])
 
         n -= CID_FIELD_SIZE + LENGTH_FIELD_SIZE + length
 
