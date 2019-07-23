@@ -7,6 +7,7 @@ Implements the pymanip.video.Camera object using pyAndorNeo module
 import time
 import asyncio
 import ctypes
+import struct
 
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
@@ -17,8 +18,6 @@ import AndorNeo.SDK3 as SDK3
 
 MODE_CONTINUOUS = 1
 MODE_SINGLE_SHOT = 0
-
-import struct
 
 validROIS = [
     (2592, 2160, 1, 1),
