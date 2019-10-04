@@ -494,6 +494,7 @@ class AsyncSession:
                 fignums=range(n_figs),
                 datestr=datestr,
                 last_values=last_values,
+                variable_names=sorted(last_values.keys()),
             )
 
             # Create Email message
