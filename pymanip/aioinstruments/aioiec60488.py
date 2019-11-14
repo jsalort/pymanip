@@ -10,7 +10,7 @@ from pymanip.aioinstruments.aiofeatures import (
     AsyncQueryCommand,
     AsyncRegisterValue,
 )
-from pymanip.aioinstruments import AsyncDriver
+from pymanip.aioinstruments.aiodrivers import AsyncDriver
 
 
 class AsyncIEC60488(AsyncDriver, fl_iec60488.IEC60488):

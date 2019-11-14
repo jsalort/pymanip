@@ -7,15 +7,16 @@ Asynchroneous version of fluidlab.interfaces
 import warnings
 import asyncio
 import fluidlab.interfaces as flinter
+import functools
 
 
 class AsyncQueryInterface(flinter.QueryInterface):
-    def __init__(self, inter):
+    def __init__(self):
+        super().__init__()
         self.loop = asyncio.get_event_loop()
-        self.inter = inter
 
     def __str__(self):
-        return "Async" + str(self.inter)
+        return "Async" + super().__str__()
 
     def __repr__(self):
         return str(self)
@@ -28,17 +29,18 @@ class AsyncQueryInterface(flinter.QueryInterface):
 
     async def _awrite(self, *args, **kwargs):
         await self.loop.run_in_executor(
-            None, self.inter._write, *args, **kwargs
+            None, self._write, *args, **kwargs
         )  # must be rewritten if necessary in concrete class
 
     async def _aread(self, *args, **kwargs):
-        await self.loop.run_in_executor(None, self.inter._read, *args, **kwargs)
+        await self.loop.run_in_executor(None, self._read, *args, **kwargs)
 
     async def _aquery(self, command, time_delay=0.1, **kwargs):
-        if hasattr(self.inter, "_query"):
-            return await self.loop.run_in_executor(
-                None, self.inter._query, command, time_delay=time_delay, **kwargs
+        if hasattr(self, "_query"):
+            query_func = functools.partial(
+                self.query, command, time_delay=time_delay, **kwargs
             )
+            return await self.loop.run_in_executor(None, query_func)
         else:
             await self.awrite(command)
             await asyncio.sleep(time_delay)
@@ -69,4 +71,4 @@ class AsyncQueryInterface(flinter.QueryInterface):
         return await self._aquery(command, **kwargs)
 
     async def await_for_srq(self, timeout=None):
-        await self.loop.run_in_executor(None, self.inter.wait_for_srq, timeout)
+        await self.loop.run_in_executor(None, self.wait_for_srq, timeout)

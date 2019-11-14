@@ -11,9 +11,10 @@ import fluidlab.instruments.features as flfeatures
 class AsyncWriteCommand(flfeatures.WriteCommand):
     def _build_driver_class(self, Driver):
         super()._build_driver_class(Driver)
+        command_str = self.command_str
 
         async def func(self):
-            await self._interface.awrite(self.command_str)
+            await self._interface.awrite(command_str)
 
         func.__doc__ = self.__doc__
         setattr(Driver, self._name, func)
@@ -23,15 +24,17 @@ class AsyncQueryCommand(flfeatures.QueryCommand):
     def _build_driver_class(self, Driver):
         super()._build_driver_class(Driver)
 
+        command_str = self.command_str
+
         if self.parse_result is None:
 
             async def func(self):
-                return await self._interface.aquery(self.command_str)
+                return await self._interface.aquery(command_str)
 
         else:
 
             async def func(self):
-                r = await self._interface.aquery(self.command_str)
+                r = await self._interface.aquery(command_str)
                 return self.parse_result(r)
 
         func.__doc__ = self.__doc__
