@@ -176,7 +176,7 @@ class AsyncAgilent34970a(AsyncIEC60488, fl_agilent_34970a.Agilent34970a):
         # is complete)
         await self.await_till_completion_of_operations()  # *OPC
         if sampleRate:
-            tmo = int(1000 * samplesPerChan / sampleRate)
+            tmo = 2 * int(1000 * samplesPerChan / sampleRate)
         else:
             tmo = 10000
         print("tmo =", tmo, "ms")
