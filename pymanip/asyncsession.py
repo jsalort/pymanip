@@ -787,7 +787,9 @@ class AsyncSession:
             await corofunc(self)
         print("Task finished", corofunc)
 
-    def run(self, *tasks, server_port=6913, custom_routes=None, custom_figures=None):
+    async def monitor(
+        self, *tasks, server_port=6913, custom_routes=None, custom_figures=None
+    ):
         loop = asyncio.get_event_loop()
         self.custom_figures = custom_figures
 
@@ -834,13 +836,12 @@ class AsyncSession:
                 raise TypeError("Coroutine or Coroutinefunction is expected")
         print("Starting event loop")
         if server_port:
-            loop.run_until_complete(
-                asyncio.gather(webserver, self.figure_gui_update(), *tasks_final)
-            )
+            await asyncio.gather(webserver, self.figure_gui_update(), *tasks_final)
         else:
-            loop.run_until_complete(
-                asyncio.gather(self.figure_gui_update(), *tasks_final)
-            )
+            await asyncio.gather(self.figure_gui_update(), *tasks_final)
+
+    def run(self, *tasks, server_port=6913, custom_routes=None, custom_figures=None):
+        asyncio.run(self.monitor(*tasks, server_port, custom_routes, custom_figures))
 
     def save_remote_data(self, data):
         """

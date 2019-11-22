@@ -83,6 +83,14 @@ class AsyncFloatValue(AsyncNumberValue, flfeatures.FloatValue):
     pass
 
 
+class AsyncBoolValue(AsyncValue, flfeatures.BoolValue):
+    pass
+
+
+class AsyncIntValue(AsyncNumberValue, flfeatures.IntValue):
+    pass
+
+
 class AsyncRegisterValue(AsyncNumberValue, flfeatures.RegisterValue):
     async def aget_as_number(self):
         value = await self._interface.aquery(self.command_get)

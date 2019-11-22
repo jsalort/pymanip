@@ -20,7 +20,11 @@ def interface_from_string(name, default_physical_interface=None, **kwargs):
     if classname == "VISAInterface":
         from pymanip.interfaces.aiovisa import AsyncVISAInterface
 
-        return AsyncVISAInterface(name)
+        return AsyncVISAInterface(name, **kwargs)
+    elif classname == "SerialInterface":
+        from pymanip.interfaces.aioserial import AsyncSerialInterface
+
+        return AsyncSerialInterface(name, **kwargs)
 
     raise NotImplementedError()
 

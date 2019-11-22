@@ -8,6 +8,7 @@ import warnings
 import asyncio
 import fluidlab.interfaces as flinter
 import functools
+from time import monotonic
 
 
 class AsyncQueryInterface(flinter.QueryInterface):
@@ -45,19 +46,38 @@ class AsyncQueryInterface(flinter.QueryInterface):
 
     async def _aread(self, *args, **kwargs):
         async with self.lock:
-            await self.loop.run_in_executor(None, self._read, *args, **kwargs)
+            data = await self.loop.run_in_executor(None, self._read, *args, **kwargs)
+        return data
 
     async def _aquery(self, command, time_delay=0.1, **kwargs):
-        async with self.lock:
-            if hasattr(self, "_query"):
-                query_func = functools.partial(
-                    self.query, command, time_delay=time_delay, **kwargs
-                )
+        if hasattr(self, "_query"):
+            query_func = functools.partial(
+                self.query, command, time_delay=time_delay, **kwargs
+            )
+            async with self.lock:
                 return await self.loop.run_in_executor(None, query_func)
+        else:
+            if hasattr(self, "timeout"):
+                timeout = self.timeout
+            elif "timeout" in kwargs:
+                timeout = kwargs["timeout"]
             else:
-                await self.awrite(command)
+                timeout = 60.0
+
+            if timeout < 10:
+                timeout = 10.0
+
+            await self.awrite(command)
+            start = monotonic()
+            while True:
                 await asyncio.sleep(time_delay)
-                return await self.aread(**kwargs)
+                data = await self.aread(**kwargs)
+                if data:
+                    return data
+                elif monotonic() - start > timeout:
+                    print("timeout")
+                    break
+                await asyncio.sleep(9 * time_delay)
 
     async def awrite(self, *args, **kwargs):
         if not self.opened:
@@ -81,7 +101,7 @@ class AsyncQueryInterface(flinter.QueryInterface):
                 "query() called on non-opened interface.", flinter.InterfaceWarning
             )
             self.open()
-        return await self._aquery(command, **kwargs)
+        return await self._aquery(command, time_delay=time_delay, **kwargs)
 
     async def await_for_srq(self, timeout=None):
         async with self.lock:
