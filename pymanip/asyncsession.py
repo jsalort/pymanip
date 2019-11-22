@@ -603,25 +603,37 @@ class AsyncSession:
                         p.set_ydata(yy)
                         if fixed_xlim is None:
                             xlim = ax.get_xlim()
-                            if xlim[1] < np.max(xx) or xlim[0] > np.min(xx):
-                                ax.set_xlim((np.min(xx), np.max(xx)))
+                            try:
+                                if xlim[1] < np.max(xx) or xlim[0] > np.min(xx):
+                                    ax.set_xlim((np.min(xx), np.max(xx)))
+                            except TypeError:
+                                pass
                         if fixed_ylim is None:
                             ylim = ax.get_ylim()
-                            if ylim[1] < np.max(yy) or ylim[0] > np.min(yy):
-                                ax.set_ylim((np.min(yy), np.max(yy)))
+                            try:
+                                if ylim[1] < np.max(yy) or ylim[0] > np.min(yy):
+                                    ax.set_ylim((np.min(yy), np.max(yy)))
+                            except TypeError:
+                                pass
                     else:
                         p, = ax.plot(vs_x, vs_y, "s-")
                         line_objects[y] = p
                         ax.set_xlabel(x)
                         ax.set_ylabel(y)
                         if fixed_xlim is None:
-                            if np.min(vs_x) != np.max(vs_x):
-                                ax.set_xlim((np.min(vs_x), np.max(vs_x)))
+                            try:
+                                if np.min(vs_x) != np.max(vs_x):
+                                    ax.set_xlim((np.min(vs_x), np.max(vs_x)))
+                            except TypeError:
+                                pass
                         else:
                             ax.set_xlim(fixed_xlim)
                         if fixed_ylim is None:
-                            if np.min(vs_y) != np.max(vs_y):
-                                ax.set_ylim((np.min(vs_y), np.max(vs_y)))
+                            try:
+                                if np.min(vs_y) != np.max(vs_y):
+                                    ax.set_ylim((np.min(vs_y), np.max(vs_y)))
+                            except TypeError:
+                                pass
                         else:
                             ax.set_ylim(fixed_ylim)
                         fig.show()
