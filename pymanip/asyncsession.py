@@ -1,7 +1,20 @@
-"""
+"""Asynchronous Session Module (:mod:`pymanip.asyncsession`)
+============================================================
 
-This module defines another kind of session, meant to be used for asynchronous
-monitoring, where each variable can be logged with its own timestamp.
+This module defines two classes, :class:`pymanip.asyncsession.AsyncSession`
+and :class:`pymanip.asyncsession.RemoteObserver`. The former is used to
+manage an experimental session, the latter to access its live data from a
+remote computer.
+
+.. autoclass:: AsyncSession
+   :members:
+   :private-members:
+
+.. autoclass:: RemoteObserver
+   :members:
+   :private-members:
+
+.. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab
 
 """
 
@@ -41,9 +54,28 @@ __all__ = ["AsyncSession"]
 
 
 class AsyncSession:
+    """This class represents an asynchronous experiment session. It is the main tool that we
+    use to set up monitoring of experimental systems. It will manage the storage for the data,
+    as well as several asynchronous functions for use during the monitoring of the experimental
+    system such as live plot of monitored data, regular control email, and remote HTTP access to
+    the live data by human (connection from a web browser), or by a machine using the
+    :class:`pymanip.asyncsession.RemoteObserver` class. It has methods to access the data for
+    processing during the experiment, or post-processing after the experiment is finished.
+
+    :param session_name: the name of the session, defaults to None. It will be used as the filename of the sqlite3 database file stored on disk. If None, then no file is created, and data will be temporarily stored in memory, but will be lost when the object is released.
+    :type session_name: str, optional
+    :param verbose: sets the session verbosity, defaults to True
+    :type verbose: bool, optional
+    :param delay_save: if True, the data is stored in memory during the duration of the session, and is saved to disk only at the end of the session. It is not recommanded, but useful in cases where fast operation requires to avoid disk access during the session.
+    :type delay_save: bool, optional
+    """
+
     database_version = 3
 
     def __init__(self, session_name=None, verbose=True, delay_save=False):
+        """Constructor method
+        """
+
         self.session_name = session_name
         self.custom_figures = None
         self.delay_save = delay_save
@@ -131,11 +163,12 @@ class AsyncSession:
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
 
     def save_database(self):
-        """
-        If delay_save = True, the database is kept in-memory, and later
-        saved to disk when this function is called.
+        """This method is useful only if delay_save = True. Then, the database is kept in-memory for
+        the duration of the session. This method saves the database on the disk.
         A new database file will be created with the content of the current
-        in-memory database
+        in-memory database.
+
+        This method is automatically called at the exit of the context manager.
         """
         if self.delay_save:
             try:
@@ -151,13 +184,19 @@ class AsyncSession:
                 disk_db.close()
 
     def __enter__(self):
+        """Context manager enter method
+        """
         return self
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method
+        """
         self.save_database()
         self.conn.close()
 
     def get_version(self):
+        """Returns current version of the database layout.
+        """
         version = self.parameter("_database_version")
         if version is None:
             version = 1
@@ -165,6 +204,8 @@ class AsyncSession:
 
     @property
     def t0(self):
+        """Session creation timestamp
+        """
         if hasattr(self, "_session_creation_timestamp"):
             return self._session_creation_timestamp
         t0 = self.parameter("_session_creation_timestamp")
@@ -181,10 +222,14 @@ class AsyncSession:
 
     @property
     def initial_timestamp(self):
+        """Session creation timestamp, identical to :attr:`pymanip.asyncsession.AsyncSession.t0`
+        """
         return self.t0
 
     @property
     def last_timestamp(self):
+        """Timestamp of the last recorded value
+        """
         ts = list()
         last_values = self.logged_last_values()
         if last_values:
@@ -196,6 +241,9 @@ class AsyncSession:
         return None
 
     def print_welcome(self):
+        """Prints informative start date/end date message. If verbose is True, this method
+        is called by the constructor.
+        """
         start_string = time.strftime(dateformat, time.localtime(self.initial_timestamp))
         print(colored.blue("*** Start date: " + start_string))
         last = self.last_timestamp
@@ -203,25 +251,55 @@ class AsyncSession:
             end_string = time.strftime(dateformat, time.localtime(last))
             print(colored.blue("***   End date: " + end_string))
 
-    def add_entry(self, **kwargs):
+    def add_entry(self, *args, **kwargs):
+        """This methods adds scalar values into the database. Each entry value
+        will hold a timestamp corresponding to the time at which this method has been called.
+        Variables are passed in dictionnaries or as keyword-arguments. If several variables
+        are passed, then they all hold the same timestamps.
+
+        For parameters which consists in only one scalar value, and for which timestamps are
+        not necessary, use :meth:`pymanip.asyncsession.AsyncSession.save_parameter` instead.
+
+        :param \\*args: dictionnaries with name-value to be added in the database
+        :type \\*args: dict, optional
+        :param \\**kwargs: name-value to be added in the database
+        :type \\**kwargs: float, optional
+        """
         ts = datetime.now().timestamp()
+        data = dict()
+        for a in args:
+            data.update(a)
+        data.update(kwargs)
         with self.conn as c:
             cursor = c.cursor()
             cursor.execute("SELECT name FROM log_names;")
             names = set([d[0] for d in cursor.fetchall()])
-            for key, val in kwargs.items():
+            for key, val in data.items():
                 if key not in names:
                     c.execute("INSERT INTO log_names VALUES (?);", (key,))
                     names.add(key)
                 c.execute("INSERT INTO log VALUES (?,?,?);", (ts, key, val))
 
-    def add_dataset(self, **kwargs):
+    def add_dataset(self, *args, **kwargs):
+        """This method adds arrays, or other pickable objects, as “datasets” into the
+        database. They will hold a timestamp corresponding to the time at which the method
+        has been called.
+
+        :param \\*args: dictionnaries with name-value to be added in the database
+        :type \\*args: dict, optional
+        :param \\**kwargs: name-value to be added in the database
+        :type \\**kwargs: object, optional
+        """
         ts = datetime.now().timestamp()
+        data = dict()
+        for a in args:
+            data.update(a)
+        data.update(kwargs)
         with self.conn as c:
             cursor = c.cursor()
             cursor.execute("SELECT name FROM dataset_names;")
             names = set([d[0] for d in cursor.fetchall()])
-            for key, val in kwargs.items():
+            for key, val in data.items():
                 if key not in names:
                     c.execute("INSERT INTO dataset_names VALUES (?);", (key,))
                     names.add(key)
@@ -231,6 +309,12 @@ class AsyncSession:
                 )
 
     def logged_variables(self):
+        """This method returns a set of the names of the scalar variables currently stored
+        in the session database.
+
+        :return: names of scalar variables
+        :rtype: set
+        """
         with self.conn as conn:
             c = conn.cursor()
             c.execute("SELECT name FROM log_names;")
@@ -239,13 +323,54 @@ class AsyncSession:
         return names
 
     def logged_data(self):
+        """This method returns a name-value dictionnary containing all scalar variables
+        currently stored in the session database.
+
+        :return: all scalar variable values
+        :rtype: dict
+        """
         names = self.logged_variables()
         result = dict()
         for name in names:
             result[name] = self.__getitem__(name)
         return result
 
+    def logged_variable(self, varname):
+        """This method retrieve the timestamps and values of a specified scalar variable.
+        It is possible to use the sesn[varname] syntax as a shortcut.
+
+        :param varname: name of the scalar variable to retrieve
+        :type varname: str
+        :return: timestamps and values
+        :rtype: tuple (timestamps, values) of numpy arrays.
+
+        :Exemple:
+
+        >>> ts, val = sesn.logged_variable('T_Pt_bas')
+
+        """
+        with self.conn as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                      SELECT timestamp, value FROM log
+                      WHERE name='{:}';
+                      """.format(
+                    varname
+                )
+            )
+            data = c.fetchall()
+        t = np.array([d[0] for d in data])
+        v = np.array([d[1] for d in data])
+        return t, v
+
     def logged_first_values(self):
+        """This method returns a dictionnary holding the first logged value of all scalar
+        variables stored in the session database.
+
+        :return: first values
+        :rtype: dict
+        """
         with self.conn as conn:
             c = conn.cursor()
             c.execute("SELECT name FROM log_names;")
@@ -265,6 +390,12 @@ class AsyncSession:
         return result
 
     def logged_last_values(self):
+        """This method returns a dictionnary holding the last logged value of all scalar
+        variables stored in the session database.
+
+        :return: last logged values
+        :rtype: dict
+        """
         with self.conn as conn:
             c = conn.cursor()
             c.execute("SELECT name FROM log_names;")
@@ -284,6 +415,16 @@ class AsyncSession:
         return result
 
     def logged_data_fromtimestamp(self, name, timestamp):
+        """This method returns the timestamps and values of a given scalar variable, recorded
+        after the specified timestamp.
+
+        :param name: name of the scalar variable to be retrieved.
+        :type name: str
+        :param timestamp: timestamp from which to recover values
+        :type timestamp: float
+        :return: the timestamps, and values of the specified variable
+        :rtype: tuple of two numpy arrays
+        """
         with self.conn as conn:
             c = conn.cursor()
             c.execute(
@@ -300,6 +441,12 @@ class AsyncSession:
         return t, v
 
     def dataset_names(self):
+        """This method returns the names of the datasets currently stored in the session
+        database.
+
+        :return: names of datasets
+        :rtype: set
+        """
         with self.conn as conn:
             c = conn.cursor()
             try:
@@ -310,6 +457,26 @@ class AsyncSession:
         return set([d[0] for d in data])
 
     def datasets(self, name):
+        """This method returns a generator which will yield all timestamps and datasets
+        recorded under the specified name.
+        The rationale for returning a generator instead of a list, is that each individual
+        dataset may be large.
+
+        :param name: name of the dataset to retrieve
+        :type name: str
+
+        :Exemple:
+
+        - To plot all the recorded datasets named 'toto'
+
+        >>> for timestamp, data in sesn.datasets('toto'):
+        >>>    plt.plot(data, label=f'ts = {timestamp-sesn.t0:.1f}')
+
+        - To retrieve a list of all the recorded datasets named 'toto'
+
+        >>> datas = [d for ts, d in sesn.datasets('toto')]
+
+        """
         with self.conn as conn:
             c = conn.cursor()
             try:
@@ -333,9 +500,24 @@ class AsyncSession:
                 yield row[0], pickle.loads(row[1])
 
     def dataset_last_data(self, name):
+        """This method returns the last recorded dataset under the specified name.
+
+        :param name: name of the dataset to retrieve
+        :type name: str
+        :return: dataset value
+        :rtype: object
+        """
         return next(self.datasets(name))
 
     def dataset_times(self, name):
+        """This method returns the timestamp of the recorded dataset under the specified
+        name.
+
+        :param name: name of the dataset to retrieve
+        :type name: str
+        :return: array of timestamps
+        :rtype: :class:`numpy.ndarray`
+        """
         with self.conn as conn:
             c = conn.cursor()
             it = c.execute(
@@ -350,6 +532,17 @@ class AsyncSession:
         return t
 
     def dataset(self, name, ts=None):
+        """This method returns the dataset recorded at the specified timestamp, and under
+        the specified name.
+
+        :param name: name of the dataset to retrieve
+        :type name: str
+        :param ts: timestamp at which the dataset was stored, defaults to the timestamp of the last recorded dataset under that name
+        :type ts: float, optional
+        :return: the value of the recorded dataset
+        :rtype: object
+        """
+
         if ts is None:
             ts, data = self.dataset_last_data(name)
             return data
@@ -365,10 +558,24 @@ class AsyncSession:
             data = pickle.loads(c.fetchone()[0])
         return data
 
-    def save_parameter(self, **kwargs):
+    def save_parameter(self, *args, **kwargs):
+        """This methods saves a scalar parameter into the database. Unlike scalar values
+        saved by the :meth:`pymanip.asyncsession.AsyncSession.add_entry` method, such parameter
+        can only hold one value, and does not have an associated timestamp.
+        Parameters can be passed as dictionnaries, or keyword arguments.
+
+        :param \\*args: dictionnaries with name-value to be added in the database
+        :type \\*args: dict, optional
+        :param \\**kwargs: name-value to be added in the database
+        :type \\**kwargs: float, optional
+        """
+        data = dict()
+        for a in args:
+            data.update(a)
+        data.update(kwargs)
         with self.conn as conn:
             c = conn.cursor()
-            for key, val in kwargs.items():
+            for key, val in data.items():
                 c.execute(
                     """SELECT rowid FROM parameters
                              WHERE name='{:}';
@@ -398,6 +605,13 @@ class AsyncSession:
                     )
 
     def parameter(self, name):
+        """This method retrieve the value of the specified parameter.
+
+        :param name: name of the parameter to retrieve
+        :type name: str
+        :return: value of the parameter
+        :rtype: float
+        """
         with self.conn as conn:
             c = conn.cursor()
             c.execute(
@@ -414,9 +628,21 @@ class AsyncSession:
         return None
 
     def has_parameter(self, name):
+        """This method returns True if specified parameter exists in the session database.
+
+        :param name: name of the parameter to retrieve
+        :type name: str
+        :return: True if parameter exists, False if it does not
+        :rtype: bool
+        """
         return self.parameter(name) is not None
 
     def parameters(self):
+        """This method returns all parameter name and values.
+
+        :return: parameters
+        :rtype: dict
+        """
         with self.conn as conn:
             c = conn.cursor()
             c.execute("SELECT * FROM parameters;")
@@ -424,20 +650,10 @@ class AsyncSession:
         return {d[0]: d[1] for d in data}
 
     def __getitem__(self, key):
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute(
-                """
-                      SELECT timestamp, value FROM log
-                      WHERE name='{:}';
-                      """.format(
-                    key
-                )
-            )
-            data = c.fetchall()
-        t = np.array([d[0] for d in data])
-        v = np.array([d[1] for d in data])
-        return t, v
+        """Implement the evaluation of self[varname] as a shortcut to obtain timestamp and values for a given
+        variable name.
+        """
+        return self.logged_variable(key)
 
     async def send_email(
         self,
@@ -449,8 +665,22 @@ class AsyncSession:
         delay_hours=6,
         initial_delay_hours=None,
     ):
-        """
-        Asynchronous task which sends an email every delay_hours hours.
+        """This method returns an asynchronous task which sends an email at regular intervals.
+        Such a task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
+        :meth:`pymanip.asyncsession.AsyncSession.run`, and does not have to be awaited manually.
+
+        :param from_addr: email address of the sender
+        :type from_addr: str
+        :param to_addrs: email addresses of the recipients
+        :type to_addrs: list of str
+        :param host: hostname of the SMTP server
+        :type host: str
+        :param port: port number of the SMTP server, defaults to 25
+        :type port: int, optional
+        :param delay_hours: interval between emails, defaults to 6 hours
+        :type delay_hours: float, optional
+        :param initial_delay_hours: time interval before the first email is sent, default to None (immediately)
+        :type initial_delay_hours: float, optional
         """
 
         if self.session_name is None:
@@ -549,8 +779,27 @@ class AsyncSession:
         fixed_ylim=None,
         fixed_xlim=None,
     ):
-        """
-        if x, y is specified instead of varnames, plot var y against var x
+        """This method returns an asynchronous task which creates and regularly updates a plot for
+        the specified scalar variables. Such a task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
+        :meth:`pymanip.asyncsession.AsyncSession.run`, and does not have to be awaited manually.
+
+        If varnames is specified, the variables are plotted against time. If x and y are specified, then
+        one is plotted against the other.
+
+        :param varnames: names of the scalar variables to plot
+        :type varnames: list or str, optional
+        :param maxvalues: number of values to plot, defaults to 1000
+        :type maxvalues: int, optional
+        :param yscale: fixed yscale for temporal plot, defaults to automatic ylim
+        :type yscale: tuple or list, optional
+        :param x: name of the scalar variable to use on the x axis
+        :type x: str, optional
+        :param y: name of the scalar variable to use on the y axis
+        :type y: str, optional
+        :param fixed_xlim: fixed xscale for x-y plots, defaults to automatic xlim
+        :type fixed_xlim: tuple or list, optional
+        :param fixed_ylim: fixed yscale for x-y plots, defaults to automatic ylim
+        :type fixed_ylim: tuple or list, optional
         """
         if varnames is None:
             if not isinstance(x, str) or not isinstance(y, str):
@@ -695,6 +944,10 @@ class AsyncSession:
             pass
 
     async def figure_gui_update(self):
+        """This method returns an asynchronous task which updates the figures created by the
+        :meth:`pymanip.asyncsession.AsyncSession.plot` tasks. This task is added automatically,
+        and should not be used manually.
+        """
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
             while self.running:
@@ -710,13 +963,42 @@ class AsyncSession:
                     await asyncio.sleep(1.0)
 
     def ask_exit(self, *args, **kwargs):
+        """This methods informs all tasks that the monitoring session should stop. Call this method if you
+        wish to cleanly stop the monitoring session. It is also automatically called if the interrupt signal
+        is received.
+        """
         self.running = False
         print(" Signal caught... stopping...")
 
     async def sweep(self, task, iterable):
-        # expects task of the format
-        # async def balayage(sesn, voltage):
-        #   do something with voltage
+        """This methods returns an asynchronous task which repeatedly awaits a given co-routine by iterating
+        the specified iterable. The returned asynchronous task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
+        :meth:`pymanip.asyncsession.AsyncSession.run`, and does not have to be awaited manually.
+
+        This should be used when the main task of the asynchronous session is to sweep some value. The asynchronous session
+        will exit when all values have been iterated.
+        This is similar to running a script which consists in a synchronous for-loop, except that other tasks, such as remote
+        access, live-plot and emails can be run concurrently.
+
+        :param task: the co-routine function to repeatedly call and await
+        :type task: function
+        :param iterable: values to pass when calling the function
+        :type iterable: list
+
+        :Example:
+
+        >>> async def balayage(sesn, voltage):
+        >>>     await sesn.generator.vdc.aset(voltage)
+        >>>     await asyncio.sleep(5)
+        >>>     response = await sesn.multimeter.aget(channel)
+        >>>     sesn.add_entry(voltage=voltage, response=response)
+        >>>
+        >>> async def main(sesn):
+        >>>     await sesn.monitor(sesn.sweep(balayage, [0.0, 1.0, 2.0]))
+        >>>
+        >>> asyncio.run(main(sesn))
+
+        """
         for val in iterable:
             await task(self, val)
             if not self.running:
@@ -724,6 +1006,18 @@ class AsyncSession:
         self.running = False
 
     async def sleep(self, duration, verbose=True):
+        """This method returns an asynchronous task which waits the specified amount of time and
+        prints a countdown. This should be called with verbose=True by only one of the tasks.
+        The other tasks should call with verbose=False.
+        This method should be preferred over asyncio.sleep because it checks that
+        :meth:`pymanip.asyncsession.AsyncSession.ask_exit` has not been called, and stops waiting
+        if it has. This is useful to allow rapid abortion of the monitoring session.
+
+        :param duration: time to wait
+        :type duration: float
+        :param verbose: whether to print the countdown, defaults to True
+        :type verbose: bool, optional
+        """
         start = time.monotonic()
         while self.running and time.monotonic() - start < duration:
             if verbose:
@@ -740,6 +1034,9 @@ class AsyncSession:
             sys.stdout.write("\n")
 
     async def server_main_page(self, request):
+        """This asynchronous method returns the HTTP response to a request for the main html web page.
+        Should not be called manually.
+        """
         print("[", datetime.now(), request.remote, request.rel_url, "]")
         if self.session_name:
             context = {"title": self.session_name}
@@ -749,6 +1046,9 @@ class AsyncSession:
         return response
 
     async def server_logged_last_values(self, request):
+        """This asynchronous method returns the HTTP response to a request for JSON data of the last logged
+        values. Should not be called manually.
+        """
         data = [
             {
                 "name": name,
@@ -760,16 +1060,25 @@ class AsyncSession:
         return web.json_response(data)
 
     async def server_get_parameters(self, request):
+        """This asynchronous method returns the HTTP response to a request for JSON data of the session
+        parameters. Should not be called manually.
+        """
         params = {k: v for k, v in self.parameters().items() if not k.startswith("_")}
         return web.json_response(params)
 
     async def server_plot_page(self, request):
+        """This asynchronous method returns the HTTP response to a request for the HTML plot page.
+        Should not be called manually.
+        """
         print("[", datetime.now(), request.remote, request.rel_url, "]")
         context = {"name": request.match_info["name"]}
         response = aiohttp_jinja2.render_template("plot.html", request, context)
         return response
 
     async def server_data_from_ts(self, request):
+        """This asynchronous method returns the HTTP response to a request for JSON with all data
+        after the specified timestamp. Should not be called manually.
+        """
         data_in = await request.json()
         last_ts = data_in["last_ts"]
         name = data_in["name"]
@@ -779,9 +1088,16 @@ class AsyncSession:
         return web.json_response(data_out)
 
     async def server_current_ts(self, request):
+        """This asynchronous method returns the HTTP response to a request for JSON with the current
+        server time. Should not be called manually.
+        """
         return web.json_response({"now": datetime.now().timestamp()})
 
     async def mytask(self, corofunc):
+        """This method repeatedly awaits the given co-routine function, as long as
+        :meth:`pymanip.asyncsession.AsyncSession.ask_exit` has not been called.
+        Should not be called manually.
+        """
         print("Starting task", corofunc)
         while self.running:
             await corofunc(self)
@@ -790,6 +1106,20 @@ class AsyncSession:
     async def monitor(
         self, *tasks, server_port=6913, custom_routes=None, custom_figures=None
     ):
+        """This method runs the specified tasks, and opens a web-server for remote access and set up the tasks to run
+        matplotlib event loops if necessary. This is the main
+        method that the main function of user program should await for. It is also responsible for setting up
+        the signal handling and binding it to the ask_exit method.
+
+        :param \\*tasks: asynchronous tasks to run: if the task is a co-routine function, it will be called repeatedly until ask_exit is called. If task is an awaitable it is called only once. Such an awaitable is responsible to check that ask_exit has not been called. Several such awaitables are provided: :meth:`pymanip.asyncsession.AsyncSession.send_email`, :meth:`pymanip.asyncsession.AsyncSession.plot` and :meth:`pymanip.asyncsession.AsyncSession.sweep`.
+        :type \\*tasks: co-routine function or awaitable
+        :param server_port: the network port to open for remote HTTP connection, defaults to 6913. If None, no server is created.
+        :type server_port: int, optional
+        :param custom_routes: additionnal aiohttp routes for the web-server, defaults to None
+        :type custom_routes: co-routine function, optional
+        :param custom_figures: additional matplotlib figure object that needs to run the matplotlib event loop
+        :type custom_figures: :class:`matplotlib.pyplot.Figure`, optional
+        """
         loop = asyncio.get_event_loop()
         self.custom_figures = custom_figures
 
@@ -841,11 +1171,17 @@ class AsyncSession:
             await asyncio.gather(self.figure_gui_update(), *tasks_final)
 
     def run(self, *tasks, server_port=6913, custom_routes=None, custom_figures=None):
+        """Synchronous call to :meth:`pymanip.asyncsession.AsyncSession.monitor`.
+        """
+
         asyncio.run(self.monitor(*tasks, server_port, custom_routes, custom_figures))
 
     def save_remote_data(self, data):
-        """
-        Save data from RemoteObserver object as datasets and parameters
+        """This method saves the data returned by a :class:`pymanip.asyncsession.RemoteObserver` object into the current session database,
+        as datasets and parameters.
+
+        :param data: data returned by the :class:`pymanip.asyncsession.RemoteObserver` object
+        :type data: dict
         """
         for k, v in data.items():
             # print(k,type(v),v)
@@ -874,15 +1210,25 @@ class AsyncSession:
 
 
 class RemoteObserver:
-    """
-    Remote observation of a running async session
+    """This class represents remote observers of a monitoring session. It connects to the server opened on a remote computer by
+    :meth:`pymanip.asyncsession.AsyncSession.monitor`. The aim of an instance of RemoteObserver is to retrieve the data saved into
+    the remote computer session database.
+
+    :param host: hostname of the remote compute to connect to
+    :type host: str
+    :param port: port number to connect to, defaults to 6913
+    :type port: int, optional
     """
 
     def __init__(self, host, port=6913):
+        """Constructor method
+        """
         self.host = host
         self.port = port
 
     def _get_request(self, apiname):
+        """Private method to send a GET request for the specified API name
+        """
         url = "http://{host:}:{port:}/api/{api:}".format(
             host=self.host, port=self.port, api=apiname
         )
@@ -894,6 +1240,8 @@ class RemoteObserver:
             raise
 
     def _post_request(self, apiname, params):
+        """Private method to send a POST request for the specified API name and params
+        """
         url = "http://{host:}:{port:}/api/{api:}".format(
             host=self.host, port=self.port, api=apiname
         )
@@ -905,20 +1253,36 @@ class RemoteObserver:
             raise
 
     def get_last_values(self):
-        """
-        Client function to grab the last set of values from
-        a remote running async session
+        """This method retrieve the last set of values from
+        the remote monitoring session.
+
+        :return: scalar variable last recorded values
+        :rtype: dict
         """
 
         data = self._get_request("logged_last_values")
         return {d["name"]: d["value"] for d in data}
 
     def start_recording(self):
+        """This method establishes the connection to the remote computer, and sets the
+        start time for the current observation session.
+        """
         self.server_ts_start = self._get_request("server_current_ts")["now"]
         data = self.get_last_values()
         self.remote_varnames = list(data.keys())
 
     def stop_recording(self, reduce_time=True, force_reduce_time=True):
+        """This method retrieves all scalar variable data recorded saved by the remote
+        computer since :meth:`pymanip.asyncsession.RemoteObserver.start_recording` established
+        the connection.
+
+        :param reduce_time: if True, try to collapse all timestamp arrays into a unique timestamp array. This is useful if the remote computer program only has one call to add_entry. Defaults to True.
+        :type reduce_time: bool, optional
+        :param force_reduce_time: bypass checks that all scalar values indeed have the same timestamps.
+        :type force_reduce_time: bool, optional
+        :return: timestamps and values of all data saved in the remote computed database since the call to :meth:`pymanip.asyncsession.RemoteObserver.start_recording`
+        :rtype: dict
+        """
         recordings = dict()
         for varname in self.remote_varnames:
             data = self._post_request(
