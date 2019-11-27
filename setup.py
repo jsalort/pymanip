@@ -15,6 +15,7 @@ setup(
     version="0.3",
     description="Python framework for experiments",
     long_description=readme(),
+    long_description_content_type="text/markdown",
     url="https://github.com/jsalort/pymanip",
     author="Julien Salort",
     author_email="julien.salort@ens-lyon.fr",
