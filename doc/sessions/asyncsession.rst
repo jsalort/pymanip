@@ -53,7 +53,23 @@ In this example, we see the use of the context managers, both for the :class:`As
 and for the instrument object. The main experimental measurement lies in the :func:`monitoring_task` function, which should not be an explicit `for` loop. Indeed, the :meth:`sesn.monitor` method will implement the `for` loop, with checks for the interruption signal.
 
 Possible additionnal initialisation of devices can be added to the :func:`main` function. Possible additionnal initalisation of session variables can be added in the `with AsyncSession()` block.
-Note that all functions take the session object as its first argument. It is therefore possible to write the same code as a subclass of :class:`AsyncSession`, but this is not strictly necessary.
+Note that all functions take the session object as its first argument. It is therefore possible to write the same code as a subclass of :class:`AsyncSession`, but this is not strictly necessary, i.e.
+
+.. code-block:: python
+
+    class Monitoring(AsyncSession):
+
+        async def monitoring_task(self):
+            some_value = await self.some_device.aget()
+            self.add_entry(some_value=some_value)
+            await self.sleep(10)
+
+        async def main(self):
+            async with SomeDevice() as self.some_device:
+                await self.monitor(self.monitoring_task)
+
+    with Monitoring() as mon:
+        asyncio.run(mon.main())
 
 The benefits of the asynchronous structure of the example program is clearer when plotting tasks,
 and email tasks are added, or when there are several concurrent monitoring tasks. The :func:`main`
