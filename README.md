@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.com/jsalort/pymanip.svg?branch=master)](https://travis-ci.com/jsalort/pymanip)
 [![PyPI version](https://badge.fury.io/py/pymanip.svg)](https://badge.fury.io/py/pymanip)
+[![Documentation Status](https://readthedocs.org/projects/pymanip/badge/?version=latest)](https://pymanip.readthedocs.io/en/latest/?badge=latest)
 
 pymanip
 =======
