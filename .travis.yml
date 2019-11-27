@@ -2,7 +2,6 @@ language: python
 
 # python versions to use during the tests
 python:
-    - "3.6"
     - "3.7"
 
 # command to install dependencies
