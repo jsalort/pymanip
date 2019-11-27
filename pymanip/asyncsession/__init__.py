@@ -24,6 +24,7 @@ import sys
 import os.path
 import pickle
 import warnings
+import inspect
 from pprint import pprint
 
 import sqlite3
@@ -1099,8 +1100,12 @@ class AsyncSession:
         Should not be called manually.
         """
         print("Starting task", corofunc)
+        sig = inspect.signature(corofunc)
         while self.running:
-            await corofunc(self)
+            if len(sig.parameters) == 1:
+                await corofunc(self)
+            else:
+                await corofunc()
         print("Task finished", corofunc)
 
     async def monitor(
