@@ -12,7 +12,7 @@ def readme():
 
 setup(
     name="pymanip",
-    version="0.3.1",
+    version="0.3.2",
     description="Python framework for experiments",
     long_description=readme(),
     long_description_content_type="text/markdown",

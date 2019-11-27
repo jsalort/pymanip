@@ -8,7 +8,7 @@ Welcome to pymanip's documentation!
 
 pymanip is the main package that we use for data acquisition and monitoring of
 our experimental systems in the Convection group at 
-`Laboratoire de physique de l'ENS de Lyon <http://www.ens-lyon.fr/PHYSIQUE>`_
+`Laboratoire de physique de l'ENS de Lyon <http://www.ens-lyon.fr/PHYSIQUE>`_.
 It can be seen as an extension
 of the FluidLab_ module, which it heavily uses.
 It is available freely under the French 

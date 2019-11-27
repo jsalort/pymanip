@@ -1174,7 +1174,14 @@ class AsyncSession:
         """Synchronous call to :meth:`pymanip.asyncsession.AsyncSession.monitor`.
         """
 
-        asyncio.run(self.monitor(*tasks, server_port, custom_routes, custom_figures))
+        asyncio.run(
+            self.monitor(
+                *tasks,
+                server_port=server_port,
+                custom_routes=custom_routes,
+                custom_figures=custom_figures,
+            )
+        )
 
     def save_remote_data(self, data):
         """This method saves the data returned by a :class:`pymanip.asyncsession.RemoteObserver` object into the current session database,
