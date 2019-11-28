@@ -98,7 +98,8 @@ parser_gpib.add_argument(
 
 # Create parser for "oscillo"
 parser_oscillo = subparsers.add_parser(
-    "oscillo", help="Use DAQmx cards as oscilloscope"
+    "oscillo",
+    help="Use NI-DAQmx and NI-Scope cards as oscilloscope and signal analyser",
 )
 parser_oscillo.add_argument(
     "channel",
@@ -231,135 +232,135 @@ parser_video.add_argument(
     nargs=4,
 )
 
-# Parse arguments
-args = parser.parse_args()
+if __name__ == "__main__":
+    args = parser.parse_args()
 
-if args.command == "info":
-    manip_info(args.sessionName, args.quiet, args.line, args.plot)
-elif args.command == "list_instruments":
-    import pymanip
+    if args.command == "info":
+        manip_info(args.sessionName, args.quiet, args.line, args.plot)
+    elif args.command == "list_instruments":
+        import pymanip
 
-    pymanip.pymanip_import_verbose = True
-    import pymanip.instruments
-elif args.command == "check_hdf":
-    check_hdf(args.sessionName, args.plot)
-elif args.command == "list_daq":
-    if not has_daq:
-        print("DAQmx is not available")
-    else:
-        DAQmx.print_connected_devices()
-elif args.command == "rebuild_hdf":
-    rebuild_from_dat(Path(args.input_file), args.output_name)
-elif args.command == "scan_gpib":
-    scanGpib(int(args.boardNumber))
-elif args.command == "oscillo":
-    if args.trigger is not None:
-        trigger = float(args.trigger)
-    else:
-        trigger = None
-    if args.backend is not None:
-        backend = args.backend
-    if args.channel:
-        channel = args.channel
-    else:
-        chansel = ChannelSelector()
-        backend, channel = chansel.gui_select()
-    if args.sampling:
-        sampling = float(args.sampling)
-    else:
-        sampling = 5e3
-    if args.range:
-        range_ = float(args.range)
-    else:
-        range_ = 10.0
-    oscillo = Oscillo(
-        channel, sampling, range_, trigger, int(args.trigsource), backend=backend
-    )
-    oscillo.run()
-elif args.command == "video":
-    if not has_video:
-        print("Video libraries not found")
-    if isinstance(args.toolkit, list):
-        tk = args.toolkit[0]
-    else:
-        tk = args.toolkit
-    if len(args.slice) < 4:
-        slice = None
-    else:
-        slice = args.slice
-    if isinstance(args.zoom, list):
-        zoom = args.zoom[0]
-    else:
-        zoom = args.zoom
-    if isinstance(args.Trigger, list):
-        Trigger = args.Trigger[0]
-    else:
-        Trigger = args.Trigger
-    if Trigger == -1:
-        Trigger = None
-    if isinstance(args.exposure, list):
-        exposure_ms = args.exposure[0]
-    else:
-        exposure_ms = args.exposure
-    if isinstance(args.board, list):
-        board = int(args.board[0])
-    else:
-        board = int(args.board)
-    if isinstance(args.bitdepth, list):
-        bitdepth = int(args.bitdepth[0])
-    else:
-        bitdepth = int(args.bitdepth)
-    if isinstance(args.framerate, list):
-        framerate = float(args.framerate[0])
-    else:
-        framerate = float(args.framerate)
-    if isinstance(args.rotate, list):
-        rotate = float(args.rotate[0])
-    else:
-        rotate = float(args.rotate)
-    if args.ROI is not None and len(args.ROI) != 4:
-        raise ValueError("ROI must be 4 integers xmin, ymin, xmax, ymax")
-    if args.camera_type.upper() == "PCO":
-        if args.list:
-            from pymanip.video.pco import print_available_pco_cameras
+        pymanip.pymanip_import_verbose = True
+        import pymanip.instruments
+    elif args.command == "check_hdf":
+        check_hdf(args.sessionName, args.plot)
+    elif args.command == "list_daq":
+        if not has_daq:
+            print("DAQmx is not available")
+        else:
+            DAQmx.print_connected_devices()
+    elif args.command == "rebuild_hdf":
+        rebuild_from_dat(Path(args.input_file), args.output_name)
+    elif args.command == "scan_gpib":
+        scanGpib(int(args.boardNumber))
+    elif args.command == "oscillo":
+        if args.trigger is not None:
+            trigger = float(args.trigger)
+        else:
+            trigger = None
+        if args.backend is not None:
+            backend = args.backend
+        if args.channel:
+            channel = args.channel
+        else:
+            chansel = ChannelSelector()
+            backend, channel = chansel.gui_select()
+        if args.sampling:
+            sampling = float(args.sampling)
+        else:
+            sampling = 5e3
+        if args.range:
+            range_ = float(args.range)
+        else:
+            range_ = 10.0
+        oscillo = Oscillo(
+            channel, sampling, range_, trigger, int(args.trigsource), backend=backend
+        )
+        oscillo.run()
+    elif args.command == "video":
+        if not has_video:
+            print("Video libraries not found")
+        if isinstance(args.toolkit, list):
+            tk = args.toolkit[0]
+        else:
+            tk = args.toolkit
+        if len(args.slice) < 4:
+            slice = None
+        else:
+            slice = args.slice
+        if isinstance(args.zoom, list):
+            zoom = args.zoom[0]
+        else:
+            zoom = args.zoom
+        if isinstance(args.Trigger, list):
+            Trigger = args.Trigger[0]
+        else:
+            Trigger = args.Trigger
+        if Trigger == -1:
+            Trigger = None
+        if isinstance(args.exposure, list):
+            exposure_ms = args.exposure[0]
+        else:
+            exposure_ms = args.exposure
+        if isinstance(args.board, list):
+            board = int(args.board[0])
+        else:
+            board = int(args.board)
+        if isinstance(args.bitdepth, list):
+            bitdepth = int(args.bitdepth[0])
+        else:
+            bitdepth = int(args.bitdepth)
+        if isinstance(args.framerate, list):
+            framerate = float(args.framerate[0])
+        else:
+            framerate = float(args.framerate)
+        if isinstance(args.rotate, list):
+            rotate = float(args.rotate[0])
+        else:
+            rotate = float(args.rotate)
+        if args.ROI is not None and len(args.ROI) != 4:
+            raise ValueError("ROI must be 4 integers xmin, ymin, xmax, ymax")
+        if args.camera_type.upper() == "PCO":
+            if args.list:
+                from pymanip.video.pco import print_available_pco_cameras
 
-            print_available_pco_cameras()
+                print_available_pco_cameras()
+            else:
+                interface = str(args.interface)
+                if not interface:
+                    interface = "all"
+                preview_pco(
+                    interface,
+                    board,
+                    tk,
+                    slice,
+                    zoom,
+                    Trigger,
+                    exposure_ms,
+                    rotate=rotate,
+                    roi=args.ROI,
+                )
+        elif args.camera_type.upper() == "AVT":
+            if args.list:
+                print("Listing cameras not implemented for AVT")
+            else:
+                preview_avt(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
+        elif args.camera_type.upper() == "ANDOR":
+            if args.list:
+                print("Listing cameras not implemented for Andor")
+            else:
+                preview_andor(
+                    board,
+                    tk,
+                    slice,
+                    zoom,
+                    Trigger,
+                    exposure_ms,
+                    bitdepth,
+                    framerate,
+                    rotate=rotate,
+                )
         else:
-            interface = str(args.interface)
-            if not interface:
-                interface = "all"
-            preview_pco(
-                interface,
-                board,
-                tk,
-                slice,
-                zoom,
-                Trigger,
-                exposure_ms,
-                rotate=rotate,
-                roi=args.ROI,
-            )
-    elif args.camera_type.upper() == "AVT":
-        if args.list:
-            print("Listing cameras not implemented for AVT")
-        else:
-            preview_avt(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
-    elif args.camera_type.upper() == "ANDOR":
-        if args.list:
-            print("Listing cameras not implemented for Andor")
-        else:
-            preview_andor(
-                board,
-                tk,
-                slice,
-                zoom,
-                Trigger,
-                exposure_ms,
-                bitdepth,
-                framerate,
-                rotate=rotate,
-            )
+            print("Unknown camera type: ", args.camera_type)
     else:
-        print("Unknown camera type: ", args.camera_type)
-else:
-    print("Unknown command `{:}'.")
+        print("Unknown command `{:}'.")

@@ -1,6 +1,8 @@
 Asynchronous Session
 ====================
 
+.. _AsyncSession:
+
 Introduction
 ------------
 

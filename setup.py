@@ -16,7 +16,11 @@ setup(
     description="Python framework for experiments",
     long_description=readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/jsalort/pymanip",
+    url="https://pypi.org/project/pymanip/",
+    project_urls={
+        "Documentation": "https://pymanip.readthedocs.io/en/latest/",
+        "Source Code": "https://github.com/jsalort/pymanip",
+    },
     author="Julien Salort",
     author_email="julien.salort@ens-lyon.fr",
     license="CeCILL-B",
@@ -28,5 +32,9 @@ setup(
         "progressbar2",
         "aiohttp",
         "aiohttp_jinja2",
+    ],
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Operating System :: OS Independent",
     ],
 )

@@ -1,6 +1,41 @@
-"""
+"""Asynchronous Instrument features (:mod:`pymanip.aioinstruments.aiofeatures`)
+===============================================================================
 
-Async wrapper for fluidlab instrument features
+Asynchronous extension of fluidlab instrument features. The main difference is that they
+define :meth:`aget` and :meth:`aset` co-routine methods. The original :meth:`get` and
+:meth:`set` are not overridden, and may still be used.
+
+.. autoclass:: AsyncWriteCommand
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncQueryCommand
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncValue
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncNumberValue
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncFloatValue
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncBoolValue
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncIntValue
+   :members:
+   :private-members:
+
+.. autoclass:: AsyncRegisterValue
+   :members:
+   :private-members:
 
 """
 

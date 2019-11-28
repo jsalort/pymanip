@@ -1,6 +1,31 @@
-"""
+"""Asynchronous IEC60488 instrument driver (:mod:`pymanip.aioinstruments.aioiec60488`)
+======================================================================================
 
-Asynchroneous extension to fluidlab iec60488
+This module defines an asynchronous subclass of
+:class:`fluidlab.instruments.iec60488.IEC60488`.
+
+.. autoclass:: AsyncIEC60488
+   :members:
+   :private-members:
+
+   .. autoattribute:: aclear_status
+
+   .. autoattribute:: aquery_esr
+
+   .. autoattribute:: aquery_stb
+
+   .. autoattribute:: aquery_identification
+
+   .. autoattribute:: areset_device
+
+   .. autoattribute:: aperform_internal_test
+
+   .. autoattribute:: await_till_completion_of_operations
+
+   .. autoattribute:: aget_operation_complete_flag
+
+   .. autoattribute:: await
+
 
 """
 

@@ -5,60 +5,52 @@
 pymanip
 =======
 
-Python framework for experiments based on fluidlab.
-It is  developed in close relation to fluidlab package. It aims at
-providing simpler bindings for the less nerdy end-user.
+Description and goals
+---------------------
 
-It is distributed, as is, in the hope that it will be useful,
-but without any warranty of usefulness, under the terms of
-the CECILL-B license, a BSD compatible French license.
+pymanip is the main package that we use for data acquisition and monitoring of
+our experimental systems in the Convection group at 
+[Laboratoire de physique de l'ENS de Lyon](http://www.ens-lyon.fr/PHYSIQUE).
+It can be seen as an extension
+of the [FluidLab](http://bitbucket.org/fluiddyn/fluidlab) module, which it heavily uses.
+It is available freely under the French 
+[CECILL-B license](https://cecill.info/licences/Licence_CeCILL-B_V1-en.html)
+in the hope that it can be useful to others. But it is provided AS IS, without any warranty as to
+its commercial value, its secured, safe, innovative or relevant nature.
 
-You can get the source code from [github](https://github.com/jsalort/pymanip).
+Unlike FluidLab, pymanip does not garantee any long term stability, and may change the API
+in the future without warning.
+However, some parts of the pymanip module may eventually be integrated into 
+FluidLab, once they are stable enough.
 
-Typical GPIB usage
-------------------
+The pymanip module is a set of tools for data acquisition and data management. Its goals are the
+following:
 
-```python
-from pymanip import Session
-from pymanip.instruments import Agilent34970a
+- management of experimental “sessions”, for storing and retriving data, and useful live tools for experimental monitoring over long times, such as live plot, automated emails, and remote access of the live data, and also simple interrupt signal management;
+- simplify access to FluidLab instrument classes;
+- experimental implementation of asynchroneous video acquisition and DAQ acquisition;
+- experimental extension of FluidLab interface and instrument classes with asynchroneous methods;
+- miscellaneous CLI tools for saved session introspection, live video preview, live oscilloscope and spectrum analyser-style DAQ preview, and VISA/GPIB scanning.
 
-with Session('Monitoring', ('R1', 'R2') ) as MI:
+Documentation
+-------------
 
-    try:
-        multiplexer = Agilent34970a('GPIB0::9::INSTR')
-       
-        while True:
-            (R1, R2) = multiplexer.ohm_4w.get( (101, 102) )
-            
-            MI.log_addline()
-            MI.log_plot(1, ('R1') )
-            MI.sleep(30)
-    
-    except KeyboardInterrupt:
-        pass
+The documentation is available at [readthedocs](https://pymanip.readthedocs.io/en/latest/).
+
+Installation
+------------
+
+The package can be installed from [pypi](https://pypi.org/project/pymanip/) using `pip`:
+
+```
+python -m pip install pymanip
 ```
 
-Typical Acquisition card usage
-------------------------------
+or can be installed from github
 
-```python
-from pymanip import Session
-from pymanip.daq import DAQmx
-
-N = 10000
-fs = 50e3
-
-data, = DAQmx.read_analog('Dev1/ai0', 'Diff',
-                          volt_min=-10.0, volt_max=10.0,
-                          samples_per_chan=N, sample_rate=fs)
-MI.save_dataset('data')
-MI.save_parameters( ('N', 'fs') )
-MI.Stop()
+```
+git clone https://github.com/jsalort/pymanip.git
+cd pymanip
+python setup.py develop
 ```
 
-Typical camera acquisition usage
---------------------------------
-
-```python
-from pymanip.video.pco import PCO_Camera
-```

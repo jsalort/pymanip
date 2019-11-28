@@ -34,7 +34,9 @@ following:
    :maxdepth: 2
    :caption: Contents:
 
+   instruments/instruments
    sessions/asyncsession
+   cli/intro
 
 .. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab 
 

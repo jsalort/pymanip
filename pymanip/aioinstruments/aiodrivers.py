@@ -1,6 +1,17 @@
-"""
+"""Asynchronous Instrument drivers (:mod:`pymanip.aioinstruments.aiodrivers`)
+=============================================================================
 
-Async Instrument drivers
+This module defines a subclass of :class:`fluidlab.instruments.drivers.Driver` where
+the QueryInterface attribute is replaced by the corresponding AsyncQueryInterface
+instance. The asynchronous context manager is bound to the interface asynchronous context
+manager.
+
+.. autofunction:: interface_from_string
+
+.. autoclass:: AsyncDriver
+   :members:
+   :private-members:
+
 
 """
 
@@ -12,6 +23,9 @@ from pymanip.interfaces.aiointer import AsyncQueryInterface
 
 
 def interface_from_string(name, default_physical_interface=None, **kwargs):
+    """This function is similar to :func:`fluidlab.interfaces.interface_from_string` except
+    that it returns an instance of :class:`AsyncQueryInterface` instead of :class:`QueryInterface`.
+    """
 
     classname, physical_interface = flinter.interface_classname_from_string(
         name, default_physical_interface, **kwargs
@@ -30,8 +44,12 @@ def interface_from_string(name, default_physical_interface=None, **kwargs):
 
 
 class AsyncDriver(fldrivers.Driver):
-    def __init__(self, interface=None):
+    """This class is an asynchronous extension of :class:`fluidlab.instruments.drivers.Driver`.
+    """
 
+    def __init__(self, interface=None):
+        """Constructor method
+        """
         if isinstance(interface, str):
             interface = interface_from_string(
                 interface, self.default_physical_interface, **self.default_inter_params
@@ -42,8 +60,12 @@ class AsyncDriver(fldrivers.Driver):
         super().__init__(interface)
 
     async def __aenter__(self):
+        """Asynchronous context manager enter method
+        """
         await self.interface.__aenter__()
         return self
 
     async def __aexit__(self, type_, value, cb):
+        """Asynchronous context manager exit method
+        """
         await self.interface.__aexit__(type_, value, cb)
