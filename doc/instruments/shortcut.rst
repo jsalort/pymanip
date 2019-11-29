@@ -2,8 +2,7 @@ Shortcuts to FluidLab Instrument classes
 ========================================
 
 The instrument classes are the basic objects that we use to communicate with various
-scientific instruments. They are implemented in the FluidLab_ project. The documentation
-can be found on `fluidlab.instruments class documentation <https://fluidlab.readthedocs.io/en/latest/generated/fluidlab.instruments.html>`_.
+scientific instruments. They are implemented in the FluidLab_ project in the :mod:`fluidlab.instruments` module.
 
 The :mod:`pymanip.instruments` module, along with the :ref:`list_instruments cli command<list_instruments>` are simple tools, designed to simplify access to these classes.
 
@@ -28,7 +27,5 @@ The names of the available instrument classes can be conveniently obtained from 
 .. code-block:: bash
 
     $ python -m pymanip list_instruments
-
-.. automodule:: pymanip.instruments
 
 .. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab

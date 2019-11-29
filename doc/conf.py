@@ -30,7 +30,15 @@ release = "0.3"
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx.ext.autodoc", "sphinxarg.ext", "sphinx.ext.intersphinx"]
+extensions = [
+    "sphinx.ext.autodoc",  # include documentation from docstrings
+    "sphinxarg.ext",  # sphinx-argparse generate doc from argparse
+    "sphinx.ext.intersphinx",  # link to fluidlab documentation on readthedocs
+    "sphinx.ext.viewcode",  # show source code of documented classes and functions
+    "sphinx.ext.autosummary",  # generate autodoc summaries
+    "sphinx.ext.todo",
+]
+
 intersphinx_mapping = {"fluidlab": ("https://fluidlab.readthedocs.io/en/latest/", None)}
 
 # Add any paths that contain templates here, relative to this directory.

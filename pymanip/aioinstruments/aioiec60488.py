@@ -24,7 +24,7 @@ This module defines an asynchronous subclass of
 
    .. autoattribute:: aget_operation_complete_flag
 
-   .. autoattribute:: await
+   .. autoattribute:: await_continue
 
 
 """
@@ -99,7 +99,7 @@ Used in the status reporting system.
     AsyncQueryCommand(
         "aget_operation_complete_flag", "Get operation complete flag", "*OPC?"
     ),
-    AsyncQueryCommand("await", "Wait to continue", "*WAI"),
+    AsyncQueryCommand("await_continue", "Wait to continue", "*WAI"),
 ]
 
 AsyncIEC60488._build_class_with_features(afeatures)

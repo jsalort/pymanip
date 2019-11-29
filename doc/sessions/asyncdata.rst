@@ -1,0 +1,10 @@
+Data management
+===============
+
+AsyncSession objects can store three kinds of data:
+
+- scalar variables monitored in time at possibly irregular time intervals. Scalar values of these variables are logged, in a “data logger” manner. They are suited to the monitoring of quantities over time when a regular measurement rate is not required. We call them “logged variables”. Tasks can save values by calling the :meth:`pymanip.asyncsession.AsyncSession.add_entry` method, and they can be later retrieved by calling the following methods :meth:`pymanip.asyncsession.AsyncSession.logged_variables`, :meth:`pymanip.asyncsession.AsyncSession.logged_variable`, :meth:`pymanip.asyncsession.AsyncSession.logged_data`, :meth:`pymanip.asyncsession.AsyncSession.logged_first_values`, :meth:`pymanip.asyncsession.AsyncSession.logged_last_values`, :meth:`pymanip.asyncsession.AsyncSession.logged_data_fromtimestamp`, or by using the `sesn[varname]` syntax shortcut which is equivalent to the :meth:`logged_variable` method.
+
+- scalar parameter defined once in the session. We call them “parameters”. A program can save parameters with the :meth:`pymanip.asyncsession.AsyncSession.save_parameter` method, and they can be later retrieved by calling the :meth:`pymanip.asyncsession.AsyncSession.parameter`, :meth:`pymanip.asyncsession.AsyncSession.parameters`, :meth:`pymanip.asyncsession.AsyncSession.has_parameter` methods.
+
+- non-scalar variables monitored in time at possibly irregular time intervals. A non-scalar value is typically a numpy array from an acquisition card or a frame from a camera. We call them “datasets”. They can be saved with the :meth:`pymanip.asyncsession.AsyncSession.add_dataset` method, and later be retrieved by the :meth:`pymanip.asyncsession.AsyncSession.dataset`, :meth:`pymanip.asyncsession.AsyncSession.datasets`,  :meth:`pymanip.asyncsession.AsyncSession.dataset_names`, :meth:`pymanip.asyncsession.AsyncSession.dataset_last_data`, :meth:`pymanip.asyncsession.AsyncSession.dataset_times` methods.
