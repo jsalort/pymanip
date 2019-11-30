@@ -34,6 +34,7 @@ following:
    :maxdepth: 2
    :caption: Contents:
 
+   installation
    instruments/instruments
    sessions/asyncsession
    cli/intro
