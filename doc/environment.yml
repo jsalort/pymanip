@@ -6,3 +6,9 @@ dependencies:
     - sphinx
     - opencv
     - matplotlib
+    - pip:
+        - pyvisa
+        - pyvisa-py
+        - pydaqmx
+        - sphinx-argparse
+        - sphinx_rtd_theme

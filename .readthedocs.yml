@@ -8,9 +8,6 @@ formats: all
 
 python:
     version: 3.7
-    install:
-        - requirements: requirements.txt
-        - requirements: doc/requirements.txt
 
 conda:
     environment: doc/environment.yml
