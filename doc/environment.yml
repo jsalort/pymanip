@@ -1,0 +1,8 @@
+dependencies:
+    - python=3.7
+    - numpy
+    - scipy
+    - h5py
+    - sphinx
+    - opencv
+    - matplotlib

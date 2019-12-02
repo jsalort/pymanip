@@ -10,5 +10,3 @@ pytest
 pytest-cov
 coveralls
 importlib_resources
-sphinx-argparse
-sphinx_rtd_theme

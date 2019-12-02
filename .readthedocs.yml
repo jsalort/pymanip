@@ -1,0 +1,16 @@
+version: 2
+
+sphinx:
+    configuration: docs/conf.py
+    fail_on_warning: true
+
+formats: all
+
+python:
+    version: 3.7
+    install:
+        - requirements: requirements.txt
+        - requirements: docs/requirements.txt
+
+conda:
+    file: doc/environment.yml
