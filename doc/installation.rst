@@ -7,7 +7,7 @@ Dependencies
 :mod:`pymanip` requires FluidLab_ which it builds upon, as well as several third-party modules
 to communicate with instruments, either indirectly through FluidLab_, or directly. Not all
 dependencies are declared in the `requirements.txt` file, because none of them are hard
-dependencies. It is possible to use :`pymanip` or FluidLab_ with only a subset of these
+dependencies. It is possible to use :mod:`pymanip` or FluidLab_ with only a subset of these
 dependencies.
 Here is a dependence table, depending on what you want to do with the package. If a feature
 is available through FluidLab_, the table indicates the FluidLab_ submodule that we are

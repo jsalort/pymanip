@@ -1,8 +1,8 @@
-"""
+"""Andor module (:mod:`pymanip.video.andor`)
+============================================
 
-Support for Andor cameras
-- camera submodule implements the pymanip.video.Camera object using pyAndorNeo module
-- reader submodule implements reading of DAT and SIF files in pure python
+This module is a shortcut for the :class:`pymanip.video.andor.camera.Andor_Camera`
+class.
 
 """
 

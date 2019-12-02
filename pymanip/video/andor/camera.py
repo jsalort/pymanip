@@ -1,6 +1,13 @@
-"""
+"""Andor Camera module (:mod:`pymanip.video.andor.camera`)
+==========================================================
 
-Implements the pymanip.video.Camera object using pyAndorNeo module
+This module implement the :class:`Andor_Camera` class, as a subclass
+of the :class:`pymanip.video.Camera` base class. It uses the
+third-party :mod:`pyAndorNeo` module.
+
+.. autoclass:: Andor_Camera
+   :members:
+   :private-members:
 
 """
 
@@ -73,7 +80,16 @@ def parse_metadata(buf, verbose=False):
 
 
 class Andor_Camera(Camera):
+    """Concrete :class:`pymanip.video.Camera` class for Andor camera.
+
+    :param camNum: camera number, defaults to 0.
+    :type camNum: int, optional
+    """
+
     def __init__(self, camNum=0):
+        """Constructor method
+        """
+
         self.camNum = camNum
 
         # Auto properties (bound in SDK3Cam __init__)
@@ -158,23 +174,32 @@ class Andor_Camera(Camera):
         print(self.name)
 
     def close(self):
+        """This method closes the Camera handle.
+        """
         SDK3.Close(self.handle)
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method.
+        """
         super(Andor_Camera, self).__exit__(type_, value, cb)
         self.close()
 
     def set_exposure_time(self, seconds):
+        """This method sets the camera exposure time
+
+        :param seconds: exposure in seconds
+        :type seconds: float
+
+        """
         self.ExposureTime.setValue(seconds)
 
     def get_exposure_time(self):
-        """ returns exposure time in seconds """
+        """This method returns the exposure time in seconds
+        """
         return self.ExposureTime.getValue()
 
     def acquisition_oneshot(self, timeout=1.0):
-        """
-        Simple one shot image grabbing.
-        Returns an autonomous numpy array
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_oneshot` for the Andor camera.
         """
 
         # Make sure no acquisition is running & flush
@@ -237,9 +262,10 @@ class Andor_Camera(Camera):
         initialising_cams=None,
         raise_on_timeout=True,
     ):
-        """
-        Multiple image acquisition
-        yields a shared memory numpy array
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the Andor camera.
+
+        .. todo:
+            add support for initialising_cams
         """
 
         loop = asyncio.get_event_loop()
@@ -335,6 +361,8 @@ class Andor_Camera(Camera):
             yield True
 
     def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition` for the Andor camera.
+        """
         yield from synchronize_generator(
             self.acquisition_async, num, timeout, raw, None, raise_on_timeout
         )

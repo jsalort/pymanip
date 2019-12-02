@@ -1,7 +1,16 @@
-"""
+"""Andor reader module (:mod:`pymanip.video.andor.reader`)
+==========================================================
 
-Andor Camera DAT and SIF image file reader
+This module implements simple pure-python reader for Andor DAT and SIF
+files.
 
+.. autoclass:: AndorAcquisitionReader
+   :members:
+   :private-members:
+
+.. autoclass:: SIFFile
+   :members:
+   :private-members:
 
 """
 
@@ -15,11 +24,16 @@ import numpy as np
 
 
 class AndorAcquisitionReader:
-    """
-    Read DAT spool files in a directory
+    """This class is a simple pure-python reader for Andor DAT spool files in a directory.
+
+    :param acquisition_folder: the folder in which to read the DAT spool files
+    :type acquisition_folder: str
+
     """
 
     def __init__(self, acquisition_folder):
+        """Constructor method
+        """
         config = configparser.ConfigParser()
         with io.open(
             os.path.join(acquisition_folder, "acquisitionmetadata.ini"),
@@ -44,10 +58,18 @@ class AndorAcquisitionReader:
             self.file_list.sort()
 
     def images(self):
+        """This generator method yields the images found in the folder.
+        """
         for i in range(len(self)):
             yield self[i]
 
     def __getitem__(self, key):
+        """This method returns the nth image in the folder.
+
+        :param key: image number
+        :type key: int
+
+        """
         bname = os.path.basename(self.file_list[key])
         n = bname.find("spool")
         timestamp = int(bname[:n]) / 1e6
@@ -59,32 +81,49 @@ class AndorAcquisitionReader:
         return timestamp, data[::-1, :]
 
     def __len__(self):
+        """Number of images in folder.
+        """
         return len(self.file_list)
 
 
 class SIFFile:
-    """
-    Read SIF file
+    """This class implements a pure-python reader for Andor SIF files.
+
+    :param filename: the SIF filename
+    :type filename: str
+
     """
 
     def __init__(self, filename):
+        """Constructor method
+        """
         self.filename = filename
 
     def open(self):
+        """This method opens the file.
+        """
         self.f = open(self.filename, "rb")
 
     def close(self):
+        """This method closes the file.
+        """
         self.f.close()
 
     def __enter__(self):
+        """Context manager enter method
+        """
         self.open()
         self.read_header()
         return self
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method
+        """
         self.close()
 
     def read_header(self):
+        """This method reads the header in the SIF file.
+        """
         self.filetype = self.f.readline().decode("ascii").strip()
         if self.filetype != "Andor Technology Multi-Channel File":
             raise ValueError("Wrong file type")
@@ -322,18 +361,35 @@ class SIFFile:
         self.Npixels = TSubImage["dimX"] * TSubImage["dimY"]
 
     def read_nth_frame(self, n):
+        """This method reads and returns the nth frame in the file.
+
+        :param n: frame number to read
+        :type n: int
+        :return: frame
+        :rtype: numpy.ndarray
+
+        """
         self.f.seek(self.datastart + self.Npixels * n * 4)
         return self.read_frame()
 
     def read_frame(self):
+        """The methods reads the next frame in file.
+
+        :return: frame
+        :rtype: numpy.ndarray
+        """
         return np.fromfile(self.f, dtype=np.float32, count=self.Npixels).reshape(
             (self.TSubImage["dimY"], self.TSubImage["dimX"])
         )[::-1, :]
 
     def images(self):
+        """This generator yields all the frames in the file.
+        """
         self.f.seek(self.datastart)
         for ts in self.timestamp:
             yield ts, self.read_frame()
 
     def __len__(self):
+        """Number of frames in file.
+        """
         return self.timestamp.size

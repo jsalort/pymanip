@@ -1,10 +1,23 @@
-"""
+"""Video acquisition module (:mod:`pymanip.video`)
+==================================================
 
-Module for camera and video recording:
+This module defines the :class:`~pymanip.video.Camera` abstract base class,
+which implements common methods such as the live video preview, and higher
+level simple methods to quickly set up a video recording. It also
+defines common useful functions, and a simple extension of Numpy arrays to
+hold metadata (such as frame timestamp).
 
-Depends on :
-    - opencv2 (conda install --channel conda-forge opencv)
-    - hdf5, pyqtgraph, progressbar2 (normal conda channel)
+.. autoclass:: Camera
+   :members:
+   :private-members:
+
+.. autoclass:: CameraTimeout
+
+.. autoclass:: MetadataArray
+   :members:
+   :private-members:
+
+.. autofunction:: save_image
 
 """
 
@@ -40,10 +53,32 @@ from pymanip.asynctools import synchronize_function
 
 
 class CameraTimeout(Exception):
+    """This class defines a CameraTimeout exception.
+    """
+
     pass
 
 
 def save_image(im, ii, basename, zerofill, file_format, compression, compression_level):
+    """This function is a simple general function to save an input image from the camera
+    to disk.
+
+    :param im: input image
+    :type im: :class:`~pymanip.video.MetadataArray`
+    :param ii: frame number
+    :type ii: int
+    :param basename: file basename
+    :type basename: str
+    :param zerofill: number of digits for the frame number
+    :type zerofill: int
+    :param file_format: image file format on disk. Possible values are: "raw", "npy", "npy.gz", "hdf5", "png", or a file extension that OpenCV imwrite supports
+    :type file_format: str
+    :param compression: the compression argument "gzip" or "lzf" to pass to :meth:`h5py.create_dataset` if file_format is "hdf5"
+    :type compression: str
+    :param compression_level: the png compression level passed to opencv for the "png" file format
+    :type compression_level: int
+
+    """
     if file_format == "raw":
         filename = ("{:}-{:0" + str(zerofill) + "d}.li16").format(basename, ii + 1)
         im.tofile(filename)
@@ -74,7 +109,9 @@ def save_image(im, ii, basename, zerofill, file_format, compression, compression
 
 
 class MetadataArray(np.ndarray):
-    """ Array with metadata. """
+    """This class extends Numpy array to allow for an additionnal metadata
+    attribute.
+    """
 
     def __new__(cls, input_array, metadata=None):
         obj = np.asarray(input_array).view(cls)
@@ -88,24 +125,209 @@ class MetadataArray(np.ndarray):
 
 
 class Camera:
-    """
-    Subclasses must implement:
-        - acquisition_oneshot method
-        - acquisition generator
-        - resolution, name, bitdepth properties
+    """This class is the abstract base class for all other concrete camera classes.
+    The concrete sub-classes *must* implement the following methods:
+
+    - :meth:`acquisition_oneshot` method
+
+    - :meth:`acquisition` and :meth:`acquisition_async` generator methods
+
+    - :attr:`resolution`, :attr:`name` and :attr:`bitdepth` properties
+
+    The concrete sub-classes will also probably have to override the constructor
+    method, and the enter/exit context manager method, as well as common property getters
+    and setters:
+
+    - :meth:`set_exposure_time`
+
+    - :meth:`set_trigger_mode`
+
+    - :meth:`set_roi`
+
+    - :meth:`set_frame_rate`
+
+    It may also define specialized getters for the camera which support them:
+
+    - :meth:`set_adc_operating_mode`: ADC operating mode
+
+    - :meth:`set_pixel_rate`: pixel rate sensor readout (in Hz)
+
+    - :meth:`set_delay_exposuretime`
+
     """
 
-    def __init__(self):
-        super(Camera, self).__init__()
+    def acquisition_oneshot(self):
+        """This method must be implemented in the sub-classes.
+        It starts the camera, grab one frame, stops the camera, and returns the frame. It is useful for testing
+        purposes, or in cases where only one frame is desired between very long time delays. It takes no input parameters.
+        Returns an "autonomous" array (the buffer is independant of the camera object).
+
+        :return: frame
+        :rtype: :class:`~pymanip.video.MetadataArray`
+
+        """
+        raise NotImplementedError()
+
+    def acquisition(
+        self,
+        num=np.inf,
+        timeout=1000,
+        raw=False,
+        initialising_cams=None,
+        raise_on_timeout=True,
+    ):
+        """This generator method is the main method that sub-classes must implement, along with the asynchronous variant.
+        It is used by all the other higher-level methods, and can also be used directly in user code.
+
+        :param num: number of frames to acquire, defaults to float("inf").
+        :type num: int, or float("inf"), optional
+        :param timout: timeout for frame acquisition (in milliseconds)
+        :type timeout: int, optional
+        :param raw: if True, returns bytes from the camera without any conversion. Defaults to False.
+        :type raw: bool, optional
+        :param initialising_cams: None, or set of camera objects. This camera object will remove itself from this set, once it is ready to grab frames. Useful in the case of multi camera acquisitions, to determine when all cameras are ready to grab frames. Defaults to None.
+        :type initialising_cams: set, optional
+        :param raise_on_timeout: boolean indicating whether to actually raise an exception when timeout occurs
+        :type raise_on_timeout: bool, optional
+
+        It starts the camera, yields :obj:`num` images, and closes the camera.
+        It can be aborted when sent a true-truth value object. It then cleanly
+        stops the camera and finally yields True as a confirmation that the stop_signal has been caught before returning.
+        Sub-classes must therefore reads the possible stop_signal when yielding the frame, and act accordingly.
+
+        The :class:`~pymanip.video.MetadataArray` objects yielded by this generator use a shared memory buffer which may
+        be overriden for the next frame, and which is no longer defined when the generator object is cleaned up.
+        The users are responsible for copying the array, if they want a persistant copy.
+
+        The typical code structure in sub-classes must be like this:
+
+        .. code-block:: python
+
+            def acquisition(self, *args, **kwargs):
+
+                # ... setup code ...
+
+                while count < num:
+
+                    # ... grab frame code ...
+
+                    stop_signal = yield MetadataArray(frame,
+                                                      metadata={"counter": count,
+                                                                "timestamp": timestamp,
+                                                                }
+                                                      )
+                    if stop_signal:
+                        break
+
+                # ... cleanup code ...
+
+                if stop_signal:
+                    yield True
+
+        User-level code will use the generator in this manner:
+
+        .. code-block:: python
+
+            gen = cam.acquire()
+            for frame in gen:
+
+                # .. do something with frame ..
+
+                if I_want_to_stop:
+                    clean = gen.send(True)
+                    if not clean:
+                        print('Warning generator not cleaned')
+                    # no need to break here because the gen will be automatically exhausted
+
+        """
+        raise NotImplementedError()
+
+    async def acquisition_async(
+        self,
+        num=np.inf,
+        timeout=1000,
+        raw=False,
+        initialising_cams=None,
+        raise_on_timeout=True,
+    ):
+        """This asynchronous generator method is similar to the :meth:`~pymanip.video.Camera.acquisition` generator method,
+        except asynchronous. So much so, that in the general case, the latter can be defined simply by yielding from this
+        asynchronous generator (so that the code is written once for both use cases), i.e.
+
+        .. code-block:: python
+
+            from pymanip.asynctools import synchronize_generator
+
+            def acquisition(
+                self,
+                num=np.inf,
+                timeout=1000,
+                raw=False,
+                initialising_cams=None,
+                raise_on_timeout=True,
+            ):
+                yield from synchronize_generator(
+                    self.acquisition_async,
+                    num,
+                    timeout,
+                    raw,
+                    initialising_cams,
+                    raise_on_timeout,
+                )
+
+        It starts the camera, yields :obj:`num` images, and closes the camera.
+        It can stop yielding images by sending the generator object a true-truth value object. It then cleanly
+        stops the camera and finally yields True as a confirmation that the stop_signal has been caught before returning.
+        Sub-classes must therefore reads the possible stop_signal when yielding the frame, and act accordingly.
+
+        The :class:`~pymanip.video.MetadataArray` objects yielded by this generator use a shared memory buffer which may
+        be overriden for the next frame, and which is no longer defined when the generator object is cleaned up.
+        The users are responsible for copying the array, if they want a persistant copy.
+
+        The user API is similar, except with asynchronous calls, i.e.
+
+        .. code-block:: python
+
+            gen = cam.acquire_async()
+            async for frame in gen:
+
+                # .. do something with frame ..
+
+                if I_want_to_stop:
+                    clean = await gen.asend(True)
+                    if not clean:
+                        print('Warning generator not cleaned')
+                    # no need to break here because the gen will be automatically exhausted
+
+
+        """
+        raise NotImplementedError()
 
     def __enter__(self):
+        """Context manager enter method
+        """
         return self
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method
+        """
         if hasattr(self, "preview_generator"):
             self.preview_generator = None
 
     def preview(self, backend="cv", slice_=None, zoom=0.5, rotate=0):
+        """This methods starts and synchronously runs the live-preview GUI.
+
+        :param backend: GUI library to use. Possible values: "cv" for OpenCV GUI, "qt" for PyQtGraph GUI.
+        :type backend: str
+        :param slice_: coordinate of the region of interest to show, defaults to None
+        :type slice_: Iterable[int], optional
+        :param zoom: zoom factor, defaults to 0.5
+        :type zoom: float, optional
+        :param rotate: image rotation angle, defaults to 0
+        :type rotate: float, optional
+
+        """
+
         if backend == "cv":
             self.preview_cv(slice_, zoom, rotate)
         elif backend == "qt":
@@ -114,6 +336,10 @@ class Camera:
             raise RuntimeError('Unknown backend "' + backend + '"')
 
     async def preview_async_cv(self, slice_, zoom, name, rotate=0):
+        """This method starts and asynchronously runs the live-preview with OpenCV GUI.
+        The params are identical to the :meth:`~pymanip.video.Camera.preview` method.
+        """
+
         minimum = None
         maximum = None
         cv2.namedWindow(name)
@@ -149,15 +375,17 @@ class Camera:
             cv2.destroyAllWindows()
 
     def preview_cv(self, slice_, zoom, rotate=0):
+        """This method starts and synchronously runs the live-preview with OpenCV GUI.
+        It is a wrapper around the :meth:`pymanip.video.Camera.preview_async_cv` method.
+        The params are identical to the :meth:`~pymanip.video.Camera.preview` method.
+        """
         return synchronize_function(
             self.preview_async_cv, slice_, zoom, name="Preview", rotate=rotate
         )
 
     def preview_exitHandler(self):
-        """
-
-        This method sends a stop signal to the camera acquisition generator
-
+        """This method sends a stop signal to the camera acquisition generator of the
+        live-preview GUI.
         """
 
         clean = self.preview_generator.send(True)
@@ -165,7 +393,9 @@ class Camera:
             print("Generator not cleaned")
 
     def display_crosshair(self):
-        # add a centered crosshair for self-reflection
+        """This method adds a centered crosshair for self-reflection to the live-preview
+        window (qt backend only)
+        """
         if self.crosshair_chkbox.isChecked():
             self.vLine = pg.InfiniteLine(
                 pos=(self.camera.Width / 2, 0), angle=90, movable=False
@@ -180,6 +410,9 @@ class Camera:
             self.image_view.removeItem(self.hLine)
 
     def preview_qt(self, slice, zoom, app=None, rotate=0):
+        """This methods starts and synchronously runs the live-preview with Qt GUI.
+        The params are identical to the :meth:`~pymanip.video.Camera.preview` method.
+        """
         if app:
             self.app = app
             just_started = False
@@ -296,15 +529,15 @@ class Camera:
             QtGui.QApplication.instance().exec_()
 
     def acquire_to_files(self, *args, **kwargs):
+        """This method starts the camera, acquires images and saves them to the disk.
+        It is a simple wrapper around the :meth:`pymanip.video.Camera.acquire_to_files_async` asynchronous
+        method. The parameters are identical.
+        """
         return synchronize_function(self.acquire_to_files_async, *args, **kwargs)
 
     def acquire_signalHandler(self, *args, **kwargs):
+        """This method sends a stop signal to the :meth:`~pymanip.video.Camera.acquire_to_files_async` method.
         """
-
-        This method sends a stop signal to the camera acquisition generator
-
-        """
-
         self.acqinterrupted = True
 
     async def acquire_to_files_async(
@@ -322,24 +555,57 @@ class Camera:
         initialising_cams=None,
         **kwargs
     ):
-        """
-        Acquire num images and saves to disk
+        """This asynchronous method starts the camera, acquires :obj:`num` images and saves them to the disk. It is
+        a simple quick way to perform camera acquisition (one-liner in the user code).
 
-        - basename, zerofill: filename parameters
-        - dryrun = True: acquire but don't actually save [default: False]
-        - file_format:
-            'raw'    -> li16 (binary little-endian 16 bits integers)
-            'npy'    -> numpy npy file
-            'npy.gz' -> gzip compressed numpy file
-            'hdf5'   -> hdf5, with optional compression [default None]
-            'png', 'jpg', 'tif' -> image format with opencv imwrite
-                            with optional compression level for PNG
-                            [default: 3]
-        - compression (optional) for HDF5
-        - compression_level (optional) for PNG
-        - delay_save: records in RAM and save at this end
+        :param num: number of frames to acquire
+        :type num: int
+        :param basename: basename for image filenames to be saved on disk
+        :type basename: str
+        :param zerofill: number of digits for the framenumber for image filename, defaults to 4
+        :type zerofill: int, optional
+        :param dryrun: do the acquisition, but saves nothing (testing purposes), defaults to False
+        :type dryrun: bool, optional
+        :param file_format: format for the image files, defaults to "png". Possible values are "raw", "npy", "npy.gz", "hdf5", "png" or any other extension supported by OpenCV imwrite.
+        :type file_format: str, optional
+        :param compression: compression option for HDF5 format ("gzip", "lzf"), defaults to None.
+        :type compression: str, optional
+        :param compression_level: png compression level for PNG format, defaults to 3.
+        :type compression_level: int, optional
+        :param verbose: prints information message, defaults to True.
+        :type verbose: bool, optional
+        :param delay_save: records all the frame in RAM, and saves at the end. This is useful for fast framerates when saving time is too slow. Defaults to False.
+        :type delay_save: bool, optional
+        :param progressbar: use :mod:`progressbar` module to show a progress bar. Defaults to True.
+        :type progressbar: bool, optional
+        :param initialising_cams: None, or set of camera objects. This camera object will remove itself from this set, once it is ready to grab frames. Useful in the case of multi camera acquisitions, to determine when all cameras are ready to grab frames. Defaults to None.
+        :type initialising_cams: set, optional
+        :return: image_counter, frame_datetime
+        :rtype: list, list
 
-        returns: image_counter, frame_datetime as lists
+        The details of the file format are given in this table:
+
+        ===============     ========================================================================
+        file_format         description
+        ===============     ========================================================================
+        raw                 native 16 bits integers, i.e. li16 (little-endian) on Intel CPUs
+        npy                 numpy npy file (warning: depends on pickle format)
+        npy.gz              gzip compressed numpy file
+        hdf5                hdf5, with optional compression
+        png, jpg, tif       image format with opencv imwrite with optional compression level for PNG
+        ===============     ========================================================================
+
+        Typical usage of the function for one camera:
+
+        .. code-block:: python
+
+            async def main():
+
+                with Camera() as cam:
+                    counts, times = await cam.acquire_to_files_async(num=20, basename='img-')
+
+            asyncio.run(main())
+
 
         """
 

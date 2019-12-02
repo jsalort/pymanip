@@ -35,8 +35,9 @@ following:
    :caption: Contents:
 
    installation
-   instruments/instruments
    sessions/asyncsession
+   instruments/instruments
+   video/introduction
    cli/intro
 
 .. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab 

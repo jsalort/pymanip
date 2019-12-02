@@ -1,3 +1,15 @@
+"""AVT Camera module (:mod:`pymanip.video.avt`)
+===============================================
+
+This module implements the :class:`pymanip.video.avt.AVT_Camera` class
+using the third-party :mod:`pymba` module.
+
+.. autoclass:: AVT_Camera
+   :members:
+   :private-members:
+
+"""
+
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
 from pymanip.asynctools import synchronize_generator
@@ -7,6 +19,15 @@ import sys
 
 
 class AVT_Camera(Camera):
+    """Concrete :class:`pymanip.video.Camera` class for AVT camera.
+
+    :param cam_num: camera number, defaults to 0
+    :type cam_num: int, optional
+    :param pixelFormat: pixel format to use, e.g. "Mono8", "Mono16". Defaults to "Mono16"
+    :type pixelFormat: str, optional
+
+    """
+
     # Class attributes
     system = None
     vimba = None
@@ -14,6 +35,12 @@ class AVT_Camera(Camera):
 
     @classmethod
     def get_camera_list(cls):
+        """This methods returns the list of camera numbers connected to
+        the computer.
+
+        :return: camera ids
+        :rtype: list
+        """
         if cls.vimba:
             return cls.vimba.getCameraIds()
         else:
@@ -21,6 +48,8 @@ class AVT_Camera(Camera):
                 return vimba_.getCameraIds()
 
     def __init__(self, cam_num=0, pixelFormat="Mono16"):
+        """Constructor method
+        """
         if not AVT_Camera.vimba:
             AVT_Camera.vimba = Vimba().__enter__()
         if not AVT_Camera.system:
@@ -52,6 +81,8 @@ class AVT_Camera(Camera):
         self.camera.PixelFormat = pixelFormat.encode("ascii")
 
     def close(self):
+        """This method closes the connection to the camera.
+        """
         self.camera.closeCamera()
         self.camera = None
         AVT_Camera.active_cameras.remove(self)
@@ -61,14 +92,28 @@ class AVT_Camera(Camera):
             AVT_Camera.vimba = None
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method
+        """
         super(AVT_Camera, self).__exit__(type_, value, cb)
         self.close()
 
     def camera_features(self):
+        """This methods returns the list of possible camera features.
+
+        :return: camera feature
+        :rtype: list
+        """
         cameraFeatureNames = self.camera.getFeatureNames()
         return [f.decode("ascii") for f in cameraFeatureNames]
 
     def camera_feature_info(self, featureName):
+        """This method queries the camera for the specified feature.
+
+        :param featureName: one of the features returned by :meth:`~pymanip.video.avt.AVT_Camera.camera_features`
+        :type featureName: str
+        :return: values associated with the specified feature
+        :rtype: dict
+        """
         featureInfo = self.camera.getFeatureInfo(featureName)
         featDict = {
             field.decode("ascii")
@@ -103,13 +148,9 @@ class AVT_Camera(Camera):
                 featDict[k] = featDict[k].decode("ascii")
         return featDict
 
-    # Image acquisition
     def acquisition_oneshot(self):
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_oneshot` for the AVT camera.
         """
-        Simple one shot image grabbing.
-        Returns an autonomous numpy array
-        """
-
         self.camera.AcquisitionMode = "SingleFrame"
         self.frame = self.camera.getFrame()
         self.frame.announceFrame()
@@ -140,9 +181,11 @@ class AVT_Camera(Camera):
         return img
 
     def set_trigger_mode(self, mode=False):
-        """
-        True if external trigger.
-        Then also sets IIDCPacketSizeAuto to 'Maximize'
+        """This method sets the trigger mode for the camera.
+        For external trigger, the method also sets IIDCPacketSizeAuto to 'Maximize'.
+
+        :param mode: True if external trigger. False if internal trigger.
+        :type mode: bool
         """
 
         if mode:
@@ -153,8 +196,11 @@ class AVT_Camera(Camera):
             self.camera.TriggerMode = "Off"
 
     def set_exposure_time(self, seconds):
-        """
-        Range: from 33.0 to 67108895.0
+        """This method sets the exposure time for the camera.
+
+        :param seconds: exposure in seconds. Possible values range from 33.0 µs to 67108895.0 µs.
+        :type seconds: float
+
         """
         self.camera.ExposureMode = "Timed"
         self.camera.ExposureTime = seconds * 1e6
@@ -166,17 +212,20 @@ class AVT_Camera(Camera):
         raw=False,
         framerate=None,
         external_trigger=False,
+        initialising_cams=None,
         raise_on_timeout=True,
     ):
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition` for the AVT camera.
+        """
         yield from synchronize_generator(
             self.acquisition_async,
-            num,
-            timeout,
-            raw,
-            framerate,
-            external_trigger,
-            None,
-            raise_on_timeout,
+            num=num,
+            timeout=timeout,
+            raw=raw,
+            framerate=framerate,
+            external_trigger=external_trigger,
+            initialising_cams=initialising_cams,
+            raise_on_timeout=raise_on_timeout,
         )
 
     async def acquisition_async(
@@ -189,12 +238,8 @@ class AVT_Camera(Camera):
         initialising_cams=None,
         raise_on_timeout=True,
     ):
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the AVT camera.
         """
-        Multiple image acquisition
-        yields a shared memory numpy array valid only
-        before generator object cleanup.
-        """
-
         self.camera.AcquisitionMode = "Continuous"
         if framerate is not None:
             # Not usable if HighSNRIImages>0, external triggering or

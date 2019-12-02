@@ -1,7 +1,18 @@
-"""
+"""PCO Camera module (:mod:`pymanip.video.pco.camera`)
+======================================================
 
-This is the definition of a higher level PCO_Camera object
-based on the low-level pco.pixelfly module.
+This module implement the :class:`pymanip.video.pco.PCO_Camera` class using
+bindings to the Pixelfly library from :mod:`pymanip.video.pco.pixelfly`.
+
+.. autoclass:: PCO_Camera
+   :members:
+   :private-members:
+
+.. autofunction:: PCO_get_binary_timestamp
+
+.. autoclass:: PCO_Buffer
+   :members:
+   :private-members:
 
 """
 
@@ -20,24 +31,35 @@ import pymanip.video.pco.pixelfly as pf
 
 
 def PCO_get_binary_timestamp(image):
-    """
-    Reads the BCD coded timestamp in the first 14 pixels of an image
+    """This functions reads the BCD coded timestamp in the first 14 pixels of an image
+    from a PCO camera.
 
-    Format:
-    Pixel  1: Image counter (MSB) 00..99
-    Pixel  2: Image counter       00..99
-    Pixel  3: Image counter       00..99
-    Pixel  4: Image counter (LSB) 00..99
-    Pixel  5: Year (MSB)          20
-    Pixel  6: Year (LSB)          03..99
-    Pixel  7: Month               01..12
-    Pixel  8: Day                 01..31
-    Pixel  9: Hour                00..23
-    Pixel 10: Minutes             00..59
-    Pixel 11: Seconds             00..59
-    Pixel 12: µs * 10000          00..99
-    Pixel 13: µs * 100            00..99
-    Pixel 14: µs                  00..90
+    :param image: the PCO camera image buffer
+    :type image: array
+    :return: counter, timestamp
+    :rtype: int, datetime
+
+    We assume the following format (per PCO documentation):
+
+    ========= =================== ======
+    Pixel     Description         Range
+    ========= =================== ======
+    Pixel  1  Image counter (MSB) 00..99
+    Pixel  2  Image counter       00..99
+    Pixel  3  Image counter       00..99
+    Pixel  4  Image counter (LSB) 00..99
+    Pixel  5  Year (MSB)          20
+    Pixel  6  Year (LSB)          03..99
+    Pixel  7  Month               01..12
+    Pixel  8  Day                 01..31
+    Pixel  9  Hour                00..23
+    Pixel 10  Minutes             00..59
+    Pixel 11  Seconds             00..59
+    Pixel 12  µs * 10000          00..99
+    Pixel 13  µs * 100            00..99
+    Pixel 14  µs                  00..90
+    ========= =================== ======
+
     """
     counter = pf.bcd_to_int(image[:4], endianess="big")
     year = pf.bcd_to_int(image[4:6], endianess="big")
@@ -54,7 +76,23 @@ def PCO_get_binary_timestamp(image):
 
 
 class PCO_Buffer:
+    """This class represents an allocated buffer for the PCO camera.
+    It implements context manager, as well as utility function to convert to bytes
+    and numpy array. The buffer is allocated in the constructor method, and freed
+    either by the context manager exit method, or manually calling the :meth:`free`
+    method.
+
+    :param cam_handle: camera handle
+    :type cam_handle: HANDLE
+    :param XResAct: resolution in x direction
+    :type XResAct: int
+    :param YResAct: resolution in y direction
+    :type YResAct: int
+    """
+
     def __init__(self, cam_handle, XResAct, YResAct):
+        """Constructor method
+        """
         self.cam_handle = cam_handle
         self.XResAct = XResAct
         self.YResAct = YResAct
@@ -66,35 +104,68 @@ class PCO_Buffer:
         self.event_handle = event
 
     def free(self):
+        """This methods frees the buffer.
+        """
         pf.PCO_FreeBuffer(self.cam_handle, self.bufNr)
         self.bufPtr = None
 
     def __enter__(self):
+        """Context manager enter method
+        """
         return self
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method
+        """
         self.free()
 
     def as_array(self):
+        """This methods returns the buffer as a numpy array. No data is copied,
+        the memory is still bound to this buffer. The user must copy the data if
+        necessary.
+
+        :return: image array
+        :rtype: numpy.ndarray
+
+        """
         return np.ctypeslib.as_array(self.bufPtr, shape=(self.YResAct, self.XResAct))
 
     def bytes(self):
+        """This methods returns the data as a bytearray.
+
+        :return: image data
+        :rtype: bytearray
+
+        """
         nval = self.XResAct * self.YResAct
         bufType = ctypes.wintypes.WORD * nval
         return bytearray(bufType.from_address(ctypes.addressof(self.bufPtr.contents)))
 
 
 class PCO_Camera(Camera):
+    """Concrete :class:`pymanip.video.Camera` class for PCO camera.
 
-    # Open/Close camera
+    :param interface: interface where to look for the camera, defaults to "all"
+    :type interface: str, optional
+    :param camera_num: camera number to look for, defaults to 0.
+    :type camera_num: int, optional
+    :param metadata_mode: enable PCO Metadata mode, defaults to False.
+    :type metadata_mode: bool, optional
+    :param timestamp_mode: enable Timestamp mode (supported by all cameras), defaults to True.
+    :type timestamp_mode: bool, optional
+
+    """
+
     def __init__(
         self, interface="all", camera_num=0, *, metadata_mode=False, timestamp_mode=True
     ):
-        """
-        pco.sdk_manual page 10:
-        First step is to PCO_OpenCamera
-        As next step camera description and status should be queried
-        by calling PCO_GetCameraDescription and PCO_GetCameraHealthStatus
+        """Constructor method
+
+        .. note::
+            pco.sdk_manual page 10:
+            First step is to PCO_OpenCamera
+            As next step camera description and status should be queried
+            by calling PCO_GetCameraDescription and PCO_GetCameraHealthStatus
         """
 
         print("interface =", interface)
@@ -127,25 +198,38 @@ class PCO_Camera(Camera):
             self.MetaDataVersion = MetaDataVersion
 
     def close(self):
+        """This method closes the connection to the camera.
+        """
         pf.PCO_CloseCamera(self.handle)
         self.handle = None
         print("Connection to camera closed.")
 
     def __exit__(self, type_, value, cb):
+        """Context manager exit method
+        """
         super(PCO_Camera, self).__exit__(type_, value, cb)
         self.close()
 
     # Query states
     def health_status(self):
+        """This method queries the camera for its health status.
+
+        :return: warn, err, status
+        """
         warn, err, status = pf.PCO_GetCameraHealthStatus(self.handle)
         return warn, err, status
 
     # Set camera settings
     def set_adc_operating_mode(self, mode):
-        """
-        Select single or dual ADC operating mode.
-        Single mode increases linearity;
-        Dual mode allows higher frame rates.
+        """This function selects single or dual ADC operating mode:
+
+           :param mode: "single" (or 0x0001) or "dual" (or 0x0002)
+           :type mode: int or str
+
+           - Single mode increases linearity;
+
+           - Dual mode allows higher frame rates.
+
         """
         if mode not in (0x0001, 0x0002):
             shortcut = {"single": 0x0001, "dual": 0x0002}
@@ -153,13 +237,22 @@ class PCO_Camera(Camera):
         pf.PCO_SetADCOperation(self.handle, mode)
 
     def set_pixel_rate(self, rate):
-        """
-        Select pixel rate for sensor readout (in Hz)
+        """This function selects the pixel rate for sensor readout.
+
+        :param rate: readout rate (in Hz)
+        :type rate: float
+
         For PCO.1600: 10 Mhz or 40 MHz
         """
         pf.PCO_SetPixelRate(self.handle, int(rate))
 
     def set_trigger_mode(self, mode):
+        """This method sets the trigger mode for the camera.
+
+        :param mode: one of PCO_TriggerModeDescription
+        :type mode: str
+        """
+
         if mode in pf.PCO_TriggerModeDescription:
             pf.PCO_SetTriggerMode(self.handle, mode)
         else:
@@ -171,8 +264,12 @@ class PCO_Camera(Camera):
             pf.PCO_SetTriggerMode(self.handle, key)
 
     def set_delay_exposuretime(self, delay=None, exposuretime=None):
-        """
-        delay and exposuretime in seconds
+        """This method sets both the delay and the exposure time.
+
+        :param delay: delay in seconds
+        :type delay: float
+        :param exposuretime: exposure time in seconds
+        :type exposuretime: float
         """
         if delay is None or exposuretime is None:
             delay_current, exposure_current, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(
@@ -208,14 +305,23 @@ class PCO_Camera(Camera):
         )
 
     def set_roi(self, roiX0=0, roiY0=0, roiX1=0, roiY1=0):
-        """
-        Positions of the upper left corner (X0,Y0) and lower right
+        r"""This method sets the positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
+
+        :param roiX0: left border in pixels, must be :math:`1 + 32n, n \in \mathbb{N}`
+        :type roiX0: int
+        :param roiY0: top border in pixels, must be :math:`1 + 8n, n \in \mathbb{N}`
+        :type roiY0`: int
+        :param roiX1: right border in pixels, must be :math:`32m, m \in \mathbb{N}`
+        :type roiX1: int
+        :param roiY1: bottom border in pixels, must be :math:`8m, m \in \mathbb{N}`
+
+        The minimum ROI is :math:`64\times 16` pixels, and it is required that :math:`roiX1 \geq roix0` and :math:`roiY1 \geq roiY0`.
         """
         if (roiX0 - 1) % 32 != 0 or roiX1 % 32 != 0:
-            raise ValueError("X0 must be 1+32n, X1 must be 32m, n, m entiers")
+            raise ValueError("X0 must be 1+32n, X1 must be 32m, n, m integers")
         if (roiY0 - 1) % 8 != 0 or roiY1 % 8 != 0:
-            raise ValueError("Y0 must be 1+8n, Y1 must be 8m, n, m entiers")
+            raise ValueError("Y0 must be 1+8n, Y1 must be 8m, n, m integers")
         if roiX1 - roiX0 + 1 < 64 or roiY1 - roiY0 + 1 < 16:
             raise ValueError("Minimum ROI is 64 x 16 pixels")
         if roiX0 >= roiX1 or roiY0 >= roiY1:
@@ -232,23 +338,44 @@ class PCO_Camera(Camera):
         pf.PCO_SetROI(self.handle, int(roiX0), int(roiY0), int(roiX1), int(roiY1))
 
     def set_frame_rate(self, Frameratemode, Framerate, Framerateexposure):
-        """
-        Sets Frame rate (mHz) and exposure time (ns)
-        Frame rate status gives the limiting factors
-        if the condition are not met.
-        Frame rate mode variable to set the frame rate mode:
-        • 0x0000= Auto mode (camera decides which parameter will be trimmed)
-        • 0x0001= Frame rate has priority, (exposure time will be trimmed)
-        • 0x0002= Exposure time has priority, (frame rate will be trimmed)
-        • 0x0003= Strict, function shall return with error if values are not possible.
-        Message returns:
-          0x0000= Settings consistent, all conditions met
-        • 0x0001= Frame rate trimmed, frame rate was limited by readout time
-        • 0x0002= Frame rate trimmed, frame rate was limited by exposure time
-        • 0x0004= Exposure time trimmed, exposure time cut to frame time
-        • 0x8000= Return values dwFrameRate and dwFrameRateExposure are not
-        yet validated. In that case, the values returned are the values passed
-        to the function
+        """This method sets Frame rate (mHz) and exposure time (ns).
+
+        :param Frameratemode: one of the possible framerate modes (0x0000, 0x0001, 0x0002, 0x0003)
+        :type Frameratemode: int
+        :param Framerate: framerate in mHz
+        :type Framerate: int
+        :param Framerateexposure: Exposure time in ns
+        :type Framerateexposure: int
+
+        :return: message, framerate, exposure time
+        :rtype: int, int, int
+
+        The meaning of the framerate mode is given in this table
+
+        ==============  =====================================================================
+        Framerate mode  Meaning
+        ==============  =====================================================================
+        0x0000          Auto mode (camera decides which parameter will be trimmed)
+        0x0001          Frame rate has priority, (exposure time will be trimmed)
+        0x0002          Exposure time has priority, (frame rate will be trimmed)
+        0x0003          Strict, function shall return with error if values are not possible.
+        ==============  =====================================================================
+
+        The message value in return gives the limiting factors when the condition are not fulfilled.
+        The meaning is given in this table
+
+        ==============  =========================================================================
+        Message         Meaning
+        ==============  =========================================================================
+        0x0000          Settings consistent, all conditions met
+        0x0001          Frame rate trimmed, frame rate was limited by readout time
+        0x0002          Frame rate trimmed, frame rate was limited by exposure time
+        0x0004          Exposure time trimmed, exposure time cut to frame time
+        0x8000          Return values dwFrameRate and dwFrameRateExposure are not yet validated.
+        ==============  =========================================================================
+
+        In the case where message 0x8000 is returned, the other values returned are simply
+        the parameter values passed to the function.
         """
         print(
             "Setting the frame rate and the exposure time to",
@@ -263,10 +390,14 @@ class PCO_Camera(Camera):
     # Properties
     @property
     def resolution(self):
+        """Camera maximum resolution
+        """
         return self.camera_description.maximum_resolution_std
 
     @property
     def name(self):
+        """Camera name
+        """
         # if hasattr(self, '_name'):
         #    return self._name
         # PCO_GetCameraName is not supported by pco.1600
@@ -276,11 +407,15 @@ class PCO_Camera(Camera):
 
     @property
     def bitdepth(self):
+        """Camera sensor bit depth
+        """
         return 16
 
     def current_delay_exposure_time(self):
-        """
-        returns current delay and exposure time in seconds
+        """This method returns current delay and exposure time in seconds.
+
+        :return: delay, exposure
+        :rtype: float, float
         """
 
         delay, exposure, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(
@@ -292,22 +427,39 @@ class PCO_Camera(Camera):
         )
 
     def current_trigger_mode_description(self):
+        """This method returns the current trigger mode description.
+
+        :return: description of current trigger mode
+        :rtype: str
+        """
         return pf.PCO_TriggerModeDescription[pf.PCO_GetTriggerMode(self.handle)]
 
     def current_adc_operation(self):
+        """This method returns the current ADC operation mode.
+
+        :return: Current ADC operation mode (0x0001 for "single", 0x0002 for "dual")
+        :rtype: int
+        """
         return pf.PCO_ADCOperation(self.handle)
 
     def current_pixel_rate(self):
+        """This method returns the current pixel rate.
+
+        :return: Current pixel rate (e.g. 10 MHz or 40 MHz for the PCO.1600
+        :rtype: int
+        """
         return pf.PCO_GetPixelRate(self.handle)
 
     def current_frame_rate(self):
+        """This method returns the current frame rate.
+
+        :return: Current frame rate
+        :rtype: int
+        """
         return pf.PCO_GetFrameRate(self.handle)
 
-    # Image acquisition
     def acquisition_oneshot(self):
-        """
-        Simple one shot image grabbing.
-        Returns an autonomous numpy array
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_oneshot` for the PCO camera.
         """
         # Arm camera
         pf.PCO_ArmCamera(self.handle)
@@ -332,6 +484,8 @@ class PCO_Camera(Camera):
         return array
 
     def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition` for the PCO camera.
+        """
         yield from synchronize_generator(
             self.acquisition_async, num, timeout, raw, None, raise_on_timeout
         )
@@ -344,12 +498,7 @@ class PCO_Camera(Camera):
         initialising_cams=None,
         raise_on_timeout=True,
     ):
-        """
-        Multiple image acquisition
-        yields a shared memory numpy array valid only
-        before generator object cleanup.
-
-        timeout in milliseconds
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the PCO camera.
         """
 
         loop = asyncio.get_event_loop()

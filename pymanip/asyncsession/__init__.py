@@ -967,6 +967,10 @@ class AsyncSession:
         """This methods informs all tasks that the monitoring session should stop. Call this method if you
         wish to cleanly stop the monitoring session. It is also automatically called if the interrupt signal
         is received.
+        It essentially sets the :attr:`running` attribute to False.
+        Long user-defined tasks should check the :attr:`running` attribute, and abort if set to False.
+        All other AsyncSession tasks check the attribute and will stop. The :meth:`~pymanip.asyncsession.AsyncSession.sleep`
+        method also aborts sleeping.
         """
         self.running = False
         print(" Signal caught... stopping...")
@@ -1115,6 +1119,10 @@ class AsyncSession:
         matplotlib event loops if necessary. This is the main
         method that the main function of user program should await for. It is also responsible for setting up
         the signal handling and binding it to the ask_exit method.
+
+        It defines a :attr:`running` attribute, which is finally set to False when the monitoring must stop. User can
+        use the :meth:`~pymanip.asyncsession.AsyncSession.ask_exit` method to stop the monitoring. Time consuming
+        user-defined task should check the :attr:`running` and abort if set to False.
 
         :param \\*tasks: asynchronous tasks to run: if the task is a co-routine function, it will be called repeatedly until ask_exit is called. If task is an awaitable it is called only once. Such an awaitable is responsible to check that ask_exit has not been called. Several such awaitables are provided: :meth:`pymanip.asyncsession.AsyncSession.send_email`, :meth:`pymanip.asyncsession.AsyncSession.plot` and :meth:`pymanip.asyncsession.AsyncSession.sweep`.
         :type \\*tasks: co-routine function or awaitable
