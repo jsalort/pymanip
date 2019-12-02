@@ -6,7 +6,9 @@ dependencies:
     - sphinx
     - opencv
     - matplotlib
+    - aiohttp
     - pip:
+        - aiohttp_jinja2
         - pyvisa
         - pyvisa-py
         - pydaqmx
