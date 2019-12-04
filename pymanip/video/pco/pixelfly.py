@@ -141,8 +141,8 @@ class PCO_ErrorWarningSource(IntEnum):
     SC2_ERROR_PCOCAM_HEAD_UP = 0x00020000  # error at uP of head board in pco.camera
     SC2_ERROR_PCOCAM_MAIN_UP = 0x00030000  # error at uP of main board in pco.camera
     SC2_ERROR_PCOCAM_FWIRE_UP = (
-        0x00040000
-    )  # error at uP of firewire board in pco.camera
+        0x00040000  # error at uP of firewire board in pco.camera
+    )
     SC2_ERROR_PCOCAM_MAIN_FPGA = 0x00050000  # error at FPGA of main board in pco.camera
     SC2_ERROR_PCOCAM_HEAD_FPGA = 0x00060000  # error at FGPA of head board in pco.camera
     SC2_ERROR_PCOCAM_MAIN_BOARD = 0x00070000  # error at main board in pco.camera

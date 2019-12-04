@@ -866,7 +866,7 @@ class AsyncSession:
                             except TypeError:
                                 pass
                     else:
-                        p, = ax.plot(vs_x, vs_y, "s-")
+                        (p,) = ax.plot(vs_x, vs_y, "s-")
                         line_objects[y] = p
                         ax.set_xlabel(x)
                         ax.set_ylabel(y)
@@ -920,7 +920,7 @@ class AsyncSession:
                             if x.size > maxvalues:
                                 x = x[-maxvalues:]
                                 y = y[-maxvalues:]
-                            p, = ax.plot(x, y, "o-", label=name)
+                            (p,) = ax.plot(x, y, "o-", label=name)
                             line_objects[name] = p
                             ax.set_xlabel("t [h]")
                             if x[0] != x[-1]:

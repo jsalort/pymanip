@@ -19,9 +19,13 @@ from pymanip.nisyscfg._lib.types import NISysCfgResourcePropertyType
 
 
 def NISysCfgGetResourceProperty(resourceHandle, propertyID):
-    attr_ctype, attr_ini, create_func, ref_func, enum_class = NISysCfgResourcePropertyType[
-        propertyID
-    ]
+    (
+        attr_ctype,
+        attr_ini,
+        create_func,
+        ref_func,
+        enum_class,
+    ) = NISysCfgResourcePropertyType[propertyID]
     if create_func is None:
         create_func = attr_ctype
     if ref_func == ctypes.byref:

@@ -1,7 +1,17 @@
-"""
+"""Concrete implementation with niscope (:mod:`pymanip.aiodaq.scope`)
+=====================================================================
 
-Concrete implementation with niscope
-(tested only for PXI-5922)
+This module is a concrete implementation of the :class:`~pymanip.aiodaq.AcquisitionCard`
+class using the :mod:`niscope` module.
+
+.. note::
+   We have tested this module only for with a PXI-5922 card.
+
+.. autoclass:: ScopeSystem
+   :members:
+   :private-members:
+
+.. autofunction:: get_device_list
 
 """
 
@@ -31,6 +41,13 @@ possible_sample_rates = [60e6 / n for n in range(4, 1201)]
 
 
 class ScopeSystem(AcquisitionCard):
+    """This class is the concrete implentation for NI Scope cards.
+
+    :param scope_name: the name of the scope device, e.g. "Dev1"
+    :type scope_name: str
+
+    """
+
     def __init__(self, scope_name=None):
         super(ScopeSystem, self).__init__()
         self.scope_name = scope_name
@@ -42,17 +59,25 @@ class ScopeSystem(AcquisitionCard):
 
     @property
     def samp_clk_max_rate(self):
+        """Maximum rate for the board clock.
+        """
         return max(possible_sample_rates)
 
     def possible_trigger_channels(self):
+        """This method returns the list of possible channels for external triggering.
+        """
         return ["Ext"] + self.channels
 
     def close(self):
+        """This method closes the connection to the board.
+        """
         if self.scope:
             self.scope.close()
             self.scope = None
 
     def add_channel(self, channel_name, terminal_config, voltage_range):
+        """Concrete implementation of :meth:`pymanip.aiodaq.AcquisitionCard.add_channel`.
+        """
         cn = str(channel_name)
         if "/" in cn:
             scope_name, cn = cn.split("/")
@@ -73,6 +98,8 @@ class ScopeSystem(AcquisitionCard):
                 )
 
     def configure_clock(self, sample_rate, samples_per_chan):
+        """Concrete implementation for :meth:`pymanip.aiodaq.AcquisitionCard.configure_clock`
+        """
         if sample_rate not in possible_sample_rates:
             initial_sample_rate = sample_rate
             chosen = possible_sample_rates[0]
@@ -99,6 +126,8 @@ class ScopeSystem(AcquisitionCard):
         trigger_level=0,
         trigger_config=TriggerConfig.EdgeRising,
     ):
+        """Concrete implementation for :meth:`pymanip.aiodaq.AcquisitionCard.configure_trigger`
+        """
         if trigger_source is None:
             print("Setting trigger to Immediate")
             self.scope.ConfigureTrigger("Immediate")
@@ -126,12 +155,16 @@ class ScopeSystem(AcquisitionCard):
         self.trigger_set = True
 
     def start(self):
+        """Concrete implementation for :meth:`pymanip.aiodaq.AcquisitionCard.start`
+        """
         if not self.trigger_set:
             self.configure_trigger()
         self.scope.InitiateAcquisition()
         self.running = True
 
     async def stop(self):
+        """Concrete implementation for :meth:`pymanip.aiodaq.AcquisitionCard.stop`
+        """
         if self.running:
             self.running = False
             while self.reading:
@@ -139,6 +172,8 @@ class ScopeSystem(AcquisitionCard):
             self.scope.Abort()
 
     async def read(self, tmo=None):
+        """Concrete implementation for :meth:`pymanip.aiodaq.AcquisitionCard.read`
+        """
         self.reading = True
         start = time.monotonic()
         data = None
@@ -164,6 +199,19 @@ class ScopeSystem(AcquisitionCard):
 
 
 def get_device_list(daqmx_devices=None, verbose=False):
+    """This function gets the list of Scope device in the system. If NI System
+    Configuration is available, the list is grabbed from this library. Otherwise,
+    the function attempts to use the `nilsdev` command line tool.
+
+    Because `nilsdev` returns both DAQmx and Scope devices, the list of DAQmx devices
+    is queried to remove them from the returned list. If the user code has already
+    queried them, it is possible to pass them to avoid unnecessary double query.
+
+    :param daqmx_devices: the list of DAQmx devices.
+    :type daqmx_devices: list, optional
+    :param verbose: sets verbosity level
+    :type verbose: bool, optional
+    """
     if has_nisyscfg:
         return {
             f"{devname:} (scope)": [f"{devname:}/{ii:d}" for ii in range(2)]

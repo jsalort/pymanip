@@ -10,3 +10,4 @@ from .stanford_sr830 import AsyncStanfordSR830
 from .newport_xps_rl import AsyncNewportXpsRL
 from .tdk_lambda import AsyncTdkLambda
 from .julabo import AsyncJulabo
+from .tti_cpx400dp import AsyncTtiCpx400dp

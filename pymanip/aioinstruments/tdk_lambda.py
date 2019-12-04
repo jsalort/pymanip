@@ -1,6 +1,9 @@
-"""
+"""Asynchronous TDK Lambda extension (:mod:`pymanip.aioinstruments.tdk_lambda`)
+===============================================================================
 
-Async TDK Lambda extension
+.. autoclass:: AsyncTdkLambda
+   :members:
+   :private-members:
 
 """
 

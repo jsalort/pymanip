@@ -272,9 +272,12 @@ class PCO_Camera(Camera):
         :type exposuretime: float
         """
         if delay is None or exposuretime is None:
-            delay_current, exposure_current, tb_delay, tb_exposure = pf.PCO_GetDelayExposureTime(
-                self.handle
-            )
+            (
+                delay_current,
+                exposure_current,
+                tb_delay,
+                tb_exposure,
+            ) = pf.PCO_GetDelayExposureTime(self.handle)
         if delay is None:
             delay = delay_current
         else:

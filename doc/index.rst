@@ -38,6 +38,7 @@ following:
    sessions/asyncsession
    instruments/instruments
    video/introduction
+   acquisition/index
    cli/intro
 
 .. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab 

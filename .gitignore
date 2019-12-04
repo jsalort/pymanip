@@ -9,6 +9,7 @@ _build
 
 # Metadata
 .DS_Store
+.cache
 
 # Setuptools distribution folder
 /dist/
