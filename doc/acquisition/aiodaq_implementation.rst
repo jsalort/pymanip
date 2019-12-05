@@ -1,5 +1,5 @@
-Implementation
-==============
+Implementation of asynchronous acquisition
+==========================================
 
 .. automodule:: pymanip.aiodaq
 

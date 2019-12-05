@@ -1,7 +1,11 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
+"""PXI acquisition module (:mod:`pymanip.daq.PXI`)
+==================================================
 
-from __future__ import print_function, division
+This module is an attempt to implement simultaneous DAQmx and Scope acquisition
+on a PXI chassis.
+It is not functionnal at the moment.
+
+"""
 
 import numpy as np
 

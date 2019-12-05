@@ -16,4 +16,6 @@ inline manual,
 
     introspection
     instruments
+    oscillo
+    live_preview
     reference

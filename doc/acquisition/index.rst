@@ -5,4 +5,6 @@ Acquisition cards
    :maxdepth: 2
    :caption: Contents:
 
+   shortcut
+   aiodaq
    aiodaq_implementation

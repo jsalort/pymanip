@@ -1,8 +1,13 @@
-"""
-This module implements handy wrappers around the NI-Scope API
-"""
+"""Scope acquisition module (:mod:`pymanip.daq.Scope`)
+======================================================
 
-from __future__ import print_function, unicode_literals, division
+This module implements a :func:`read_analog` similar to that of the
+:mod:`~pymanip.daq.DAQmx` module, but for Scope devices.
+It uses the :mod:`niScope` module from National Instruments.
+
+.. autofunction:: read_analog
+
+"""
 
 from niScope import Scope
 from platform import platform
@@ -42,18 +47,20 @@ def read_analog(
     sample_rate=1000.0,
     coupling_type="DC",
 ):
-    """
-    Scope analog read.
+    """This function reads signal from a digital oscillosope.
 
-    Input
-    =====
-
-        scope_name: name of the NI-Scope device (e.g. 'Dev3')
-        channelList: comma-separated string of channel number (e.g. "0")
-        volt_range
-        samples_per_scan
-        sample_rate: for 5922 60e6/n avec n entre 4 et 1200
-        coupling_type: 'DC', 'AC', 'GND'
+    :param scope_name: name of the NI-Scope device (e.g. 'Dev3')
+    :type scope_channel: str
+    :param channelList: comma-separated string of channel number (e.g. "0")
+    :type channelList: str
+    :param volt_range: voltage range
+    :type volt_range: float
+    :param samples_per_chan: number of samples to read per channel
+    :type samples_per_chan: int
+    :param sample_rate: for 5922 60e6/n avec n entre 4 et 1200
+    :type sample_rate: float
+    :param coupling_type: 'DC', 'AC', 'GND'
+    :type coupling_type: str
     """
 
     # Make sure scalars have the correct type, as it will otherwise

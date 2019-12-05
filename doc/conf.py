@@ -41,7 +41,7 @@ extensions = [
 
 intersphinx_mapping = {"fluidlab": ("https://fluidlab.readthedocs.io/en/latest/", None)}
 
-autodoc_mock_imports = ["AndorNeo", "pymba", "win32event"]
+autodoc_mock_imports = ["AndorNeo", "pymba", "win32event", "nidaqmx", "niScope"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

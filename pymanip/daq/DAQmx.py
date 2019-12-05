@@ -1,7 +1,32 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
+"""DAQmx acquisition module (:mod:`pymanip.daq.DAQmx`)
+======================================================
 
-from __future__ import print_function, unicode_literals, division
+The :mod:`fluidlab.daq.daqmx` module is a simple functional front-end to
+the third-party :mod:`PyDAQmx` module. It mainly provides two simple one-liner functions:
+
+- :func:`~fluidlab.daq.daqmx.read_analog`
+
+- :func:`~fluidlab.daq.daqmx.write_analog`
+
+The :mod:`pymanip.daq.DAQmx` module is essentially based on its fluidlab counterpart, with
+other choices for the default values of arguments, and an additionnal `autoset` feature for
+the :func:`read_analog` function.
+It also adds a convenience function for printing the list of DAQmx devices, used by the
+pymanip CLI interface.
+
+A discovery function is also added, :func:`~pymanip.daq.daqmx.print_connected_devices`, based
+on the dedicated :class:`~pymanip.daq.daqmx.DAQDevice` class, which is used by the
+`list_daq` sub-command on pymanip command line.
+
+.. autoclass:: DAQDevice
+   :members:
+   :private-members:
+
+.. autofunction:: print_connected_devices
+
+.. autofunction:: read_analog
+
+"""
 
 import numpy as np
 
@@ -19,13 +44,26 @@ from fluidlab.daq.daqmx import write_analog
 import six
 
 
-class DAQDevice(object):
-    """
-    This class is represents a DAQmx device
+class DAQDevice:
+    """This class is represents a DAQmx device.
+
+    :param device_name: name of the DAQmx device, e.g. "Dev1"
+    :type device_name: str
+
+    It mostly implement a number of property getters, which are wrappers to the
+    :mod:`PyDAQmx` low-level functions.
+
+    In addition, it has a static method, :meth:`~pymanip.daq.DAQmx.DAQDevice.list_connected_devices`
+    to discover currently connected devices.
     """
 
     @staticmethod
     def list_connected_devices():
+        """This static method discovers the connected devices.
+
+        :return: connected devices
+        :rtype: list of :class:`pymanip.daq.DAQmx.DAQDevice` objects
+        """
         try:
             from PyDAQmx import DAQmxGetSystemInfoAttribute, DAQmx_Sys_DevNames
 
@@ -39,10 +77,13 @@ class DAQDevice(object):
             pass
 
     def __init__(self, device_name):
+        """Constructor method
+        """
         self.device_name = device_name
 
     @property
     def product_category(self):
+        """Device product category (str)"""
         try:
             from PyDAQmx import (
                 DAQmxGetDevProductCategory,
@@ -99,6 +140,7 @@ class DAQDevice(object):
 
     @property
     def product_type(self):
+        """Device product type"""
         from PyDAQmx import DAQmxGetDevProductType
 
         bufsize = 1024
@@ -108,6 +150,7 @@ class DAQDevice(object):
 
     @property
     def product_num(self):
+        """Device product num"""
         from PyDAQmx import DAQmxGetDevProductNum
 
         num = ctypes.c_uint32(0)
@@ -116,6 +159,7 @@ class DAQDevice(object):
 
     @property
     def ai_chans(self):
+        """List of the analog input channels on the device"""
         from PyDAQmx import DAQmxGetDevAIPhysicalChans
 
         bufsize = 2048
@@ -128,6 +172,7 @@ class DAQDevice(object):
 
     @property
     def ao_chans(self):
+        """List of the analog output channels on the device"""
         from PyDAQmx import DAQmxGetDevAOPhysicalChans
 
         bufsize = 2048
@@ -140,6 +185,7 @@ class DAQDevice(object):
 
     @property
     def di_lines(self):
+        """List of digital input lines on the device"""
         from PyDAQmx import DAQmxGetDevDILines
 
         bufsize = 2048
@@ -152,6 +198,7 @@ class DAQDevice(object):
 
     @property
     def di_ports(self):
+        """List of digital input ports on the device"""
         from PyDAQmx import DAQmxGetDevDIPorts
 
         bufsize = 2048
@@ -164,6 +211,7 @@ class DAQDevice(object):
 
     @property
     def do_lines(self):
+        """List of digital output lines on the device"""
         from PyDAQmx import DAQmxGetDevDOLines
 
         bufsize = 2048
@@ -176,6 +224,7 @@ class DAQDevice(object):
 
     @property
     def do_ports(self):
+        """List of digital output ports on the device"""
         from PyDAQmx import DAQmxGetDevDOPorts
 
         bufsize = 2048
@@ -188,6 +237,7 @@ class DAQDevice(object):
 
     @property
     def bus_type(self):
+        """Bus type connection to the device"""
         from PyDAQmx import (
             DAQmxGetDevBusType,
             DAQmx_Val_PCI,
@@ -211,6 +261,7 @@ class DAQDevice(object):
 
     @property
     def pci_busnum(self):
+        """PCI Bus number"""
         from PyDAQmx import DAQmxGetDevPCIBusNum
 
         num = ctypes.c_uint32(0)
@@ -219,6 +270,7 @@ class DAQDevice(object):
 
     @property
     def pci_devnum(self):
+        """PCI Device number"""
         from PyDAQmx import DAQmxGetDevPCIDevNum
 
         num = ctypes.c_uint32(0)
@@ -227,6 +279,7 @@ class DAQDevice(object):
 
     @property
     def pxi_chassisnum(self):
+        """PXI Chassis number"""
         from PyDAQmx import DAQmxGetDevPXIChassisNum
 
         num = ctypes.c_uint32(0)
@@ -235,6 +288,7 @@ class DAQDevice(object):
 
     @property
     def pxi_slotnum(self):
+        """PXI Slot number"""
         from PyDAQmx import DAQmxGetDevPXISlotNum
 
         num = ctypes.c_uint32(0)
@@ -243,6 +297,7 @@ class DAQDevice(object):
 
     @property
     def location(self):
+        """Description of the location (PCI bus and number, or PXI chassis and slot)"""
         from PyDAQmx import DAQError
 
         bus = self.bus_type
@@ -264,6 +319,8 @@ class DAQDevice(object):
 
 
 def print_connected_devices():
+    """This function prints the list of connected DAQmx devices.
+    """
     for device in DAQDevice.list_connected_devices():
         print(
             "**",
@@ -289,16 +346,29 @@ def read_analog(
     output_filename=None,
     verbose=True,
 ):
-    """
+    """This function reads signal from analog input.
 
-    Reads signal from analog input.
-
-    resources_names: names from MAX (Dev1/ai0)
-    terminal_config: "Diff", "RSE", "NRSE"
-    volt_min, volt_max: channel range
+    :param resources_names: names from MAX (Dev1/ai0)
+    :type resource_names: str, or list
+    :param terminal_config: "Diff", "RSE", "NRSE"
+    :type terminal_config: str, or list
+    :param volt_min: minimum voltage
+    :type volt_min: float, or list, optional
+    :param volt_max: maximum voltage
+    :type volt_max: float, or list, optional
+    :param samples_per_chan: Number of samples to be read per channel
+    :type samples_per_chan: int
+    :param sample_rate: Clock frequency
+    :type sample_rate: float
+    :param coupling_type: Coupling of the channels ("DC", "AC", "GND")
+    :type coupling_type: str, or list
+    :param output_filename: If not None, file to write the acquired data
+    :type output_filename: str, optional
+    :param verbose: Verbosity level. Defaults to True (unlike in Fluidlab)
+    :type verbose: bool, optional
 
     If the channel range is not specified, a 5.0 seconds samples will first be acquired
-    to determine appropriate channel range.
+    to determine appropriate channel range (autoset feature).
 
     """
 
