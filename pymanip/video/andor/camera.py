@@ -264,7 +264,7 @@ class Andor_Camera(Camera):
     ):
         """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the Andor camera.
 
-        .. todo:
+        .. todo::
             add support for initialising_cams
         """
 

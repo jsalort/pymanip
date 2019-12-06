@@ -75,7 +75,7 @@ class DAQmxSystem(AcquisitionCard):
     def add_channel(self, channel_name, terminal_config, voltage_range):
         """Concrete implementation of :meth:`pymanip.aiodaq.AcquisitionCard.add_channel`.
 
-        .. todo:
+        .. todo::
             Actually check the type for terminal_config.
 
         """
