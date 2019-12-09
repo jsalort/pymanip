@@ -785,13 +785,13 @@ def bcd_to_int(input_, endianess="little"):
     9               1001
     ==============  =====
     """
-    if isinstance(input, Iterable):
+    if isinstance(input_, Iterable):
         if endianess == "little":
-            return int("".join([bcd_byte_to_str(b) for b in reversed(input)]))
+            return int("".join([bcd_byte_to_str(b) for b in reversed(input_)]))
         else:
-            return int("".join([bcd_byte_to_str(b) for b in input]))
+            return int("".join([bcd_byte_to_str(b) for b in input_]))
     else:
-        return int(bcd_byte_to_str(input))
+        return int(bcd_byte_to_str(input_))
 
 
 class PCO_METADATA(ctypes.Structure):
