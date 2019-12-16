@@ -75,6 +75,15 @@ A simple acquisition script, for use with an external GBF clock, would be:
     dt_avg = np.mean(t[1:] - t[:-1])
     print("Average:", 1.0 / dt_avg, "fps")
 
+The returned image is an instance of :class:`~pymanip.video.MetadataArray`, which is an extension of
+:class:`numpy.ndarray` with an additionnal :attr:`~pymanip.video.MetadataArray.metadata` attribute.
+When possible, the :class:`~pymanip.video.Camera` concrete subclasses set this metadata
+attribute with two key-value pairs:
+
+- "timestamp";
+- "counter".
+
+The "timestamp" key is the frame timestamp in camera clock time. The "counter" key is the frame number.
 
 Generator method
 ----------------

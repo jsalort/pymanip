@@ -16,6 +16,11 @@ hold metadata (such as frame timestamp).
 .. autoclass:: MetadataArray
    :members:
    :private-members:
+   :show-inheritance:
+
+   .. attribute:: metadata
+
+      dictionnary attribute containing user-defined key-value pairs
 
 .. autofunction:: save_image
 

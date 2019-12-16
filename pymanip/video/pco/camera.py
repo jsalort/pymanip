@@ -251,6 +251,23 @@ class PCO_Camera(Camera):
 
         :param mode: one of PCO_TriggerModeDescription
         :type mode: str
+
+        Possible values are:
+
+        ======= ==============================================
+        mode    description
+        ======= ==============================================
+        0x0000  auto sequence
+        0x0001  software trigger
+        0x0002  external exposure start & software trigger
+        0x0003  external exposure control
+        0x0004  external synchronized
+        0x0005  fast external exposure control
+        0x0006  external CDS control
+        0x0007  slow external exposure control
+        0x0102  external synchronized HDSDI
+        ======= ==============================================
+
         """
 
         if mode in pf.PCO_TriggerModeDescription:

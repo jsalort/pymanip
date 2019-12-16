@@ -96,6 +96,10 @@ of the functions.
 
 .. autofunction:: PCO_GetPixelRate
 
+.. data:: PCO_TriggerModeDescription
+
+   dictionnary of trigger modes
+
 """
 
 import ctypes
