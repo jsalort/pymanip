@@ -1,0 +1,4 @@
+Miscellaneous
+=============
+
+.. automodule:: pymanip.mytime

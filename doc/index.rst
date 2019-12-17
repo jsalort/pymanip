@@ -40,6 +40,7 @@ following:
    video/introduction
    acquisition/index
    cli/intro
+   miscellaneous
 
 .. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab 
 

@@ -1,13 +1,22 @@
-# -*- coding: utf-8 -*-
-"""
+"""Time utilities (:mod:`pymanip.mytime`)
+=========================================
 
 This modules contains very simple functions for handling dates and times.
-In particular, this is useful to read fluidlab's session timestamps which
-are roughly in RFC 3339 format.
+In particular, the :func:`datestr2epoch` is useful to read fluidlab's session timestamps
+which are roughly in RFC 3339 format.
+
+.. autofunction:: sleep
+
+.. autofunction:: datestr2epoch
+
+.. autofunction:: epoch2datestr
+
+.. autofunction:: tic
+
+.. autofunction:: toc
 
 """
 
-from __future__ import unicode_literals, print_function, division
 import datetime
 from time import time
 import sys
@@ -25,6 +34,13 @@ else:
 
 
 def sleep(duration):
+    """Prints a timer for specified duration.
+    This is mostly similar to :meth:`pymanip.asyncsession.AsyncSession.sleep`, except that
+    it is meant to be used outside a session.
+
+    :param duration: the duration for which to sleep
+    :type duration: float
+    """
     debut = time()
     while (time() - debut) < duration:
         if six.PY2:
@@ -56,10 +72,10 @@ def sleep(duration):
 
 
 def datestr2epoch(string):
-    """
-    Convert datestr into epoch.
+    """Convert datestr into epoch.
     Correct string is:
-    '2016-02-25T17:36+0100' or '2016-02-25T17:36+01:00'
+    '2016-02-25T17:36+0100' or '2016-02-25T17:36+01:00'.
+
     UTC+1 or UTC+0100 is also accepted by this function
     Accepts a single string or a list of string
     """
@@ -105,8 +121,7 @@ def datestr2epoch(string):
 
 
 def epoch2datestr(epoch, tz=None):
-    """
-    Convert epoch into datestr.
+    """Convert epoch into datestr.
     If no tz is given, the output is given in Coordinated Universal Time
     """
     if not tz:
@@ -120,11 +135,21 @@ tic_starts = []
 
 
 def tic():
+    """Simple timer start.
+    """
     tic_starts.append(time())
 
 
-def toc():
-    print("Elapsed time {:.2f} seconds.".format(time() - tic_starts[-1]))
+def toc(comment=None):
+    """Simpler timer stop.
+
+    :param comment: comment for print
+    :type comment: str, optional
+    """
+    if comment is None:
+        print("Elapsed time {:.2f} seconds.".format(time() - tic_starts[-1]))
+    else:
+        print(comment, "{:.2f} seconds.".format(time() - tic_starts[-1]))
 
 
 if __name__ == "__main__":
