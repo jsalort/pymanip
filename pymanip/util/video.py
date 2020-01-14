@@ -22,6 +22,13 @@ try:
     has_andor = True
 except Exception:
     has_andor = False
+
+try:
+    from pymanip.video.ids import IDS_Camera
+
+    has_ids = True
+except Exception:
+    has_ids = False
 from contextlib import ExitStack
 import asyncio
 
@@ -133,4 +140,22 @@ def preview_andor(
                 )
             else:
                 raise ValueError("Only 12-bits or 16-bits")
+            cam.preview(backend, slice, zoom, rotate)
+
+
+def preview_ids(
+    num=0,
+    backend="cv",
+    slice=None,
+    zoom=1.0,
+    TriggerMode=None,
+    exposure_ms=1,
+    bitdepth=12,
+    framerate=10.0,
+    rotate=0,
+):
+    if not has_ids:
+        print("IDS bindings (pyueyes) are not available")
+    else:
+        with IDS_Camera(num) as cam:
             cam.preview(backend, slice, zoom, rotate)

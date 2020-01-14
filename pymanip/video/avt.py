@@ -7,6 +7,7 @@ using the third-party :mod:`pymba` module.
 .. autoclass:: AVT_Camera
    :members:
    :private-members:
+   :show-inheritance:
 
 """
 

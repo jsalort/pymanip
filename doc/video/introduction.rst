@@ -3,8 +3,9 @@ Video acquisition
 
 The :mod:`pymanip.video` module provides tools to help with camera acquisition. We
 use the third-party :mod:`pymba` module bindings to the AVT Vimba_ SDK for 
-AVT cameras, and the third-party :mod:`pyAndorNeo` module bindings to the
-Andor_ SDK3 library for the Andor Camera. 
+AVT cameras, the third-party :mod:`pyAndorNeo` module bindings to the
+Andor_ SDK3 library for the Andor Camera, and the third-party :mod:`pyueye` module
+bindings to the IDS ueye library.
 We wrote our own bindings to the Pixelfly_ library for the PCO camera.
 Beware that the code works for us, but there is no garantee that it will work with
 your camera models.
@@ -26,6 +27,7 @@ Camera type    Concrete class
 AVT            :class:`pymanip.video.avt.AVT_Camera`
 PCO            :class:`pymanip.video.pco.PCO_Camera`
 Andor          :class:`pymanip.video.andor.Andor_Camera`
+IDS            :class:`pymanip.video.ids.IDS_Camera`
 =============  ==========================================
 
 They all are sub-classes of the :class:`pymanip.video.Camera` abstract base
@@ -44,6 +46,7 @@ methods are implementation details.
    andor
    avt
    pco
+   ids
 
 .. _Andor: https://www.scivision.dev/andor-neo-windows-sdk3-install/
 

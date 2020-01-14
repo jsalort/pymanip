@@ -12,7 +12,7 @@ def synchronize_generator(async_generator, *args, **kwargs):
         r = await ag.asend(stop_signal)
         return r
 
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     try:
         stop_signal = None
         while not stop_signal:
@@ -20,13 +20,9 @@ def synchronize_generator(async_generator, *args, **kwargs):
             stop_signal = yield val
         if stop_signal:
             val = loop.run_until_complete(consume_generator(stop_signal))
-            loop.close()
-            loop = None
             yield val
     except StopAsyncIteration:
-        loop.close()
-        loop = None
-    assert loop is None
+        pass
 
 
 def synchronize_function(async_func, *args, **kwargs):
@@ -37,9 +33,8 @@ def synchronize_function(async_func, *args, **kwargs):
     try:
         r = asyncio.run(async_func(*args, **kwargs))
     except AttributeError:
-        loop = asyncio.new_event_loop()
+        loop = asyncio.get_event_loop()
         r = loop.run_until_complete(async_func(*args, **kwargs))
-        loop.close()
     return r
 
 

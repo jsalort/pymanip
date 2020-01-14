@@ -8,7 +8,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
-from pymanip.util.video import preview_pco, preview_avt, preview_andor
+from pymanip.util.video import preview_pco, preview_avt, preview_andor, preview_ids
 
 try:
     from pymanip.util.oscillo import Oscillo
@@ -133,7 +133,7 @@ parser_video = subparsers.add_parser(
     "video", help="Display video preview for specified camera"
 )
 parser_video.add_argument(
-    "camera_type", help="Camera type: PCO, AVT, DC1394", metavar="camera_type"
+    "camera_type", help="Camera type: PCO, AVT, DC1394, IDS", metavar="camera_type"
 )
 parser_video.add_argument(
     "-l", "--list", help="List available cameras", action="store_true"
@@ -350,6 +350,21 @@ if __name__ == "__main__":
                 print("Listing cameras not implemented for Andor")
             else:
                 preview_andor(
+                    board,
+                    tk,
+                    slice,
+                    zoom,
+                    Trigger,
+                    exposure_ms,
+                    bitdepth,
+                    framerate,
+                    rotate=rotate,
+                )
+        elif args.camera_type.upper() == "IDS":
+            if args.list:
+                print("Listing cameras not implemented for IDS")
+            else:
+                preview_ids(
                     board,
                     tk,
                     slice,
