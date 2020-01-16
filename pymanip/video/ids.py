@@ -74,7 +74,7 @@ class IDS_Camera(Camera):
             # setup the color depth to the current windows setting
             ueye.is_GetColorDepth(self.hCam, self.nBitsPerPixel, self.m_nColorMode)
             self.bytes_per_pixel = int(self.nBitsPerPixel / 8)
-            print("IS_COLORMODE_BAYER: ",)
+            print("IS_COLORMODE_BAYER: ")
             print("\tm_nColorMode: \t\t", self.m_nColorMode)
             print("\tnBitsPerPixel: \t\t", self.nBitsPerPixel)
             print("\tbytes_per_pixel: \t\t", self.bytes_per_pixel)
@@ -88,7 +88,7 @@ class IDS_Camera(Camera):
             self.m_nColorMode = ueye.IS_CM_BGRA8_PACKED
             self.nBitsPerPixel = ueye.INT(32)
             self.bytes_per_pixel = int(self.nBitsPerPixel / 8)
-            print("IS_COLORMODE_CBYCRY: ",)
+            print("IS_COLORMODE_CBYCRY: ")
             print("\tm_nColorMode: \t\t", self.m_nColorMode)
             print("\tnBitsPerPixel: \t\t", self.nBitsPerPixel)
             print("\tbytes_per_pixel: \t\t", self.bytes_per_pixel)
@@ -102,7 +102,7 @@ class IDS_Camera(Camera):
             self.m_nColorMode = ueye.IS_CM_MONO8
             self.nBitsPerPixel = ueye.INT(8)
             self.bytes_per_pixel = int(self.nBitsPerPixel / 8)
-            print("IS_COLORMODE_MONOCHROME: ",)
+            print("IS_COLORMODE_MONOCHROME: ")
             print("\tm_nColorMode: \t\t", self.m_nColorMode)
             print("\tnBitsPerPixel: \t\t", self.nBitsPerPixel)
             print("\tbytes_per_pixel: \t\t", self.bytes_per_pixel)
@@ -259,24 +259,26 @@ class IDS_Camera(Camera):
                     copy=False,
                 )
 
-                nRet = ueye.is_GetImageInfo(self.hCam, self.MemID, image_info, ctypes.sizeof(image_info))
+                nRet = ueye.is_GetImageInfo(
+                    self.hCam, self.MemID, image_info, ctypes.sizeof(image_info)
+                )
                 if nRet != ueye.IS_SUCCESS:
                     raise RuntimeError("is_GetImageInfo ERROR")
 
                 count = count + 1
-                ts = datetime(image_info.TimestampSystem.wYear.value,
-                              image_info.TimestampSystem.wMonth.value,
-                              image_info.TimestampSystem.wDay.value,
-                              image_info.TimestampSystem.wHour.value,
-                              image_info.TimestampSystem.wMinute.value,
-                              image_info.TimestampSystem.wSecond.value,
-                              image_info.TimestampSystem.wMilliseconds*1000)
+                ts = datetime(
+                    image_info.TimestampSystem.wYear.value,
+                    image_info.TimestampSystem.wMonth.value,
+                    image_info.TimestampSystem.wDay.value,
+                    image_info.TimestampSystem.wHour.value,
+                    image_info.TimestampSystem.wMinute.value,
+                    image_info.TimestampSystem.wSecond.value,
+                    image_info.TimestampSystem.wMilliseconds * 1000,
+                )
                 stop_signal = yield MetadataArray(
-                            array.reshape((self.height.value, self.width.value)),
-                            metadata={'counter': count,
-                                'timestamp': ts.timestamp(),
-                                },
-                            )
+                    array.reshape((self.height.value, self.width.value)),
+                    metadata={"counter": count, "timestamp": ts.timestamp()},
+                )
                 if stop_signal:
                     break
 
@@ -300,19 +302,25 @@ class IDS_Camera(Camera):
     def possible_pixelclock(self):
         """Query the possible values for pixelclock (in MHz)
         """
-        
+
         nPixelclocks = ueye.UINT()
-        nRet = ueye.is_PixelClock(self.hCam, ueye.IS_PIXELCLOCK_CMD_GET_NUMBER,
-                                  nPixelclocks,
-                                  ctypes.sizeof(nPixelclocks))
+        nRet = ueye.is_PixelClock(
+            self.hCam,
+            ueye.IS_PIXELCLOCK_CMD_GET_NUMBER,
+            nPixelclocks,
+            ctypes.sizeof(nPixelclocks),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_PIXELCLOCK_CMD_GET_NUMBER failed")
         if nPixelclocks.value == 0:
             return []
         pixelclock_list = (ueye.UINT * nPixelclocks.value)()
-        nRet = ueye.is_PixelClock(self.hCam, ueye.IS_PIXELCLOCK_CMD_GET_LIST,
-                                  pixelclock_list,
-                                  ctypes.sizeof(pixelclock_list))
+        nRet = ueye.is_PixelClock(
+            self.hCam,
+            ueye.IS_PIXELCLOCK_CMD_GET_LIST,
+            pixelclock_list,
+            ctypes.sizeof(pixelclock_list),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_PIXELCLOCK_CMD_GET_LIST failed")
         return [pc.value for pc in pixelclock_list]
@@ -321,8 +329,9 @@ class IDS_Camera(Camera):
         """Set the pixelclock (in MHz)
         """
         pc = ueye.UINT(int(pixelclock))
-        nRet = ueye.is_PixelClock(self.hCam, ueye.IS_PIXELCLOCK_CMD_SET,
-                                  pc, ctypes.sizeof(pc))
+        nRet = ueye.is_PixelClock(
+            self.hCam, ueye.IS_PIXELCLOCK_CMD_SET, pc, ctypes.sizeof(pc)
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_PIXELCLOCK_CMD_SET failed")
         return pc.value
@@ -331,12 +340,12 @@ class IDS_Camera(Camera):
         """Queries the current pixelclock (in MHz)
         """
         pc = ueye.UINT()
-        nRet = ueye.is_PixelClock(self.hCam, ueye.IS_PIXELCLOCK_CMD_GET,
-                                  pc, ctypes.sizeof(pc))
+        nRet = ueye.is_PixelClock(
+            self.hCam, ueye.IS_PIXELCLOCK_CMD_GET, pc, ctypes.sizeof(pc)
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_PIXELCLOCK_CMD_GET failed")
         return pc.value
-
 
     def possible_exposure_time(self):
         """Query the min, max and increment in ms
@@ -344,16 +353,28 @@ class IDS_Camera(Camera):
         min_ms = ctypes.c_double()
         max_ms = ctypes.c_double()
         inc_ms = ctypes.c_double()
-        nRet = ueye.is_Exposure(self.hCam, ueye.IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_MIN,
-                         min_ms, ctypes.sizeof(min_ms))
+        nRet = ueye.is_Exposure(
+            self.hCam,
+            ueye.IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_MIN,
+            min_ms,
+            ctypes.sizeof(min_ms),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_MIN failed")
-        nRet = ueye.is_Exposure(self.hCam, ueye.IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_MAX,
-                         max_ms, ctypes.sizeof(max_ms))
+        nRet = ueye.is_Exposure(
+            self.hCam,
+            ueye.IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_MAX,
+            max_ms,
+            ctypes.sizeof(max_ms),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_MAX failed")
-        nRet = ueye.is_Exposure(self.hCam, ueye.IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_INC,
-                         inc_ms, ctypes.sizeof(inc_ms))
+        nRet = ueye.is_Exposure(
+            self.hCam,
+            ueye.IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_INC,
+            inc_ms,
+            ctypes.sizeof(inc_ms),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_EXPOSURE_CMD_GET_EXPOSURE_RANGE_INC failed")
         return min_ms.value, max_ms.value, inc_ms.value
@@ -362,8 +383,12 @@ class IDS_Camera(Camera):
         """Query the current exposure time in ms
         """
         exposure_ms = ctypes.c_double()
-        nRet = ueye.is_Exposure(self.hCam, ueye.IS_EXPOSURE_CMD_GET_EXPOSURE,
-                                exposure_ms, ctypes.sizeof(exposure_ms))
+        nRet = ueye.is_Exposure(
+            self.hCam,
+            ueye.IS_EXPOSURE_CMD_GET_EXPOSURE,
+            exposure_ms,
+            ctypes.sizeof(exposure_ms),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_EXPOSURE_CMD_GET_EXPOSURE failed")
 
@@ -374,14 +399,17 @@ class IDS_Camera(Camera):
         If 0 is passed, the exposure time is set to the maximum value of 1/frame rate.
         """
         exposure_ms_double = ctypes.c_double(exposure_ms)
-        nRet = ueye.is_Exposure(self.hCam, ueye.IS_EXPOSURE_CMD_SET_EXPOSURE,
-                                exposure_ms_double,
-                                ctypes.sizeof(exposure_ms_double))
+        nRet = ueye.is_Exposure(
+            self.hCam,
+            ueye.IS_EXPOSURE_CMD_SET_EXPOSURE,
+            exposure_ms_double,
+            ctypes.sizeof(exposure_ms_double),
+        )
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("IS_EXPOSURE_CMD_SET_EXPOSURE failed")
         actual = exposure_ms_double.value
         if actual != exposure_ms:
-            print('Warning: actual value of exposure time is', actual, 'ms')
+            print("Warning: actual value of exposure time is", actual, "ms")
 
     def set_frame_rate(self, framerate_fps):
         """Sets the framerate in frames per seconds
@@ -391,7 +419,7 @@ class IDS_Camera(Camera):
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("SetFrameRate failed")
         if newFPS.value != framerate_fps:
-            print('Warning actual framerate is', newFPS.value)
+            print("Warning actual framerate is", newFPS.value)
         return newFPS.value
 
     def current_frame_rate(self):
@@ -402,4 +430,3 @@ class IDS_Camera(Camera):
         if nRet != ueye.IS_SUCCESS:
             raise RuntimeError("GetFrameRate failed")
         return fps.value
-        

@@ -169,9 +169,15 @@ class NISysCfgStatus(IntEnum):
     EndOfEnum = (
         1  # Reached end of the enumeration. Used by the NISysCfgNext* functions.
     )
-    SelfTestBasicOnly = 0x00040370  # The expert performed a basic self-test because it does not implement the specified mode.
-    FoundCachedOfflineSystem = 0x00040400  # Initialization succeeded but the target is offline. Only cached system properties are available.
-    RestartLocalhostInitiated = 0x00040401  # For the local system, the option to wait until the restart is complete is ignored. The function has successfully initiated a restart with the operating system.
+    SelfTestBasicOnly = (
+        0x00040370
+    )  # The expert performed a basic self-test because it does not implement the specified mode.
+    FoundCachedOfflineSystem = (
+        0x00040400
+    )  # Initialization succeeded but the target is offline. Only cached system properties are available.
+    RestartLocalhostInitiated = (
+        0x00040401
+    )  # For the local system, the option to wait until the restart is complete is ignored. The function has successfully initiated a restart with the operating system.
 
     # Common error codes
     NotImplemented = (
@@ -179,38 +185,62 @@ class NISysCfgStatus(IntEnum):
     )
     NullPointer = 0x80004003  # A required pointer parameter was NULL.
     Fail = 0x80004005  # Miscellaneous operation failure.
-    Unexpected = 0x8000FFFF  # A critical unexpected error occurred. Please report this to National Instruments.
+    Unexpected = (
+        0x8000FFFF
+    )  # A critical unexpected error occurred. Please report this to National Instruments.
     OutOfMemory = 0x8007000E  # Out of memory.
     InvalidArg = 0x80070057  # Some parameter is invalid.
     OperationTimedOut = 0x80040420  # The operation timed out.
     FileNotFound = 0x8004049E  # The specified file was not found.
-    InvalidMACFormat = 0x800404CA  # Unsupported MAC address format. Supply the MAC address as a colon separated string of characters instead of Hex display.
+    InvalidMACFormat = (
+        0x800404CA
+    )  # Unsupported MAC address format. Supply the MAC address as a colon separated string of characters instead of Hex display.
 
     # 'Hardware' and 'Resource' functions
     PropMismatch = (
         0x80040370  # The property already exists with a different type or value.
     )
     PropDoesNotExist = 0x80040371  # The property does not exist for this resource.
-    UriIllegalSyntax = 0x80040372  # The name of the target or expert contains illegal characters or has an invalid format. Each label of the hostname must be between 1 and 63 characters long, and the entire hostname, including delimiting dots, must be 255 characters or less.
-    UriTargetDoesNotExist = 0x80040373  # Could not contact the NI System Configuration API at the specified target address. Ensure that the system is online.
+    UriIllegalSyntax = (
+        0x80040372
+    )  # The name of the target or expert contains illegal characters or has an invalid format. Each label of the hostname must be between 1 and 63 characters long, and the entire hostname, including delimiting dots, must be 255 characters or less.
+    UriTargetDoesNotExist = (
+        0x80040373
+    )  # Could not contact the NI System Configuration API at the specified target address. Ensure that the system is online.
     UriExpertDoesNotExist = 0x80040374  # A specified expert is not installed.
     ItemDoesNotExist = 0x80040375  # The specified resource name does not exist.
     InvalidMode = 0x80040376  # The specified mode is invalid.
-    SysConfigAPINotInstalled = 0x80040378  # The NI System Configuration API is not installed on the specified target.
+    SysConfigAPINotInstalled = (
+        0x80040378
+    )  # The NI System Configuration API is not installed on the specified target.
     NameSyntaxIllegal = 0x8004037A  # The suggested name contains illegal characters.
     NameCollision = 0x8004037B  # Another resource already has the suggested name.
     NoPropValidated = 0x8004037C  # None of the changed properties could be validated.
-    UriUnauthorized = 0x8004037D  # The current user does not have permission for the requested operation.
-    RenameResourceDependencies = 0x8004037E  # The resource being renamed has dependencies, and the 'updateDependencies' flag was false.
+    UriUnauthorized = (
+        0x8004037D
+    )  # The current user does not have permission for the requested operation.
+    RenameResourceDependencies = (
+        0x8004037E
+    )  # The resource being renamed has dependencies, and the 'updateDependencies' flag was false.
     ValueInvalid = (
         0x8004037F  # A property contained a value that is not valid or is out of range.
     )
-    ValuesInconsistent = 0x80040380  # Multiple properties contained values that are inconsistent with each other.
+    ValuesInconsistent = (
+        0x80040380
+    )  # Multiple properties contained values that are inconsistent with each other.
     Canceled = 0x80040381  # The operation was canceled.
-    ResponseSyntax = 0x80040382  # Could not parse the response from the NI System Configuration API at the specified target address.
-    ResourceIsNotPresent = 0x80040383  # The resource name is valid but the operation requires the resource to be present.
-    ResourceIsSimulated = 0x80040384  # The resource name is valid but the operation is not supported on simulated resources.
-    NotInFirmwareUpdateState = 0x80040385  # The resource requires being in the firmware update state to perform this operation.
+    ResponseSyntax = (
+        0x80040382
+    )  # Could not parse the response from the NI System Configuration API at the specified target address.
+    ResourceIsNotPresent = (
+        0x80040383
+    )  # The resource name is valid but the operation requires the resource to be present.
+    ResourceIsSimulated = (
+        0x80040384
+    )  # The resource name is valid but the operation is not supported on simulated resources.
+    NotInFirmwareUpdateState = (
+        0x80040385
+    )  # The resource requires being in the firmware update state to perform this operation.
     FirmwareImageDeviceMismatch = (
         0x80040386  # The uploaded firmware image does not work with this resource.
     )
@@ -220,26 +250,42 @@ class NISysCfgStatus(IntEnum):
     InvalidFirmwareVersion = (
         0x80040388  # The specified firmware version does not exist.
     )
-    OlderFirmwareVersion = 0x80040389  # The specified firmware version is older than what is currently installed.
+    OlderFirmwareVersion = (
+        0x80040389
+    )  # The specified firmware version is older than what is currently installed.
     InvalidLoginCredentials = 0x8004038A  # The username or password is incorrect.
-    FirmwareUpdateAttemptFailed = 0x8004038B  # The specified firmware was not successfully installed. See the output parameters for more information.
+    FirmwareUpdateAttemptFailed = (
+        0x8004038B
+    )  # The specified firmware was not successfully installed. See the output parameters for more information.
     EncryptionFailed = 0x8004038C  # The data could not be encrypted.
-    SomePropsNotValidated = 0x8004038D  # The changes were not saved. Some of the modified properties were not validated because they do not apply to this item.
+    SomePropsNotValidated = (
+        0x8004038D
+    )  # The changes were not saved. Some of the modified properties were not validated because they do not apply to this item.
     InvalidCalibrationCredentials = 0x8004038E  # The calibration password is incorrect.
     CannotDeletePresentResource = (
         0x8004038F  # Could not delete the specified resource because it is present.
     )
-    UriTargetTransmitError = 0x80040390  # Failed transmitting data to or from the web server at the specified target address.
-    DecryptionFailed = 0x80040391  # The NI System Configuration API at the specified target address could not decrypt the data.
-    FirmwareExpertVersionMismatch = 0x80040392  # The specified firmware requires a newer version of the expert than what is currently installed.
-    AmbiguousImportAction = 0x80040393  # There was uncertainty regarding what action to take during an import.
+    UriTargetTransmitError = (
+        0x80040390
+    )  # Failed transmitting data to or from the web server at the specified target address.
+    DecryptionFailed = (
+        0x80040391
+    )  # The NI System Configuration API at the specified target address could not decrypt the data.
+    FirmwareExpertVersionMismatch = (
+        0x80040392
+    )  # The specified firmware requires a newer version of the expert than what is currently installed.
+    AmbiguousImportAction = (
+        0x80040393
+    )  # There was uncertainty regarding what action to take during an import.
     RequiredItemFailedImport = 0x80040394  # A required item could not be imported.
 
     # 'Report' functions
     PermissionDenied = (
         0x800403B0  # Unable to write to file or folder. Permission denied.
     )
-    SystemNotFound = 0x800403B1  # Unable to connect to the specified system. Ensure that the system is online.
+    SystemNotFound = (
+        0x800403B1
+    )  # Unable to connect to the specified system. Ensure that the system is online.
     TransformFailed = 0x800403B2  # Error running transform to generate report.
     NotInstalled = 0x800403B3  # Unable to find MAX on the system. Please reinstall.
     LaunchFailure = 0x800403B4  # Unexpected error launching nimax.exe.
@@ -251,7 +297,9 @@ class NISysCfgStatus(IntEnum):
     )
     IncorrectExtension = 0x800403B7  # Incorrect report file extension provided.
     FileReadOnly = 0x800403B8  # Report file is read-only. Unable to generate report.
-    ReportOverwrite = 0x800403B9  # Report file exists and the NIMAX_FailIfOverwritingReport flag was set.
+    ReportOverwrite = (
+        0x800403B9
+    )  # Report file exists and the NIMAX_FailIfOverwritingReport flag was set.
     DirectoryError = 0x800403BA  # Error creating directory for report files.
 
     # 'Export' and 'Import' functions
@@ -265,14 +313,20 @@ class NISysCfgStatus(IntEnum):
         0x80040404  # Names from one expert have collided with another expert.
     )
     UnexpectedError = 0x80040405  # Unexpected error has occurred.
-    NCENoStreamError = 0x80040406  # The expert requested its stream for import but one does not exist because it did not export a stream.
+    NCENoStreamError = (
+        0x80040406
+    )  # The expert requested its stream for import but one does not exist because it did not export a stream.
     NCECompressionError = 0x80040407  # Error compressing or decompressing file.
     NCEStreamReadError = 0x80040408  # Error reading from a stream.
     NCEStreamWriteError = 0x80040409  # Error writing to a stream.
     NCEStreamSeekError = 0x8004040A  # Error seeking to a position in a stream.
     NCERepoNotReady = 0x8004040B  # Repository not ready to be exported.
-    NCERepoInvalid = 0x8004040C  # The file or stream from which to import the repository is not a valid repository.
-    NCERepoIncompat = 0x8004040D  # The repository was exported with a newer version of MAX than what is on the importing machine.
+    NCERepoInvalid = (
+        0x8004040C
+    )  # The file or stream from which to import the repository is not a valid repository.
+    NCERepoIncompat = (
+        0x8004040D
+    )  # The repository was exported with a newer version of MAX than what is on the importing machine.
     NCENoImportStorage = 0x8004040E  # The import storage could not be opened.
     NCENoExportStorage = 0x8004040F  # The export storage could not be created.
     NCENoObjCopier = 0x80040410  # The object copier could not be created.
@@ -281,7 +335,9 @@ class NISysCfgStatus(IntEnum):
     SystemNotSupported = (
         0x80040413  # A specified system is not supported by this expert.
     )
-    SystemNotReachable = 0x80040414  # A specified system is presumably supported, but network errors prevent connection.
+    SystemNotReachable = (
+        0x80040414
+    )  # A specified system is presumably supported, but network errors prevent connection.
     ProductSoftwareNotInstalled = (
         0x80040415  # The product is not installed on the specified system.
     )
@@ -291,13 +347,19 @@ class NISysCfgStatus(IntEnum):
     ProductSoftwareTooNew = (
         0x80040417  # The product is installed on the remote system, but is too new.
     )
-    DataTooOld = 0x80040418  # The import data is too old. The product is not backward-compatible with this data.
-    DataTooNew = 0x80040419  # The import data is too new. The product is not forward-compatible with this data.
+    DataTooOld = (
+        0x80040418
+    )  # The import data is too old. The product is not backward-compatible with this data.
+    DataTooNew = (
+        0x80040419
+    )  # The import data is too new. The product is not forward-compatible with this data.
     NoItemsToCopy = (
         0x8004041A  # The operation failed because no source items were specified.
     )
     OrphanItems = 0x8004041B  # The operation failed because some items were orphans.
-    DirtyItems = 0x8004041C  # The operation failed because some items were in-edit and not saved.
+    DirtyItems = (
+        0x8004041C
+    )  # The operation failed because some items were in-edit and not saved.
     FileOverwrite = (
         0x8004041D  # The operation failed because it would overwrite a file.
     )
@@ -308,19 +370,33 @@ class NISysCfgStatus(IntEnum):
     OperationCanceled = 0x80040421  # The operation was canceled by the client.
     WarningConflicts = 0x80040422  # The operation failed because of warning conflicts.
     ErrorConflicts = 0x80040423  # The operation failed because of general conflicts.
-    ItemsRequireUserInput = 0x80040424  # The operation failed because of unresolved conflicts requiring user input.
-    ProductExpertNotReady = 0x80040425  # An expert is not ready to accept the specified source or destination, but may become ready in the future.
+    ItemsRequireUserInput = (
+        0x80040424
+    )  # The operation failed because of unresolved conflicts requiring user input.
+    ProductExpertNotReady = (
+        0x80040425
+    )  # An expert is not ready to accept the specified source or destination, but may become ready in the future.
     OrphanFiles = 0x80040426  # The operation failed because some files were orphans.
-    IsConst = 0x80040427  # Caller called a non-const method on an object that is logically const.
-    UnsupportedProductMode = 0x80040428  # An expert does not support the attempted copy mode (e.g. merge to file, etc.).
+    IsConst = (
+        0x80040427
+    )  # Caller called a non-const method on an object that is logically const.
+    UnsupportedProductMode = (
+        0x80040428
+    )  # An expert does not support the attempted copy mode (e.g. merge to file, etc.).
 
     # 'System' functions
-    RestartLocalhostAmbiguous = 0x8004046C  # To reboot your system, either specify 'localhost' on the front panel for Session in, or call Initialize Session first.
+    RestartLocalhostAmbiguous = (
+        0x8004046C
+    )  # To reboot your system, either specify 'localhost' on the front panel for Session in, or call Initialize Session first.
     ImageInvalidCorrupt = (
         0x8004046D  # The image is corrupt or the file type is invalid.
     )
-    SafeOrInstallModeRequired = 0x8004046E  # Can only perform this action in safe or install mode, and the 'auto restart' flag was false.
-    EncryptPhraseMismatch = 0x8004046F  # The encryption passphrase when applying an image was not the same as when the image was created.
+    SafeOrInstallModeRequired = (
+        0x8004046E
+    )  # Can only perform this action in safe or install mode, and the 'auto restart' flag was false.
+    EncryptPhraseMismatch = (
+        0x8004046F
+    )  # The encryption passphrase when applying an image was not the same as when the image was created.
     InvalidIP = 0x80040470  # IP Address is invalid.
     InvalidGateway = 0x80040471  # Gateway is invalid.
     InvalidDNS = 0x80040472  # DNS is invalid.
@@ -331,22 +407,34 @@ class NISysCfgStatus(IntEnum):
     )
     Locked = 0x80040476  # Remote system is locked. Requires a password to configure.
     BadPassword = 0x80040477  # The password supplied for the operation is invalid.
-    NotConfigurable = 0x80040478  # The remote device is not configurable for some reason other than password.
+    NotConfigurable = (
+        0x80040478
+    )  # The remote device is not configurable for some reason other than password.
     UnlockFailed = 0x80040479  # Failed to unlock the system.
     LockFailed = 0x8004047A  # Failed to lock the system.
     InstallFailed = 0x8004047B  # General installation failure.
-    InstallationCorrupt = 0x8004047C  # Installation component files were not found in the repository, or were corrupt.
+    InstallationCorrupt = (
+        0x8004047C
+    )  # Installation component files were not found in the repository, or were corrupt.
     EmptyFile = 0x8004047D  # The installation file is empty.
-    UnconfiguredIP = 0x8004047E  # The system must have a valid IP before certain operations such as installation. Cannot be 0.0.0.0.
+    UnconfiguredIP = (
+        0x8004047E
+    )  # The system must have a valid IP before certain operations such as installation. Cannot be 0.0.0.0.
     InstallationGenericFailure = 0x80040480  # General install error.
-    DownloadAlreadyStarted = 0x80040482  # Installation to the specified target has already started. Multiple simultaneous installations are not allowed.
+    DownloadAlreadyStarted = (
+        0x80040482
+    )  # Installation to the specified target has already started. Multiple simultaneous installations are not allowed.
     Aborted = 0x80040483  # Remote action aborted.
-    DiskFull = 0x8004048E  # Hard Drive on the remote system is either full or has encountered an I/O error.
+    DiskFull = (
+        0x8004048E
+    )  # Hard Drive on the remote system is either full or has encountered an I/O error.
     HDFormatFailed = 0x8004048F  # Hard Drive Format failed.
     HDFormatNotSafeMode = (
         0x80040490  # System must be in safe mode before attempting Hard Drive Format.
     )
-    HDFormatRebootFailed = 0x80040491  # System failed to reboot after Hard Drive format. System is in unknown state.
+    HDFormatRebootFailed = (
+        0x80040491
+    )  # System failed to reboot after Hard Drive format. System is in unknown state.
     ConnectionRefused = 0x80040492  # The server refused the network connection.
     GetRemoteFilesFailed = (
         0x80040495  # Failed to get one or more files while creating system image.
@@ -355,12 +443,18 @@ class NISysCfgStatus(IntEnum):
         0x80040496  # Failed to put one or more files while applying system image.
     )
     InvalidImage = 0x80040497  # The specified path does not point to a valid image.
-    ImageDeviceCodeMismatch = 0x80040498  # The image is for a different device class and is incompatible with the target.
+    ImageDeviceCodeMismatch = (
+        0x80040498
+    )  # The image is for a different device class and is incompatible with the target.
     SystemMismatch = (
         0x80040499  # The image was not originally created from the specified target.
     )
-    HDFormatWrongFS = 0x8004049A  # The requested file system is not supported on the specified target.
-    CustomInstallNotSupported = 0x8004049B  # The specified target does not support custom software installations.
+    HDFormatWrongFS = (
+        0x8004049A
+    )  # The requested file system is not supported on the specified target.
+    CustomInstallNotSupported = (
+        0x8004049B
+    )  # The specified target does not support custom software installations.
     FTPFailed = 0x8004049C  # A file transfer error (FTP or WebDAV) occurred.
     Timeout = 0x8004049D  # Operation timed out.
     DirNotFound = 0x8004049F  # The specified directory was not found.
@@ -369,18 +463,24 @@ class NISysCfgStatus(IntEnum):
     OverwriteError = (
         0x800404A2  # The file or directory exists and the overwrite flag was false.
     )
-    HDFormatCannotKeepCfg = 0x800404A3  # The target was not formatted because the option to keep configuration after a format is supported only for targets on the local subnet. To format the target, repeat the operation without requesting to keep the configuration.
+    HDFormatCannotKeepCfg = (
+        0x800404A3
+    )  # The target was not formatted because the option to keep configuration after a format is supported only for targets on the local subnet. To format the target, repeat the operation without requesting to keep the configuration.
     FileOrPathTooLong = (
         0x800404A4  # Filename or pathname is longer than what the server supports.
     )
-    DDPInternalTimeout = 0x800404A5  # Failed when communicating with the system. This issue is usually caused by a high latency in the network. Refer to KnowledgeBase article 42GH3O00 on ni.com for possible solutions.
+    DDPInternalTimeout = (
+        0x800404A5
+    )  # Failed when communicating with the system. This issue is usually caused by a high latency in the network. Refer to KnowledgeBase article 42GH3O00 on ni.com for possible solutions.
     IOPermissionDenied = (
         0x800404A6  # The operation failed because of insufficient permissions.
     )
     PathAlreadyExists = (
         0x800404A7  # The operation failed because the path already exists.
     )
-    ExecutionFailure = 0x800404A8  # The execution of an external command, script, or application failed.
+    ExecutionFailure = (
+        0x800404A8
+    )  # The execution of an external command, script, or application failed.
     DownloadError = (
         0x800404A9  # Failed to download the file from the 'RT Images' repository.
     )
@@ -389,10 +489,14 @@ class NISysCfgStatus(IntEnum):
         0x800404AC  # Could not contact remote target. Ensure that the system is online.
     )
     NetSvcDown = 0x800404AD  # Could not access network.
-    NotConfirmed = 0x800404AE  # Command was not confirmed. The result of the operation is uncertain.
+    NotConfirmed = (
+        0x800404AE
+    )  # Command was not confirmed. The result of the operation is uncertain.
     HostNotResolved = 0x800404AF  # Hostname could not be resolved by DNS.
     RebootTimeout = 0x800404B0  # Timeout while waiting for reboot. System is offline.
-    NoConfirmationFP1600 = 0x800404B1  # Sending new configuration operation returned a failure, but might not necessarily have failed.
+    NoConfirmationFP1600 = (
+        0x800404B1
+    )  # Sending new configuration operation returned a failure, but might not necessarily have failed.
     DuplicateStartup = 0x800404B4  # Cannot install more than one startup component.
     RemoteInvalidArgument = 0x800404B5  # Invalid argument passed.
     NotUninstallable = (
@@ -410,19 +514,29 @@ class NISysCfgStatus(IntEnum):
         0x800404BD  # Duplicate or missing components on target installation.
     )
     BufferOverflow = 0x800404BE  # Buffer overflow. Size is too small.
-    UnsupportedCDFVersion = 0x800404BF  # Unsupported version of CDF format. Needs a newer version of MAX or NI System Configuration.
+    UnsupportedCDFVersion = (
+        0x800404BF
+    )  # Unsupported version of CDF format. Needs a newer version of MAX or NI System Configuration.
     InvalidStack = 0x800404C0  # Invalid software set.
-    IncompleteStack = 0x800404C1  # Incompletely specified list of packages. Some hidden dependencies were added.
-    StackItemMissing = 0x800404C2  # One or more Software Set items could not be found in the repository.
+    IncompleteStack = (
+        0x800404C1
+    )  # Incompletely specified list of packages. Some hidden dependencies were added.
+    StackItemMissing = (
+        0x800404C2
+    )  # One or more Software Set items could not be found in the repository.
     TopLevelHiddenComponentError = (
         0x800404C3  # There is a top-level hidden component installed.
     )
-    InvalidAddon = 0x800404C4  # A component was passed in that is not an installable add-on. It may be an unknown ID, a defined item that is not an add-on, a missing add-on, or a non-installable add-on.
+    InvalidAddon = (
+        0x800404C4
+    )  # A component was passed in that is not an installable add-on. It may be an unknown ID, a defined item that is not an add-on, a missing add-on, or a non-installable add-on.
     NoRTImagesFolder = (
         0x800404C5  # Could not find or access 'RT Images' repository location.
     )
     NoRTImagesRegistry = 0x800404C6  # Could not read the 'RT Images' registry key.
     NoRTS2CDF = 0x800404C7  # Could not find the rts2cdf conversion utility.
     UnsupportedOS = 0x800404C8  # The operating system is not supported.
-    ExactVersionRequired = 0x800404C9  # Unspecified version while trying to install exact version of a component.
+    ExactVersionRequired = (
+        0x800404C9
+    )  # Unspecified version while trying to install exact version of a component.
     InvalidStartup = 0x800404CB  # A component was passed in that is not a startup.
