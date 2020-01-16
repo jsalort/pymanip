@@ -500,7 +500,7 @@ class PCO_Camera(Camera):
         :return: Current ADC operation mode (0x0001 for "single", 0x0002 for "dual")
         :rtype: int
         """
-        return pf.PCO_ADCOperation(self.handle)
+        return pf.PCO_GetADCOperation(self.handle)
 
     def current_pixel_rate(self):
         """This method returns the current pixel rate.
@@ -509,6 +509,10 @@ class PCO_Camera(Camera):
         :rtype: int
         """
         return pf.PCO_GetPixelRate(self.handle)
+
+    @property
+    def possible_pixel_rate(self):
+        return [r for r in self.camera_description.dwPixelRateDESC]
 
     def current_frame_rate(self):
         """This method returns the current frame rate.
