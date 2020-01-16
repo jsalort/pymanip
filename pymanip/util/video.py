@@ -158,4 +158,6 @@ def preview_ids(
         print("IDS bindings (pyueyes) are not available")
     else:
         with IDS_Camera(num) as cam:
+            cam.set_exposure_time(exposure_ms)
+            cam.set_frame_rate(framerate)
             cam.preview(backend, slice, zoom, rotate)
