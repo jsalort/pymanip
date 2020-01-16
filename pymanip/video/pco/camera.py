@@ -406,14 +406,17 @@ class PCO_Camera(Camera):
             self.handle, Frameratemode, Framerate, Framerateexposure
         )
         return message, f, te
-        
+
     def set_noise_filter_mode(self, mode):
         """This method does set the image correction operating mode of the camera. Image correction can either be switched
         totally off, noise filter only mode or noise filter plus hot pixel correction mode.
         The command will be rejected, if Recording State is [run], see PCO_GetRecordingState.
-        
+
+        :param mode: the noise filter mode
+        :type mode: int
+
         The noise filter mode:
-        
+
         ======= =============================
         Value   Mode
         ======= =============================
@@ -421,12 +424,26 @@ class PCO_Camera(Camera):
         0x0001  [on]
         0x0101  [on + hot pixel correction]
         ======= =============================
-        
+
         """
         pf.PCO_SetNoiseFilterMode(self.handle, mode)
-        
+
     def current_noise_filter_mode(self):
         """This methods queries the current noise filter mode.
+
+        :return: the noise filter mode
+        :rtype: int
+
+        The noise filter mode:
+
+        ======= =============================
+        Value   Mode
+        ======= =============================
+        0x0000  [off]
+        0x0001  [on]
+        0x0101  [on + hot pixel correction]
+        ======= =============================
+
         """
         return pf.PCO_GetNoiseFilterMode(self.handle)
 
