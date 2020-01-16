@@ -1757,6 +1757,52 @@ def PCO_GetPixelRate(handle):
     PCO_manage_error(ret_code)
     return rate.value
 
+def PCO_GetNoiseFilterMode(handle):
+    """This function returns the current operating mode of the image correction
+    in the camera.
+    
+    The noise filter mode:
+    
+    ======= =============================
+    Value   Mode
+    ======= =============================
+    0x0000  [off]
+    0x0001  [on]
+    0x0101  [on + hot pixel correction]
+    ======= =============================
+    """
+    
+    f = pixelfly_dll.PCO_GetNoiseFilterMode
+    f.argtypes = (HANDLE, ctypes.POINTER(WORD))
+    f.restype = ctypes.c_int
+    noiseFilterMode = WORD()
+    ret_code = f(handle, ctypes.byref(noiseFilterMode))
+    PCO_manage_error(ret_code)
+    return noiseFilterMode.value
+    
+def PCO_SetNoiseFilterMode(handle, mode):
+    """This function does set the image correction operating mode of the camera. Image correction can either be switched to totally off,
+    noise filter only mode or noise filter plus hot pixel correction mode.
+    The command will be rejected, if Recording State is [run], see PCO_GetRecordingState.
+    
+    The noise filter mode:
+    
+    ======= =============================
+    Value   Mode
+    ======= =============================
+    0x0000  [off]
+    0x0001  [on]
+    0x0101  [on + hot pixel correction]
+    ======= =============================
+    
+    """
+    if mode not in (0x0000, 0x0001, 0x0101):
+        raise ValueError("Wrong mode value")
+    f = pixelfly_dll.PCO_SetNoiseFilterMode
+    f.argtypes = (HANDLE, WORD)
+    f.restype = ctypes.c_int
+    ret_type = f(handle, mode)
+    PCO_manage_error(ret_type)
 
 if __name__ == "__main__":
     try:
