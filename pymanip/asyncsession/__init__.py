@@ -569,7 +569,7 @@ class AsyncSession:
             t = np.array([v[0] for v in it])
         return t
 
-    def dataset(self, name, ts=None):
+    def dataset(self, name, ts=None, n=None):
         """This method returns the dataset recorded at the specified timestamp, and under
         the specified name.
 
@@ -577,13 +577,18 @@ class AsyncSession:
         :type name: str
         :param ts: timestamp at which the dataset was stored, defaults to the timestamp of the last recorded dataset under that name
         :type ts: float, optional
+        :param n: select the nth dataset (in dataset timestamp chronological order)
+        :type n: int, optional
         :return: the value of the recorded dataset
         :rtype: object
         """
 
         if ts is None:
-            ts, data = self.dataset_last_data(name)
-            return data
+            if n is None:
+                ts, data = self.dataset_last_data(name)
+                return data
+            else:
+                ts = self.dataset_times(name)[n]
         with self.conn as conn:
             c = conn.cursor()
             c.execute(
