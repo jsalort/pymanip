@@ -35,39 +35,7 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
 
     if os.path.exists(sessionName + ".db"):
         with AsyncSession(sessionName) as sesn:
-            version = sesn.get_version()
-            print(
-                sessionName,
-                "is an asynchroneous session (version {:}).".format(version),
-            )
-            print()
-            last_values = sesn.logged_last_values()
-            params = {
-                key: val
-                for key, val in sesn.parameters().items()
-                if not key.startswith("_")
-            }
-            if params:
-                print("Parameters")
-                print("==========")
-                for key, val in sesn.parameters().items():
-                    print(key, ":", val)
-                print()
-
-            if last_values:
-                print("Logged variables")
-                print("================")
-                for name, t_v in last_values.items():
-                    print(name, "(", t_v[1], ")")
-                print()
-
-            ds_names = sesn.dataset_names()
-            if ds_names:
-                print("Datasets")
-                print("========")
-                for ds in ds_names:
-                    print(ds)
-                print()
+            sesn.print_description()
         return
 
     if sessionName.endswith(".hdf5"):

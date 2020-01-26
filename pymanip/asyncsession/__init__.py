@@ -252,6 +252,43 @@ class AsyncSession:
             end_string = time.strftime(dateformat, time.localtime(last))
             print(colored.blue("***   End date: " + end_string))
 
+    def print_description(self):
+        """Prints the list of parameters, logged variables and datasets.
+        """
+        version = self.get_version()
+        print(
+            self.session_name,
+            "is an asynchroneous session (version {:}).".format(version),
+        )
+        print()
+        last_values = self.logged_last_values()
+        params = {
+            key: val
+            for key, val in self.parameters().items()
+            if not key.startswith("_")
+        }
+        if params:
+            print("Parameters")
+            print("==========")
+            for key, val in self.parameters().items():
+                print(key, ":", val)
+            print()
+
+        if last_values:
+            print("Logged variables")
+            print("================")
+            for name, t_v in last_values.items():
+                print(name, "(", t_v[1], ")")
+            print()
+
+        ds_names = self.dataset_names()
+        if ds_names:
+            print("Datasets")
+            print("========")
+            for ds in ds_names:
+                print(ds)
+            print()
+
     def add_entry(self, *args, **kwargs):
         """This methods adds scalar values into the database. Each entry value
         will hold a timestamp corresponding to the time at which this method has been called.
