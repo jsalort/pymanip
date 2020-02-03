@@ -106,6 +106,7 @@ of the functions.
 
 """
 
+from pathlib import Path
 import ctypes
 
 try:
@@ -124,16 +125,16 @@ from typing import Tuple, Iterable
 import datetime
 
 # Open DLL
-pixelfly_dllpath = r"C:\Program Files\Digital Camera Toolbox\Camware4\SC2_Cam.dll"
-try:
-    pixelfly_dll = ctypes.windll.LoadLibrary(pixelfly_dllpath)
-except OSError:
+pixelfly_possible_dllpath = [
+    Path(r"C:\Program Files\Digital Camera Toolbox\Camware4\SC2_Cam.dll"),
+    Path(r"C:\Program Files\PCO Digital Camera Toolbox\pco.camware\SC2_Cam.dll"),
+]
+for pixelfly_dllpath in pixelfly_possible_dllpath:
+    if pixelfly_dllpath.exists():
+        pixelfly_dll = ctypes.windll.LoadLibrary(str(pixelfly_dllpath))
+        break
+else:
     print(pixelfly_dllpath, "not found")
-    raise ImportError
-except AttributeError:
-    # We ignore the exception when ctypes.windll does not exist
-    # to allow sphinx to import the module
-    print("Pixelfly available only on Windows")
 
 
 # General constants
