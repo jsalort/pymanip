@@ -48,6 +48,7 @@ autodoc_mock_imports = [
     "nidaqmx",
     "niScope",
     "PyDAQmx",
+    "pyueye",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

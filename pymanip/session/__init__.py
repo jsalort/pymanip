@@ -166,7 +166,7 @@ class BaseSession(object):
 
     def dataset(self, name):
         if self.grp_datasets_defined:
-            return self.grp_datasets[name].value
+            return self.grp_datasets[name][()]
 
     def dataset_names(self):
         if hasattr(self, "grp_datasets"):
@@ -194,13 +194,13 @@ class BaseSession(object):
     def log(self, varname):
         if self.opened:
             if varname == "Time" or varname == "time" or varname == "t":
-                return self.dset_time.value
+                return self.dset_time[()]
             elif varname == "?":
                 print("List of saved variables:")
                 for var in self.grp_variables.keys():
                     print(var)
             elif varname in self.grp_variables.keys():
-                return self.grp_variables[varname].value
+                return self.grp_variables[varname][()]
             else:
                 print(colored.red("Variable is not defined: ") + varname)
         else:
@@ -426,13 +426,13 @@ class SavedSession(BaseSession):
                 print(colored.yellow("Retrieving " + varname + " from cache"))
             content = self.cachestore[varname]
             if hasattr(content, "value"):
-                return content.value
+                return content[()]
             else:
                 result = list()
                 i = 0
                 while True:
                     try:
-                        result.append(content[str(i)].value)
+                        result.append(content[str(i)][()])
                         i = i + 1
                     except KeyError:
                         break

@@ -1,4 +1,4 @@
-from importlib_resources import path
+from importlib.resources import path
 
 import numpy as np
 
