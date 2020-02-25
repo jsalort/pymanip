@@ -359,6 +359,8 @@ class Camera:
                 maxint = np.iinfo(im.dtype).max
                 if rotate == 90.0:
                     im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                elif rotate == -90.0:
+                    im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
                 if slice_:
                     img = (maxint // (maximum - minimum)) * (
                         im[slice_[0] : slice_[1], slice_[2] : slice_[3]] - minimum
@@ -504,6 +506,8 @@ class Camera:
         if img is not None:
             if rotate == 90.0:
                 img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            elif rotate == -90.0:
+                img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
 
             if self.subtraction_chkbox.isChecked():
                 if self.bkgrd is None:

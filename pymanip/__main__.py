@@ -344,7 +344,16 @@ if __name__ == "__main__":
             if args.list:
                 print("Listing cameras not implemented for AVT")
             else:
-                preview_avt(board, tk, slice, zoom, Trigger, exposure_ms, rotate=rotate)
+                preview_avt(
+                    board,
+                    tk,
+                    slice,
+                    zoom,
+                    Trigger,
+                    exposure_ms,
+                    rotate=rotate,
+                    roi=args.ROI,
+                )
         elif args.camera_type.upper() == "ANDOR":
             if args.list:
                 print("Listing cameras not implemented for Andor")

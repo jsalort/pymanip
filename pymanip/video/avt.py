@@ -67,16 +67,19 @@ class AVT_Camera(Camera):
         # par défaut, on démarre en Mode 0 avec la résolution maximale à la
         # création de l'objet
         self.camera.IIDCMode = "Mode0"
+        # défaut: ROI entier
+        self.camera.OffsetX = 0
+        self.camera.OffsetY = 0
         self.camera.Width = self.camera.WidthMax
         self.camera.Height = self.camera.HeightMax
         print(
             "cam" + str(self.num) + ": maximum resolution is",
-            self.camera.Width,
+            self.camera.WidthMax,
             "x",
-            self.camera.Height,
+            self.camera.HeightMax,
         )
         print(
-            "cam" + str(self.num) + ": maximum framerate is",
+            "cam" + str(self.num) + ": maximum framerate at full resolution is",
             self.camera_feature_info("AcquisitionFrameRate")["range"][1],
         )
         self.camera.PixelFormat = pixelFormat.encode("ascii")
@@ -169,11 +172,14 @@ class AVT_Camera(Camera):
                 dt = np.uint16
             else:
                 raise NotImplementedError
-            img = np.ndarray(
-                buffer=self.frame.getBufferByteData(),
-                dtype=dt,
-                shape=(self.frame.height, self.frame.width),
-            ).copy()
+            img = MetadataArray(
+                np.ndarray(
+                    buffer=self.frame.getBufferByteData(),
+                    dtype=dt,
+                    shape=(self.frame.height, self.frame.width),
+                ).copy(),
+                metadata={"timestamp": self.frame.timestamp * 1e-7},
+            )
 
         finally:
             self.camera.endCapture()
@@ -205,6 +211,42 @@ class AVT_Camera(Camera):
         """
         self.camera.ExposureMode = "Timed"
         self.camera.ExposureTime = seconds * 1e6
+
+    def set_roi(self, roiX0=0, roiY0=0, roiX1=0, roiY1=0):
+        """This mothods sets the position of the upper left corner (X0, Y0) and the lower right (X1, Y1)
+        corner of the ROI (region of interest) in pixels.
+        """
+        if (roiX1 - roiX0) <= 0 or (roiX1 - roiX0) > self.camera.WidthMax:
+            raise ValueError("Width must be > 0 and < WidthMax")
+        if roiX0 < 0:
+            raise ValueError("X0 must be >= 0")
+        assert roiX1 >= 0
+        if (roiY1 - roiY0) <= 0 or (roiY1 - roiY0) > self.camera.HeightMax:
+            raise ValueError("Height must be > 0 and < HeightMax")
+        if roiY0 < 0:
+            raise ValueError("Y0 must be positive")
+        assert roiY1 >= 0
+
+        # On met d'abord l'offset à 0 pour être sûr que la largeur et hauteur est acceptable
+        self.camera.OffsetX = 0
+        self.camera.OffsetY = 0
+        # On change d'abord la largeur et hauteur pour que l'offset soit acceptable
+        self.camera.Width = roiX1 - roiX0
+        self.camera.Height = roiY1 - roiY0
+        # Dernière étape...
+        self.camera.OffsetX = roiX0
+        self.camera.OffsetY = roiY0
+
+        print(
+            "cam" + str(self.num) + ": resolution is",
+            self.camera.Width,
+            "x",
+            self.camera.Height,
+        )
+        print(
+            "cam" + str(self.num) + ": maximum framerate is",
+            self.camera_feature_info("AcquisitionFrameRate")["range"][1],
+        )
 
     def acquisition(
         self,

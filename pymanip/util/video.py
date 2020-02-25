@@ -68,6 +68,7 @@ def preview_avt(
     TriggerMode=None,
     exposure_ms=10,
     rotate=0,
+    roi=None,
 ):
     if not has_avt:
         print("Pymba is not available.")
@@ -87,6 +88,9 @@ def preview_avt(
                     print("Internal trigger")
                     for c in cams:
                         c.set_trigger_mode(False)
+                if roi:
+                    for c in cams:
+                        c.set_roi(*roi)
                 loop = asyncio.get_event_loop()
                 loop.run_until_complete(
                     asyncio.gather(
@@ -107,6 +111,8 @@ def preview_avt(
                 else:
                     print("Internal trigger")
                     cam.set_trigger_mode(False)
+                if roi:
+                    cam.set_roi(*roi)
                 cam.set_exposure_time(exposure_ms / 1000)
                 cam.preview(backend, slice, zoom, rotate)
 
