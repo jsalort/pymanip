@@ -11,7 +11,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import AutoDateFormatter, AutoDateLocator, epoch2num
-from clint.textui import colored
+from fluiddyn.util.terminal_colors import cprint
 
 try:
     import pandas as pd
@@ -104,8 +104,8 @@ def check_hdf(acqName, variable_to_plot):
     end_t = data["Time"].values[-1]
     start_string = time.strftime(dateformat, time.localtime(start_t))
     end_string = time.strftime(dateformat, time.localtime(end_t))
-    print(colored.blue("*** Start date: " + start_string))
-    print(colored.blue("***  End date: " + end_string))
+    cprint.blue("*** Start date: " + start_string)
+    cprint.blue("***  End date: " + end_string)
 
     varlist = ["Time"]
     varlist += MI.log_variable_list()

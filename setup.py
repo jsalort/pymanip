@@ -27,8 +27,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "h5py",
-        "clint",
-        "fluidlab (>=0.1.0)",
+        "fluiddyn >= 0.3.2",
+        "fluidlab >=0.1.0",
         "progressbar2",
         "aiohttp",
         "aiohttp_jinja2",

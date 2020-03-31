@@ -40,7 +40,6 @@ import jinja2
 import tempfile
 import smtplib
 from email.message import EmailMessage
-from clint.textui import colored
 import requests
 import json
 
@@ -49,6 +48,7 @@ try:
 except ModuleNotFoundError:
     pass
 
+from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
 
 __all__ = ["AsyncSession"]
@@ -246,11 +246,11 @@ class AsyncSession:
         is called by the constructor.
         """
         start_string = time.strftime(dateformat, time.localtime(self.initial_timestamp))
-        print(colored.blue("*** Start date: " + start_string))
+        cprint.blue("*** Start date: " + start_string)
         last = self.last_timestamp
         if last:
             end_string = time.strftime(dateformat, time.localtime(last))
-            print(colored.blue("***   End date: " + end_string))
+            cprint.blue("***   End date: " + end_string)
 
     def print_description(self):
         """Prints the list of parameters, logged variables and datasets.

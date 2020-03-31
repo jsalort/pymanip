@@ -7,16 +7,13 @@ read_OctMI_session(sessionName, verbose=True)
 
 """
 
-from __future__ import unicode_literals, print_function, division
-
 from struct import pack, unpack, error
-import numpy as np
 from time import strftime, localtime
-from clint.textui import colored
-import six
+from functools import reduce
 
-if six.PY3:
-    from functools import reduce
+import numpy as np
+
+from fluiddyn.util.terminal_colors import cprint
 
 
 class OctaveReaderError(NameError):
@@ -426,12 +423,12 @@ def read_OctMI_session(sessionName, verbose=True, veryVerbose=False):
             lt_end = lt_start
     if verbose:
         string = strftime(time_fmt, lt_start)
-        print(colored.blue("** Start date: " + string))
+        cprint.blue("** Start date: " + string)
         if Nelem > 0:
             string = strftime(time_fmt, lt_end)
-            print(colored.blue("**   End date: " + string))
+            cprint.blue("**   End date: " + string)
         else:
-            print(colored.red("No logged variables"))
+            cprint.red("No logged variables")
 
     return Variables
 

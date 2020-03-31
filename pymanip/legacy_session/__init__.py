@@ -11,8 +11,7 @@ import os.path
 import inspect
 import h5py
 
-from clint.textui import colored
-
+from fluiddyn.util.terminal_colors import cprint
 from .octmi_binary import read_OctMI_session
 
 
@@ -38,7 +37,7 @@ class OctSession(object):
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
             if verbose:
-                print(colored.yellow("*** Cache store found at " + self.cachestorename))
+                cprint.yellow("*** Cache store found at " + self.cachestorename)
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False
@@ -81,7 +80,7 @@ class OctSession(object):
         elif varname in self.variables:
             return self.variables[varname]
         else:
-            print(colored.red("Variable is not defined: " + varname))
+            cprint.red("Variable is not defined: " + varname)
 
     def __getitem__(self, key):
         return self.log(key)
@@ -114,7 +113,7 @@ class OctSession(object):
 
     def cachedvalue(self, varname):
         if self.has_cachestore:
-            print(colored.yellow("Retriving " + varname + " from cache"))
+            cprint.yellow("Retriving " + varname + " from cache")
             return self.cachestore[varname].value
         else:
             return None
@@ -138,17 +137,14 @@ class OctSession(object):
             try:
                 self.cachestore = h5py.File(self.cachestorename, "w")
                 self.has_cachestore = True
-                print(
-                    colored.yellow("*** Cache store created at " + self.cachestorename)
-                )
+                cprint.yellow("*** Cache store created at " + self.cachestorename)
             except IOError as ioe:
                 self.has_cachestore = False
-                print(colored.red("Cannot create cache store"))
-                print(colored.red(ioe.message))
-                pass
+                cprint.red("Cannot create cache store")
+                cprint.red(ioe.message)
 
         if self.has_cachestore:
-            print(colored.yellow("Saving " + name + " in cache"))
+            cprint.yellow("Saving " + name + " in cache")
             try:
                 new_length = len(dict_caller[name])
             except TypeError:

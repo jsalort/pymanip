@@ -28,20 +28,11 @@ on the dedicated :class:`~pymanip.daq.daqmx.DAQDevice` class, which is used by t
 
 """
 
-import numpy as np
-
-try:
-    from clint.textui import colored
-except ImportError:
-
-    def colored(string):
-        return string
-
-
 import ctypes
+import numpy as np
+from fluiddyn.util.terminal_colors import cprint
 import fluidlab.daq.daqmx as daqmx
 from fluidlab.daq.daqmx import write_analog
-import six
 
 
 class DAQDevice:
@@ -381,7 +372,7 @@ def read_analog(
         samples_per_chan = int(samples_per_chan)
 
     # Ensure resource_names is str or list of str
-    if isinstance(resource_names, six.string_types):
+    if isinstance(resource_names, str):
         num_channels = 1
         resource_names = str(resource_names)
     else:
@@ -439,7 +430,7 @@ def read_analog(
         if num_channels == 1:
             channel_range = np.max([np.abs(volt_min), np.abs(volt_max)])
             if np.max(np.abs(data)) >= channel_range:
-                colored.red("WARNING: channel range too small!")
+                cprint.red("WARNING: channel range too small!")
         else:
             for chan in range(num_channels):
                 try:
@@ -451,7 +442,7 @@ def read_analog(
                     pass
 
                 if np.max(np.abs(data[chan])) >= channel_range:
-                    colored.red(
+                    cprint.red(
                         "WARNING: channel range is too small for channel "
                         + resource_names[chan]
                     )

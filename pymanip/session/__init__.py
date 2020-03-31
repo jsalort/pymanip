@@ -6,10 +6,7 @@ Module for experimental sessions.
 Useful classes are Session and SavedSession.
 """
 
-from __future__ import unicode_literals, print_function
-
 import os
-import six
 import numpy as np
 import time
 import inspect
@@ -25,21 +22,9 @@ import base64
 import quopri
 import tempfile
 
-try:
-    from clint.textui import colored
-except ImportError:
-    print("Clint is not available: no color support")
-
-    class Colored(object):
-        def blue(self, txt):
-            return txt
-
-        def red(self, txt):
-            return txt
-
-    colored = Colored()
-
 from datetime import datetime
+
+from fluiddyn.util.terminal_colors import cprint
 
 try:
     from convbox.myplot import ColorGenerator
@@ -100,10 +85,6 @@ def makeAcqName(comment=None):
     return next(defaultGenerator)
 
 
-def boldface(string):
-    return "\x1b[1;1m" + string + "\x1b[0;0m"
-
-
 class BaseSession(object):
     def __init__(self, session_name=None):
         if session_name is None:
@@ -144,8 +125,6 @@ class BaseSession(object):
                         value = value[0]
                     if name == "email_lastSent":
                         theDateStr = time.strftime(dateformat, time.localtime(value))
-                        if six.PY2:
-                            theDateStr = theDateStr.decode("utf-8")
                         print(" " + name + " = " + theDateStr)
                     else:
                         print(
@@ -202,9 +181,9 @@ class BaseSession(object):
             elif varname in self.grp_variables.keys():
                 return self.grp_variables[varname][()]
             else:
-                print(colored.red("Variable is not defined: ") + varname)
+                cprint.red("Variable is not defined: " + varname)
         else:
-            print(colored.red("Session is not opened"))
+            cprint.red("Session is not opened")
 
     def __getitem__(self, key):
         if self.has_log(key):
@@ -256,7 +235,7 @@ class BaseSession(object):
                 xlab = "t [h]"
             # print(olddebut, oldfin, newdebut, newfin)
 
-            if isinstance(varlist, six.string_types):
+            if isinstance(varlist, str):
                 lab = varlist
                 col = (0, 0, 1)
                 if newdebut is not None:
@@ -313,7 +292,7 @@ class BaseSession(object):
                 warnings.simplefilter("ignore")
                 plt.pause(0.0001)
         else:
-            print(colored.red("Session is not opened"))
+            cprint.red("Session is not opened")
 
     def sleep(self, duration):
         mytime.sleep(duration)
@@ -359,25 +338,19 @@ class SavedSession(BaseSession):
             start_t = self.dset_time[0]
             end_t = self.dset_time[total_size - 1]
             start_string = time.strftime(dateformat, time.localtime(start_t))
-            if six.PY2:
-                start_string = start_string.decode("utf-8")
             end_string = time.strftime(dateformat, time.localtime(end_t))
-            if six.PY2:
-                end_string = end_string.decode("utf-8")
             if verbose:
-                print(colored.blue("*** Start date: " + start_string))
-                print(colored.blue("***   End date: " + end_string))
+                cprint.blue("*** Start date: " + start_string)
+                cprint.blue("***   End date: " + end_string)
         elif not self.grp_datasets_defined:
             if verbose:
-                print(colored.red("No logged variables"))
+                cprint.red("No logged variables")
         if self.grp_datasets_defined:
             timestamp_string = time.strftime(
                 dateformat, time.localtime(self.grp_datasets.attrs["timestamp"])
             )
-            if six.PY2:
-                timestamp_string = timestamp_string.decode("utf-8")
             if verbose:
-                print(colored.blue("*** Acquisition timestamp " + timestamp_string))
+                cprint.blue("*** Acquisition timestamp " + timestamp_string)
         self.cachestorename = os.path.join(
             os.path.realpath(cache_location), "cache", os.path.basename(self.storename)
         )
@@ -388,7 +361,7 @@ class SavedSession(BaseSession):
         try:
             self.cachestore = h5py.File(self.cachestorename, self.cachemode)
             if verbose:
-                print(colored.yellow("*** Cache store found at " + self.cachestorename))
+                cprint.yellow("*** Cache store found at " + self.cachestorename)
             self.has_cachestore = True
         except IOError:
             self.has_cachestore = False
@@ -415,7 +388,7 @@ class SavedSession(BaseSession):
             name = args[0]
         else:
             name = [a for a in args]
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             return name in self.cachedvars
         else:
             return all([(n in self.cachedvars) for n in name])
@@ -423,7 +396,7 @@ class SavedSession(BaseSession):
     def cachedvalue(self, varname):
         if self.has_cachestore:
             if self.verbose:
-                print(colored.yellow("Retrieving " + varname + " from cache"))
+                cprint.yellow("Retrieving " + varname + " from cache")
             content = self.cachestore[varname]
             if hasattr(content, "value"):
                 return content[()]
@@ -447,7 +420,7 @@ class SavedSession(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if not isinstance(name, six.string_types):
+        if not isinstance(name, str):
             for var in name:
                 self.cache(var, dict_caller)
             return
@@ -460,17 +433,14 @@ class SavedSession(BaseSession):
             try:
                 self.cachestore = h5py.File(self.cachestorename, "w")
                 self.has_cachestore = True
-                print(
-                    colored.yellow("*** Cache store created at " + self.cachestorename)
-                )
+                cprint.yellow("*** Cache store created at " + self.cachestorename)
             except IOError as ioe:
                 self.has_cachestore = False
-                print(colored.red("Cannot create cache store"))
-                print(colored.red(ioe.message))
-                pass
+                cprint.red("Cannot create cache store")
+                cprint.red(ioe.message)
 
         if self.has_cachestore:
-            print(colored.yellow("Saving " + name + " in cache"))
+            cprint.yellow("Saving " + name + " in cache")
 
             if isinstance(dict_caller[name], list):
                 # Sauvegarde d'une liste d'objets
@@ -482,7 +452,7 @@ class SavedSession(BaseSession):
                     pass
                 grp = self.cachestore.create_group(name)
                 for itemnum, item in enumerate(dict_caller[name]):
-                    if not isinstance(item, (six.integer_types, float)):
+                    if not isinstance(item, (int, float)):
                         grp.create_dataset(
                             str(itemnum), chunks=True, data=item, compression="gzip"
                         )
@@ -543,15 +513,7 @@ class Session(BaseSession):
         date_string = time.strftime(
             dateformat, time.localtime(self.session_opening_time)
         )
-        if six.PY2:
-            # en PY3 strftime renvoie directement une str
-            # en PY2, il faut decode pour convertir en unicode
-            date_string = date_string.decode("utf-8")
-            self.logfile.write(("Session opened on " + date_string).encode("utf-8"))
-        else:
-            # en PY3 write prend une str
-            self.logfile.write("Session opened on " + date_string)
-
+        self.logfile.write("Session opened on " + date_string)
         self.logfile.flush()
         try:
             self.store = h5py.File(self.storename, "r+")
@@ -575,15 +537,13 @@ class Session(BaseSession):
                         var, chunks=True, maxshape=(None,), data=arr
                     )
                     new_headers = True
-            print(
-                colored.blue(boldface("Session reloaded from file ") + self.storename)
-            )
+            cprint.blue("Session reloaded from file", bold=True, end=" ")
+            cprint.blue(self.storename)
             if original_size > 0:
                 last_t = self.dset_time[original_size - 1]
                 date_string = time.strftime(dateformat, time.localtime(last_t))
-                if six.PY2:
-                    date_string = date_string.decode("utf-8")
-                print(boldface("Last point recorded:") + " " + date_string)
+                cprint.black("Last point recorded:", bold=True, end=" ")
+                print(date_string)
         except IOError:
             self.store = h5py.File(self.storename, "w")
             self.dset_time = self.store.create_dataset(
@@ -615,10 +575,7 @@ class Session(BaseSession):
             self.email_body = self.email_body + texte + "<br />\n"
         if not texte.endswith("\n"):
             texte = texte + "\n"
-        if six.PY2:
-            self.logfile.write(texte.encode("utf-8"))
-        else:
-            self.logfile.write(texte)
+        self.logfile.write(texte)
         self.logfile.flush()
 
     def log_addline(self, timestamp=None, dict_caller=None):
@@ -641,9 +598,8 @@ class Session(BaseSession):
                 d[newsize - 1] = dict_caller[varname]
                 self.datfile.write(" %f" % dict_caller[varname])
             except Exception:
-                print(colored.red("Variable is not defined: ") + varname)
+                cprint.red("Variable is not defined: " + varname)
                 d[newsize - 1] = 0.0
-                pass
         self.datfile.write("\n")
         self.datfile.flush()
         self.store.flush()
@@ -680,7 +636,7 @@ class Session(BaseSession):
                 dict_caller = stack[1][0].f_locals
             finally:
                 del stack
-        if isinstance(parameter_name, six.string_types):
+        if isinstance(parameter_name, str):
             try:
                 value = dict_caller[parameter_name]
                 self.parameters[parameter_name] = value
@@ -736,7 +692,7 @@ class Session(BaseSession):
                 self.grp_datasets[data_name].resize((new_length,))
             self.grp_datasets[data_name][:] = dict_caller[data_name]
             self.grp_datasets.attrs["timestamp"] = time.time()
-            print(colored.red("Warning: overriding existing dataset"))
+            cprint.red("Warning: overriding existing dataset")
         else:
             raise NameError(
                 "Dataset is already defined. Use allow_override_datasets to allow override of existing saved datasets."
@@ -757,8 +713,6 @@ class Session(BaseSession):
         self.email_from_addr = from_addr
         self.email_to_addrs = to_addrs
         date_string = time.strftime(dateformat, time.localtime(time.time()))
-        if six.PY2:
-            date_string = date_string.decode("utf-8")
         if subject is not None:
             self.email_subject = subject
         else:
@@ -798,7 +752,7 @@ class Session(BaseSession):
             )
         email_header = email_header + "User-Agent: pymanip\n"
         email_header = email_header + "To: "
-        if isinstance(self.email_to_addrs, six.string_types):
+        if isinstance(self.email_to_addrs, str):
             email_header = email_header + self.email_to_addrs + "\n"
         elif isinstance(self.email_to_addrs, tuple):
             for addr in self.email_to_addrs[:-1]:
@@ -898,8 +852,6 @@ class Session(BaseSession):
             date_string = time.strftime(
                 dateformat, time.localtime(self.parameters["email_lastSent"])
             )
-            if six.PY2:
-                date_string = date_string.decode("utf-8")
             print(date_string + ": Email successfully sent.")
 
     def time_since_last_email(self):
@@ -918,11 +870,7 @@ class Session(BaseSession):
             self.store.close()
             self.datfile.close()
             date_string = time.strftime(dateformat, time.localtime(time.time()))
-            if six.PY2:
-                date_string = date_string.decode("utf-8")
-                self.logfile.write(("Session closed on " + date_string).encode("utf-8"))
-            else:
-                self.logfile.write("Session closed on " + date_string)
+            self.logfile.write("Session closed on " + date_string)
 
             self.logfile.flush()
             self.logfile.close()

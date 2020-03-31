@@ -14,13 +14,7 @@ from platform import platform
 import time
 import pymanip.mytime as MI
 from collections import Iterable
-
-try:
-    from clint.textui import colored
-except ImportError:
-
-    def colored(string):
-        return string
+from fluiddyn.util.terminal_colors import cprint
 
 
 def print_horodateur(samples_per_chan, sample_rate):
@@ -96,29 +90,19 @@ def read_analog(
     length = scope.ActualRecordLength
     print_horodateur(length, sampling)
     if sampling != sample_rate:
-        print(
-            colored.red(
-                "Warning: sampling frequency changed to {:} Hz.".format(sampling)
-            )
-        )
+        cprint.red("Warning: sampling frequency changed to {:} Hz.".format(sampling))
     if length != samples_per_chan:
-        print(
-            colored.red("Warning: record length changed to {:d} points.".format(length))
-        )
+        cprint.red("Warning: record length changed to {:d} points.".format(length))
     if numChannels == 1:
         vRange = scope.ActualVoltageRange(channelList)
         if vRange != volt_range:
-            print(colored.red("Warning: actual voltage range is {:} V.".format(vRange)))
+            cprint.red("Warning: actual voltage range is {:} V.".format(vRange))
     else:
         for chan, v in zip(channelList.split(","), volt_range):
             vv = scope.ActualVoltageRange(chan)
             if vv != v:
-                print(
-                    colored.red(
-                        "Warning: actual range for channel {:s} is {:} V.".format(
-                            chan, vv
-                        )
-                    )
+                cprint.red(
+                    "Warning: actual range for channel {:s} is {:} V.".format(chan, vv)
                 )
     scope.InitiateAcquisition()
     duration = samples_per_chan / sampling
