@@ -42,7 +42,7 @@ following:
    cli/intro
    miscellaneous
 
-.. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab 
+.. _FluidLab: https://foss.heptapod.net/fluiddyn/fluidlab 
 
 Indices and tables
 ==================

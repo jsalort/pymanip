@@ -28,4 +28,4 @@ The names of the available instrument classes can be conveniently obtained from 
 
     $ python -m pymanip list_instruments
 
-.. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab
+.. _FluidLab: https://foss.heptapod.net/fluiddyn/fluidlab

@@ -14,7 +14,7 @@ remote computer.
    :members:
    :private-members:
 
-.. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab
+.. _FluidLab: https://foss.heptapod.net/fluiddyn/fluidlab
 
 """
 

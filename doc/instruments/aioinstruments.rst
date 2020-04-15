@@ -33,4 +33,4 @@ becomes
 
 The asynchronous instrument subclasses all have the "Async" prefix in their names. Asynchronous context manager *must* be used instead of the classical context manager because some specific initialisation may be done in the asynchronous interface :meth:`__aenter__` method. All the features have the same name as in the synchronous class, but they have :meth:`aget` and :meth:`aset` co-routine methods instead of :meth:`get` and :meth:`set` methods.
 
-.. _FluidLab: http://bitbucket.org/fluiddyn/fluidlab
+.. _FluidLab: https://foss.heptapod.net/fluiddyn/fluidlab

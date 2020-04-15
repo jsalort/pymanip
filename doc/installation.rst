@@ -33,13 +33,13 @@ for National Instruments NISysCfg library.
 Download and install
 --------------------
 
-We recommand to install FluidLab_ and :mod:`pymanip` from the repositories, i.e. FluidLab_ from bitbucket and
+We recommand to install FluidLab_ and :mod:`pymanip` from the repositories, i.e. FluidLab_ from Heptapod and
 :mod:`pymanip` from GitHub, and to use the `develop` sub-command on the setup file to easily pull updates from the
 repositories:
 
 .. code-block:: bash
 
-    $ hg clone https://bitbucket.org/fluiddyn/fluidlab
+    $ hg clone https://foss.heptapod.net/fluiddyn/fluidlab
     $ cd fluidlab
     $ python setup.py develop
     $ cd ..
