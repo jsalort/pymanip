@@ -3,6 +3,7 @@
 
 """
 
+from serial.serialutil import SerialException
 import asyncio
 import fluidlab.instruments.chiller.lauda as fl_lauda
 from pymanip.aioinstruments.aiodrivers import AsyncDriver
@@ -10,7 +11,16 @@ from pymanip.aioinstruments.aiofeatures import AsyncValue
 
 class AsyncLauda(AsyncDriver, fl_lauda.Lauda):
     async def __aenter__(self):
-        await super().__aenter__()
+        try:
+            await super().__aenter__()
+        except SerialException:
+            # for some reason we randomly get
+            # Cannot configure port, something went wrong. Original message: PermissionError(13, 'Un périphérique attaché au système ne fonctionne pas correctement.', None, 31)
+            # It is often enough to just wait and try again
+            print("Initial communication attempt failed on serial port.")
+            print("Retrying in 5 seconds")
+            await asyncio.sleep(5.0)
+            await super().__aenter__()
         identification = await self.interface.aquery("TYPE\r")
         identification = identification.decode('ascii')
         if identification not in fl_lauda.Lauda.Models:
@@ -32,7 +42,8 @@ class AsyncLaudaValue(AsyncValue, fl_lauda.LaudaValue):
     async def aget(self):
         result = await super().aget()
         result = result.decode('ascii')
-        if len(result) < 3:
+        if len(result) < 1:
+            print("result =", result)
             raise fl_lauda.LaudaException("Erreur de communication")
         elif result.startswith("ERR"):
             raise fl_lauda.LaudaException("Erreur Lauda: " + result)
@@ -52,16 +63,36 @@ class AsyncLaudaValue(AsyncValue, fl_lauda.LaudaValue):
 class AsyncLaudaOnOffValue(AsyncLaudaValue, fl_lauda.LaudaOnOffValue):
     
     async def aget(self):
+        possible_answers = {
+            0: True,  # Stand-by false, Device ON
+            1: False, # Stand-by true, Device OFF
+        }
         if self._driver.rom in fl_lauda.LaudaOnOffValue.Supported_ROM:
             resultat = await super().aget()
-            return True if (resultat == "1") else False
+            resultat = int(resultat)
+            if resultat not in possible_answers.keys():
+                raise fl_lauda.LaudaException(f"Unknown answer: '{resultat:}'")
+            return possible_answers[resultat]
         else:
+            # Those cannot go to stand-by, and are always on
             return True
             
     async def aset(self, value):
+        present_state = await self.aget()
+        if bool(value) is bool(present_state):
+            print("Chiller already on this state")
+            return
         if value:
-            await self._interface.write("START\r")
-            await asyncio.sleep(self.pause_instrument)
+            command = "START\r".encode('ascii')
+        else:
+            command = "STOP\r".encode('ascii')
+        await self._interface.awrite(command)
+        await asyncio.sleep(self.pause_instrument)
+        confirmation = await self._interface.aread()
+        confirmation = confirmation.decode('ascii')
+        if confirmation != "OK":
+            print(confirmation)
+            raise fl_lauda.LaudaException("Erreur de communication")
             
 class AsyncLaudaStatValue(AsyncValue, fl_lauda.LaudaStatValue):
 
