@@ -545,7 +545,8 @@ class AsyncSession:
         :return: dataset value
         :rtype: object
         """
-        return next(self.datasets(name))
+        last_ts = self.dataset_times(name)[-1]
+        return last_ts, self.dataset(name, ts=last_ts)
 
     def dataset_times(self, name):
         """This method returns the timestamp of the recorded dataset under the specified

@@ -93,8 +93,10 @@ def test_parameters(tmpdir):
 def test_datasets():
     async def task(sesn):
         sesn.add_dataset(a=[1, 2, 3, 4])
+        sesn.add_dataset(c=[1, 2, 3])
         await asyncio.sleep(0.001)
         sesn.add_dataset(b=np.array([5, 6, 7, 8]))
+        sesn.add_dataset(c=[4, 5, 6])
         sesn.ask_exit()
 
     with AsyncSession() as sesn:
@@ -103,9 +105,11 @@ def test_datasets():
         assert (sesn.dataset("b") == (5, 6, 7, 8)).all()
         for ts, d_a in sesn.datasets("a"):
             assert d_a == [1, 2, 3, 4]
-        assert sesn.dataset_names() == {"a", "b"}
+        assert sesn.dataset_names() == {"a", "b", "c"}
         t_a, d_a = sesn.dataset_last_data("a")
         assert d_a == [1, 2, 3, 4]
         t_a = sesn.dataset_times("a")[0]
         t_b = sesn.dataset_times("b")[0]
         assert t_b - t_a >= 0.001
+        t_last, data_last = sesn.dataset_last_data("c")
+        assert data_last == [4, 5, 6]
