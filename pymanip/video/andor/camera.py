@@ -18,7 +18,6 @@ import struct
 
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
-from pymanip.asynctools import synchronize_generator
 
 import AndorNeo.SDK3Cam as SDK3Cam
 import AndorNeo.SDK3 as SDK3
@@ -359,13 +358,6 @@ class Andor_Camera(Camera):
             self.AcquisitionStop()
         if stop_signal:
             yield True
-
-    def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
-        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition` for the Andor camera.
-        """
-        yield from synchronize_generator(
-            self.acquisition_async, num, timeout, raw, None, raise_on_timeout
-        )
 
 
 if __name__ == "__main__":

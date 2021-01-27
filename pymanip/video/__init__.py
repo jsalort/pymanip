@@ -30,7 +30,7 @@ import sys
 import signal
 import os
 import gzip
-import numpy as np
+import numpy as np 
 
 try:
     import pyqtgraph as pg
@@ -54,7 +54,7 @@ import h5py
 import time
 from progressbar import ProgressBar
 import asyncio
-from pymanip.asynctools import synchronize_function
+from pymanip.asynctools import synchronize_function, synchronize_generator
 
 
 class CameraTimeout(Exception):
@@ -204,31 +204,6 @@ class Camera:
         be overriden for the next frame, and which is no longer defined when the generator object is cleaned up.
         The users are responsible for copying the array, if they want a persistant copy.
 
-        The typical code structure in sub-classes must be like this:
-
-        .. code-block:: python
-
-            def acquisition(self, *args, **kwargs):
-
-                # ... setup code ...
-
-                while count < num:
-
-                    # ... grab frame code ...
-
-                    stop_signal = yield MetadataArray(frame,
-                                                      metadata={"counter": count,
-                                                                "timestamp": timestamp,
-                                                                }
-                                                      )
-                    if stop_signal:
-                        break
-
-                # ... cleanup code ...
-
-                if stop_signal:
-                    yield True
-
         User-level code will use the generator in this manner:
 
         .. code-block:: python
@@ -245,7 +220,9 @@ class Camera:
                     # no need to break here because the gen will be automatically exhausted
 
         """
-        raise NotImplementedError()
+        yield from synchronize_generator(
+            self.acquisition_async, num, timeout, raw, None, raise_on_timeout
+        )
 
     async def acquisition_async(
         self,
@@ -361,14 +338,28 @@ class Camera:
                     im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 elif rotate == -90.0:
                     im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
+                try:
+                    l, c = im.shape
+                    color = False
+                except ValueError:
+                    l, c, ncomp = im.shape
+                    color = True
+
                 if slice_:
-                    img = (maxint // (maximum - minimum)) * (
-                        im[slice_[0] : slice_[1], slice_[2] : slice_[3]] - minimum
-                    )
+                    if color:
+                        img = (maxint // (maximum - minimum)) * (
+                            im[slice_[0] : slice_[1], slice_[2] : slice_[3], :] - minimum
+                        )
+                    else:
+                        img = (maxint // (maximum - minimum)) * (
+                            im[slice_[0] : slice_[1], slice_[2] : slice_[3]] - minimum
+                        )
+
                 else:
                     img = (maxint // (maximum - minimum)) * (im - minimum)
-                l, c = img.shape
-                cv2.imshow(name, cv2.resize(img, (int(c * zoom), int(l * zoom))))
+                img = cv2.resize(img, (int(c * zoom), int(l * zoom)))
+
+                cv2.imshow(name, img)
                 k = cv2.waitKey(1)
                 if k in (0x1B, ord("s")):
                     clean = await preview_generator.asend(True)
@@ -504,6 +495,14 @@ class Camera:
         # for camera reading)
         img = next(self.preview_generator)
         if img is not None:
+            try:
+                l, c = img.shape
+                color = False
+            except ValueError:
+                l, c, ncomp = img.shape
+                color = True
+            if zoom != 1.0:
+                img = cv2.resize(img, (int(c * zoom), int(l * zoom)))
             if rotate == 90.0:
                 img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
             elif rotate == -90.0:
@@ -520,9 +519,13 @@ class Camera:
                 img = img - self.bkgrd  # self.bkgrd - img
                 img[img < 0] = 0
                 img = img.astype(np.uint16)
-
+            if not color:
+                img = img.T
+            else:
+                img = np.transpose(img, axes=(1,0,2))
+            
             self.image_view.setImage(
-                img.T, autoRange=False, autoLevels=False, autoHistogramRange=False
+                img, autoRange=False, autoLevels=False, autoHistogramRange=False
             )
             if not self.range_set:
                 self.image_view.autoRange()

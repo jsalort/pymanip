@@ -18,7 +18,6 @@ import ctypes
 import numpy as np
 from pyueye import ueye
 from pymanip.video import MetadataArray, Camera, CameraTimeout
-from pymanip.asynctools import synchronize_generator
 
 
 class IDS_Camera(Camera):
@@ -291,13 +290,6 @@ class IDS_Camera(Camera):
                 raise RuntimeError("is_DisableEvent ERROR")
         if stop_signal:
             yield True
-
-    def acquisition(self, num=np.inf, timeout=1000, raw=False, raise_on_timeout=True):
-        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition` for the Andor camera.
-        """
-        yield from synchronize_generator(
-            self.acquisition_async, num, timeout, raw, None, raise_on_timeout
-        )
 
     def possible_pixelclock(self):
         """Query the possible values for pixelclock (in MHz)

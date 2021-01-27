@@ -24,7 +24,6 @@ import win32event
 
 import numpy as np
 import asyncio
-from pymanip.asynctools import synchronize_generator
 
 from pymanip.video import MetadataArray, Camera, CameraTimeout
 import pymanip.video.pco.pixelfly as pf
@@ -546,13 +545,6 @@ class PCO_Camera(Camera):
                 pf.PCO_SetRecordingState(self.handle, False)
                 pf.PCO_CancelImages(self.handle)
         return array
-
-    def acquisition(self, num=np.inf, timeout=None, raw=False, raise_on_timeout=True):
-        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition` for the PCO camera.
-        """
-        yield from synchronize_generator(
-            self.acquisition_async, num, timeout, raw, None, raise_on_timeout
-        )
 
     async def acquisition_async(
         self,

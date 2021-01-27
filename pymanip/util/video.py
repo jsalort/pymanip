@@ -29,6 +29,14 @@ try:
     has_ids = True
 except Exception:
     has_ids = False
+
+try:
+    from pymanip.video.ximea import Ximea_Camera
+    
+    has_ximea = True
+except Exception:
+    has_ximea = False
+
 from contextlib import ExitStack
 import asyncio
 
@@ -166,4 +174,25 @@ def preview_ids(
         with IDS_Camera(num) as cam:
             cam.set_exposure_time(exposure_ms)
             cam.set_frame_rate(framerate)
+            cam.preview(backend, slice, zoom, rotate)
+
+def preview_ximea(
+    num=0,
+    backend="cv",
+    slice=None,
+    zoom=1.0,
+    TriggerMode=None,
+    exposure_ms=1.0,
+    rotate=0,
+):
+
+    if not has_ximea:
+        print("Ximea bindings are not available.")
+    else:
+        if num != 0:
+            raise NotImplementedError("Multiple Ximea camera")
+        if TriggerMode is not None:
+            raise NotImplementedError("Trigger mode")
+        with Ximea_Camera() as cam:
+            cam.set_exposure_time(exposure_ms*1e-3)
             cam.preview(backend, slice, zoom, rotate)

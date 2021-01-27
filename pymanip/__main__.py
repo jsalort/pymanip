@@ -8,7 +8,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
-from pymanip.util.video import preview_pco, preview_avt, preview_andor, preview_ids
+from pymanip.util.video import preview_pco, preview_avt, preview_andor, preview_ids, preview_ximea
 
 try:
     from pymanip.util.oscillo import Oscillo
@@ -382,6 +382,19 @@ if __name__ == "__main__":
                     exposure_ms,
                     bitdepth,
                     framerate,
+                    rotate=rotate,
+                )
+        elif args.camera_type.upper() == "XIMEA":
+            if args.list:
+                print("Listing Ximea camera not implemented.")
+            else:
+                preview_ximea(
+                    board,
+                    tk,
+                    slice,
+                    zoom,
+                    Trigger,
+                    exposure_ms,
                     rotate=rotate,
                 )
         else:
