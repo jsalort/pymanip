@@ -173,10 +173,10 @@ class AsyncSession:
         """
         if self.delay_save:
             try:
-                os.remove(self.session_name + ".db")
+                os.remove(str(self.session_name) + ".db")
             except FileNotFoundError:
                 pass
-            disk_db = sqlite3.connect(self.session_name + ".db")
+            disk_db = sqlite3.connect(str(self.session_name) + ".db")
             try:
                 with disk_db as c:
                     for line in self.conn.iterdump():

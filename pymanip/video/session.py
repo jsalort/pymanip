@@ -96,6 +96,7 @@ class VideoSession(AsyncSession):
                     if self.output_folder.exists():
                         i = i + 1
                     else:
+                        self.output_folder.mkdir()
                         break
             else:
                 self.output_folder = Path(output_path)
