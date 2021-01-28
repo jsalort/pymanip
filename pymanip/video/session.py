@@ -37,7 +37,8 @@ class VideoSession(AsyncSession):
         if isinstance(camera_or_camera_list, (list, tuple)):
             self.camera_list = camera_or_camera_list
         else:
-            self.camera_list = (camera_or_camera_list,)
+            self.cam = camera_or_camera_list
+            self.camera_list = (self.cam,)
         self.trigger_gbf = trigger_gbf
         self.framerate = framerate
         self.nframes = nframes
@@ -143,7 +144,9 @@ class VideoSession(AsyncSession):
     async def _start_clock(self):
         while len(self.initialising_cams) > 0:
             await asyncio.sleep(0.1)
-        if hasattr(self, "prepare_cameras"):
+        if len(self.camera_list) == 1 and hasattr(self, "prepare_camera"):
+            self.prepare_camera()
+        elif hasattr(self, "prepare_cameras"):
             self.prepare_cameras()
         with self.trigger_gbf:
             self.trigger_gbf.trigger()
