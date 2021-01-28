@@ -18,20 +18,26 @@ import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
 
 from ximea import xiapi
-from ximea.xidefs import XI_IMG_FORMAT
+from ximea.xidefs import XI_IMG_FORMAT, XI_TRG_SOURCE, XI_TRG_SELECTOR
 
 class Ximea_Camera(Camera):
     """Concrete :class:`pymanip.video.Camera` class for AVT camera.
     """
+    color_order = "BGR" # Ximea RGB mode is [blue][green][red] per the doc.
     
-    def __init__(self, serial_number=None, pixelFormat="XI_RGB24"):
+    def __init__(self, serial_number=None, pixelFormat=None):
         # pour le moment on ouvre simplement la première caméra
         self.cam = xiapi.Camera()
         if serial_number is None:
             self.cam.open_device()
         else:
             self.cam.open_device_by_SN(serial_number)
-        if pixelFormat not in XI_IMG_FORMAT:
+        if pixelFormat is None:
+            if self.cam.is_iscolor():
+                pixelFormat = "XI_RGB24"
+            else:
+                pixelFormat = "XI_MONO8"
+        elif pixelFormat not in XI_IMG_FORMAT:
             raise ValueError(f"Wrong pixelFormat. Possible values are {set(XI_IMG_FORMAT.keys()):}")
         self.cam.set_imgdataformat(pixelFormat)
         print(f"Camera {self.name:} opened ({pixelFormat:})")
@@ -60,22 +66,61 @@ class Ximea_Camera(Camera):
         :type seconds: float
         """
         self.cam.set_exposure(int(seconds*1e6))
+        print("Exposure time set to", 1000*seconds, "ms")
     
     def get_exposure_time(self):
         """This method gets the exposure time in seconds for the camera.
         """
         return self.cam.get_exposure()/1e6
     
-    async def get_image(self, image, timeout=5000):
+    def set_auto_white_balance(self, toggle):
+        """Enable/Disable auto white balance
+        
+        :param toggle: True if auto white balance
+        :type toggle: bool
+        """
+        self.cam.set_param('auto_wb', toggle)
+    
+    def set_trigger_mode(self, external):
+        """Set external trigger
+        """
+        if external:
+            self.cam.set_gpi_mode("XI_GPI_TRIGGER")
+            self.cam.set_trigger_source("XI_TRG_EDGE_RISING")
+            self.cam.set_trigger_selector("XI_TRG_SEL_EXPOSURE_START")
+        else:
+            self.cam.set_trigger_source("XI_TRG_OFF")
+    
+    def set_limit_bandwidth(self, limit):
+        """Enable limit bandwidth (useful if there are several cameras
+        acquiring simultaneously).
+        """
+        if limit:
+            self.cam.set_limit_bandwidth_mode("XI_ON")
+        else:
+            self.cam.set_limit_bandwidth_mode("XI_OFF")
+
+    def get_trigger_mode(self):
+        """Returns True if external, False if software
+        """
+        return self.cam.get_trigger_source() != "XI_TRG_OFF"
+
+    def set_downsampling(self, binning):
+        """Change image resolution by binning
+        """
+        self.cam.set_downsampling(binning)
+
+    async def get_image(self, loop, image, timeout=5000):
         """Asynchronous version of xiapi.Camera.get_image method
         This function awaits for next image to be available in transport buffer.
+        Color images are in BGR order (similar to OpenCV default).
+        Attention: matplotlib expects RGB order.
         
         :param image: Image instance to copy image to
         :type image: :class:`xiapi.Image`
         :param timeout: timeout in milliseconds
         :type timeout: int
         """
-        loop = asyncio.get_event_loop()
         stat = await loop.run_in_executor(
             None,
             self.cam.device.xiGetImage,
@@ -101,6 +146,7 @@ class Ximea_Camera(Camera):
         
         timeout in milliseconds.
         """
+        loop = asyncio.get_event_loop()
         if timeout is None:
             timeout = max((5000, 5*self.get_exposure_time()*1000))
         img = xiapi.Image()
@@ -111,7 +157,7 @@ class Ximea_Camera(Camera):
                 if count == 0 and initialising_cams is not None and self in initialising_cams:
                     initialising_cams.remove(self)
                 try:
-                    await self.get_image(img, timeout)
+                    await self.get_image(loop, img, timeout)
                 except CameraTimeout:
                     if raise_on_timeout:
                         raise

@@ -64,7 +64,8 @@ class CameraTimeout(Exception):
     pass
 
 
-def save_image(im, ii, basename, zerofill, file_format, compression, compression_level):
+def save_image(im, ii, basename, zerofill, file_format, compression, compression_level,
+               color_order=None):
     """This function is a simple general function to save an input image from the camera
     to disk.
 
@@ -99,6 +100,8 @@ def save_image(im, ii, basename, zerofill, file_format, compression, compression
         with h5py.File(filename, "w") as f:
             f.attrs["counter"] = im.metadata["counter"]
             f.attrs["timestamp"] = im.metadata["timestamp"].timestamp()
+            if color_order is not None:
+                f.attrs["color_order"] = color_order
             # compression='gzip' trop lent pour 30 fps
             # compression='lzf' presque bon mais un peu lent à 30 fps
             f.create_dataset("image", data=im, compression=compression)
@@ -110,6 +113,8 @@ def save_image(im, ii, basename, zerofill, file_format, compression, compression
             params = (cv2.IMWRITE_PNG_COMPRESSION, compression_level)
         else:
             params = None
+        if color_order == "RGB":
+            im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, im, params)
 
 
@@ -358,7 +363,9 @@ class Camera:
                 else:
                     img = (maxint // (maximum - minimum)) * (im - minimum)
                 img = cv2.resize(img, (int(c * zoom), int(l * zoom)))
-
+                if self.color_order == "RGB":
+                    # OpenCV works in BGR order.
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 cv2.imshow(name, img)
                 k = cv2.waitKey(1)
                 if k in (0x1B, ord("s")):
@@ -523,6 +530,9 @@ class Camera:
                 img = img.T
             else:
                 img = np.transpose(img, axes=(1,0,2))
+                if self.color_order == "BGR":
+                    # Qt comme Matplotlib travaille en RGB.
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
             self.image_view.setImage(
                 img, autoRange=False, autoLevels=False, autoHistogramRange=False
@@ -654,24 +664,30 @@ class Camera:
         )
         self.acqinterrupted = False
         async for im in acqgen:
-            if dryrun:
-                continue
             if ii == 0:
                 print(im.dtype)
-            if delay_save:
-                images.append(im.copy())
-            else:
-                start_time = time.process_time()
-                save_image(
-                    im,
-                    ii,
-                    basename,
-                    zerofill,
-                    file_format,
-                    compression,
-                    compression_level,
-                )
-                computation_time += time.process_time() - start_time
+            if not dryrun:
+                if delay_save:
+                    images.append(im.copy())
+                else:
+                    start_time = time.process_time()
+                    if hasattr(self, "color_order"):
+                        color_order = self.color_order
+                    else:
+                        color_order = None
+                    if im.ndim < 3:
+                        color_order = None
+                    save_image(
+                        im,
+                        ii,
+                        basename,
+                        zerofill,
+                        file_format,
+                        compression,
+                        compression_level,
+                        color_order=color_order,
+                    )
+                    computation_time += time.process_time() - start_time
             if hasattr(im, "metadata"):
                 count.append(im.metadata["counter"])
                 ts = im.metadata["timestamp"]

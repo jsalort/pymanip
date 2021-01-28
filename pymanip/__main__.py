@@ -160,7 +160,7 @@ parser_video.add_argument(
     "--toolkit",
     help="Graphical toolkit to use: cv or qt",
     metavar="toolkit",
-    default="cv",
+    default="qt",
     type=str,
     nargs=1,
 )
@@ -185,6 +185,14 @@ parser_video.add_argument(
     type=int,
     nargs=1,
 )
+
+parser_video.add_argument(
+    "-w",
+    "--whitebalance",
+    help="Enable auto white balance (for color cameras)",
+    action="store_true",
+)
+
 parser_video.add_argument(
     "-e",
     "--exposure",
@@ -388,6 +396,11 @@ if __name__ == "__main__":
             if args.list:
                 print("Listing Ximea camera not implemented.")
             else:
+                print("white_balance =", args.whitebalance)
+                if board == 0:
+                    board = None
+                else:
+                    raise NotImplementedError("open via SN")
                 preview_ximea(
                     board,
                     tk,
@@ -396,6 +409,7 @@ if __name__ == "__main__":
                     Trigger,
                     exposure_ms,
                     rotate=rotate,
+                    white_balance=args.whitebalance,
                 )
         else:
             print("Unknown camera type: ", args.camera_type)

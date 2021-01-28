@@ -177,22 +177,21 @@ def preview_ids(
             cam.preview(backend, slice, zoom, rotate)
 
 def preview_ximea(
-    num=0,
+    num=None,
     backend="cv",
     slice=None,
     zoom=1.0,
     TriggerMode=None,
     exposure_ms=1.0,
     rotate=0,
+    white_balance=False,
 ):
 
     if not has_ximea:
         print("Ximea bindings are not available.")
     else:
-        if num != 0:
-            raise NotImplementedError("Multiple Ximea camera")
-        if TriggerMode is not None:
-            raise NotImplementedError("Trigger mode")
-        with Ximea_Camera() as cam:
+        with Ximea_Camera(num) as cam:
+            cam.set_trigger_mode(TriggerMode)
             cam.set_exposure_time(exposure_ms*1e-3)
+            cam.set_auto_white_balance(white_balance)
             cam.preview(backend, slice, zoom, rotate)
