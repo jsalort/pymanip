@@ -92,7 +92,7 @@ class VideoSession(AsyncSession):
                 i = 1
                 while True:
                     self.output_folder = base_dir / f"{i:02d}"
-                    session_name = output_path / "session"
+                    session_name = self.output_folder / "session"
                     if self.output_folder.exists():
                         i = i + 1
                     else:
