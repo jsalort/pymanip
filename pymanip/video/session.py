@@ -163,17 +163,17 @@ class VideoSession(AsyncSession):
                     await asyncio.sleep(0.1)
                 else:
                     img = q.get()
+                    self.add_entry(
+                        ts=img.metadata["timestamp"], count=img.metadata["counter"]
+                    )
                     if hasattr(self, "process_image"):
                         img = await loop.run_in_executor(None, self.process_image, img)
                     filepath = (
                         self.output_folder
-                        / f"img-cam{cam_no:d}-{i[cam_no]:04d}.{self.output_format:}"
+                        / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
                     )
                     await loop.run_in_executor(
                         None, cv2.imwrite, str(filepath), img, None
-                    )
-                    self.add_entry(
-                        ts=img.metadata["timestamp"], count=img.metadata["counter"]
                     )
                     i[cam_no] += 1
             if not self.running:
