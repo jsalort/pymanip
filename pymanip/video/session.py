@@ -190,6 +190,15 @@ class VideoSession(AsyncSession):
         for cam_no, ii in enumerate(i):
             print(f"{ii:d} images saved (cam {cam_no:}).")
 
+    def _convert_for_ffmpeg(self, cam_no, img, fmin, fmax, gain):
+        fff = 255 * gain * np.array(img - fmin, dtype=np.float64) / (fmax - fmin)
+        fff[fff < 0] = 0
+        fff[fff > 255] = 255
+        ff = np.array(fff, dtype=np.uint8)
+        if self.camera_list[cam_no].color_order == "RGB":
+            ff = cv2.cvtColor(ff, cv2.COLOR_RGB2BGR)
+        return ff.tostring()
+
     async def _save_video(self, cam_no, gain=1.0):
         loop = asyncio.get_event_loop()
         command = None
@@ -239,17 +248,10 @@ class VideoSession(AsyncSession):
                     fmin = np.min(img)
                 if fmax is None:
                     fmax = np.max(img)
-
-                fff = (
-                    255 * gain * np.array(img - fmin, dtype=np.float64) / (fmax - fmin)
+                data = await loop.run_in_executor(
+                    None, self._convert_for_ffmpeg, cam_no, img, fmin, fmax, gain
                 )
-                fff[fff < 0] = 0
-                fff[fff > 255] = 255
-                ff = np.array(fff, dtype=np.uint8)
-                if self.camera_list[cam_no].color_order == "RGB":
-                    ff = cv2.cvtColor(ff, cv2.COLOR_RGB2BGR)
-                # ff = cv2.resize(ff, output_size)
-                proc.stdin.write(ff.tostring())
+                proc.stdin.write(data)
                 await proc.stdin.drain()
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
