@@ -116,14 +116,20 @@ class VideoSession(AsyncSession):
             if cam_no == 0:
                 pb = ProgressBar(initial_value=0, min_value=0, max_value=self.nframes)
             gen = cam.acquisition_async(
-                self.nframes, initialising_cams=self.initialising_cams
+                self.nframes,
+                initialising_cams=self.initialising_cams,
+                raise_on_timeout=False,
             )
             n = 0
             async for im in gen:
-                self.image_queues[cam_no].put(im)
-                n = n + 1
-                if cam_no == 0:
-                    pb.update(n)
+                if im is not None:
+                    self.image_queues[cam_no].put(im)
+                    n = n + 1
+                    if cam_no == 0:
+                        pb.update(n)
+                else:
+                    print("Camera timed out! Stopping...")
+                    self.running = False
                 if not self.running:
                     success = await gen.asend(True)
                     if not success:
