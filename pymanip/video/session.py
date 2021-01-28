@@ -166,6 +166,8 @@ class VideoSession(AsyncSession):
                     await asyncio.sleep(0.1)
                 else:
                     img = q.get()
+                    if hasattr(self, "process_image"):
+                        img = await loop.run_in_executor(None, self.process_image, img)
                     filepath = (
                         self.output_folder
                         / f"img-cam{cam_no:d}-{i[cam_no]:04d}.{self.output_format:}"
@@ -192,6 +194,7 @@ class VideoSession(AsyncSession):
             print(f"{ii:d} images saved (cam {cam_no:}).")
 
     async def _save_video(self, cam_no, gain=1.0):
+        loop = asyncio.get_event_loop()
         command = None
         fmin = None
         fmax = None
@@ -203,6 +206,8 @@ class VideoSession(AsyncSession):
                 await asyncio.sleep(0.1)
             else:
                 img = self.image_queues[cam_no].get()
+                if hasattr(self, "process_image"):
+                    img = await loop.run_in_executor(None, self.process_image, img)
                 if command is None:
                     output_size = img.shape
                     command = [
@@ -274,7 +279,7 @@ class VideoSession(AsyncSession):
         max_dt = np.max(dt)
         min_fps = 1.0 / max_dt
         max_fps = 1.0 / min_dt
-        print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3d})")
+        print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3f})")
 
         return camera_timestamps, camera_counter
 
