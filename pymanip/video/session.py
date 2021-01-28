@@ -253,7 +253,9 @@ class VideoSession(AsyncSession):
                 )
                 proc.stdin.write(data)
                 await proc.stdin.drain()
-        await asyncio.wait_for(proc.wait(), timeout=5.0)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+        print(stdout)
+        print(stderr)
         print("ffmpeg has terminated.")
 
     async def main(self):
