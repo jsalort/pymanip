@@ -37,8 +37,7 @@ class VideoSession(AsyncSession):
         if isinstance(camera_or_camera_list, (list, tuple)):
             self.camera_list = camera_or_camera_list
         else:
-            self.cam = camera_or_camera_list
-            self.camera_list = (self.cam,)
+            self.camera_list = (camera_or_camera_list,)
         self.trigger_gbf = trigger_gbf
         self.framerate = framerate
         self.nframes = nframes
@@ -114,6 +113,8 @@ class VideoSession(AsyncSession):
 
     async def _acquire_images(self, cam_no):
         with self.camera_list[cam_no] as cam:
+            if hasattr(self, "prepare_camera"):
+                self.prepare_camera(cam)
             if cam_no == 0:
                 pb = ProgressBar(initial_value=0, min_value=0, max_value=self.nframes)
             gen = cam.acquisition_async(
@@ -144,10 +145,6 @@ class VideoSession(AsyncSession):
     async def _start_clock(self):
         while len(self.initialising_cams) > 0:
             await asyncio.sleep(0.1)
-        if len(self.camera_list) == 1 and hasattr(self, "prepare_camera"):
-            self.prepare_camera()
-        elif hasattr(self, "prepare_cameras"):
-            self.prepare_cameras()
         with self.trigger_gbf:
             self.trigger_gbf.trigger()
         return datetime.now().timestamp()
