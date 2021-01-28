@@ -101,7 +101,7 @@ class VideoSession(AsyncSession):
                 self.output_folder = Path(output_path)
                 self.output_folder.mkdir(exist_ok=exist_ok)
                 session_name = self.output_folder
-            print("Output path is", str(output_path.absolute()))
+            print("Output folder is", str(self.output_folder.absolute()))
 
         super().__init__(session_name, delay_save=True)
         for cam in self.camera_list:
