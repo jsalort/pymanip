@@ -46,7 +46,7 @@ class VideoSession(AsyncSession):
         self.output_format = output_format
 
         if output_path is None:
-            current_date = datetime.today().strftime("%Y%m%d")
+            current_date = datetime.today().strftime("%Y-%m-%d")
             base_dir = Path(".") / current_date
             base_dir.mkdir(exist_ok=True)
 
@@ -242,11 +242,13 @@ class VideoSession(AsyncSession):
             self.trigger_gbf.configure_burst(self.framerate, self.nframes)
             self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
         acquisition_tasks = [
-            self._acquire_images(cam_no) for cam_no in len(self.camera_list)
+            self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
         ]
         clock_task = self._start_clock()
         if self.output_format == "mp4":
-            save_tasks = [self._save_video(cam_no) for cam_no in len(self.camera_list)]
+            save_tasks = [
+                self._save_video(cam_no) for cam_no in range(len(self.camera_list))
+            ]
         else:
             save_tasks = [self._save_images()]
         await self.monitor(
