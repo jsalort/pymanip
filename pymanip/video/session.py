@@ -264,6 +264,20 @@ class VideoSession(AsyncSession):
         await self.monitor(
             *acquisition_tasks, clock_task, *save_tasks, server_port=None
         )
+        _, camera_timestamps = self.logged_variable("ts")
+        _, camera_counter = self.logged_variable("count")
+
+        dt = camera_timestamps[1:] - camera_timestamps[:-1]
+        mean_dt = np.mean(dt)
+        mean_fps = 1.0 / mean_dt
+        min_dt = np.min(dt)
+        max_dt = np.max(dt)
+        min_fps = 1.0 / max_dt
+        max_fps = 1.0 / min_dt
+        print("fps =", mean_fps, "(between", min_fps, "and", max_fps, ")")
+
+        return camera_timestamps, camera_counter
 
     def run(self):
-        asyncio.run(self.main())
+        ts, count = asyncio.run(self.main())
+        return ts, count
