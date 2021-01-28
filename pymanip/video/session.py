@@ -203,12 +203,14 @@ class VideoSession(AsyncSession):
                 await asyncio.sleep(0.1)
             else:
                 img = self.image_queues[cam_no].get()
+                self.add_entry(
+                    ts=img.metadata["timestamp"], count=img.metadata["counter"]
+                )
                 if hasattr(self, "process_image"):
                     img = await loop.run_in_executor(None, self.process_image, img)
                 if command is None:
                     output_size = img.shape
                     command = [
-                        "ffmpeg",
                         "-y",
                         "-f",
                         "rawvideo",
@@ -250,7 +252,9 @@ class VideoSession(AsyncSession):
                 if self.camera_list[cam_no].color_order == "RGB":
                     ff = cv2.cvtColor(ff, cv2.COLOR_RGB2BGR)
                 # ff = cv2.resize(np.array(fff, dtype=np.uint8), output_size)
-                await proc.communicate(ff.tostring())
+                proc.stdin.write(ff.to_string)
+                await proc.stdin.drain()
+        await proc.wait()
 
     async def main(self):
         with self.trigger_gbf:
