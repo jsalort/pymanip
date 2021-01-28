@@ -195,10 +195,7 @@ class VideoSession(AsyncSession):
         command = None
         fmin = None
         fmax = None
-        while True:
-            if not self.running:
-                if all([q.empty() for q in self.image_queues]):
-                    break
+        while self.running or not self.image_queues[cam_no].empty():
             if self.image_queues[cam_no].empty():
                 await asyncio.sleep(0.1)
             else:
@@ -254,7 +251,8 @@ class VideoSession(AsyncSession):
                 # ff = cv2.resize(ff, output_size)
                 proc.stdin.write(ff.tostring())
                 await proc.stdin.drain()
-        await proc.wait()
+        await asyncio.wait_for(proc.wait(), timeout=5.0)
+        print("ffmpeg has terminated.")
 
     async def main(self):
         with self.trigger_gbf:
