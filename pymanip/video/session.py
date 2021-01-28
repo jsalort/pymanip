@@ -251,8 +251,8 @@ class VideoSession(AsyncSession):
                 ff = np.array(fff, dtype=np.uint8)
                 if self.camera_list[cam_no].color_order == "RGB":
                     ff = cv2.cvtColor(ff, cv2.COLOR_RGB2BGR)
-                # ff = cv2.resize(np.array(fff, dtype=np.uint8), output_size)
-                proc.stdin.write(ff.to_string)
+                ff = cv2.resize(ff, output_size)
+                proc.stdin.write(ff.to_string())
                 await proc.stdin.drain()
         await proc.wait()
 
