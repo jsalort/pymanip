@@ -274,7 +274,7 @@ class VideoSession(AsyncSession):
         max_dt = np.max(dt)
         min_fps = 1.0 / max_dt
         max_fps = 1.0 / min_dt
-        print("fps =", mean_fps, "(between", min_fps, "and", max_fps, ")")
+        print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3d})")
 
         return camera_timestamps, camera_counter
 
