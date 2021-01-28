@@ -246,8 +246,8 @@ class VideoSession(AsyncSession):
                 )
                 fff[fff < 0] = 0
                 fff[fff > 255] = 255
-                ff = cv2.resize(np.array(fff, dtype=np.uint8), output_size)
-                await proc.communicate(cv2.cvtColor(ff, cv2.COLOR_RGB2BGR).tostring())
+                # ff = cv2.resize(np.array(fff, dtype=np.uint8), output_size)
+                await proc.communicate(cv2.cvtColor(fff, cv2.COLOR_RGB2BGR).tostring())
 
     async def main(self):
         with self.trigger_gbf:
