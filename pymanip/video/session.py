@@ -231,7 +231,7 @@ class VideoSession(AsyncSession):
                     ]
                     proc = await asyncio.create_subprocess_exec(
                         "ffmpeg",
-                        command,
+                        *command,
                         stdin=asyncio.subprocess.PIPE,
                         stdout=None,
                         stderr=None,
