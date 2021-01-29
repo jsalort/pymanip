@@ -380,13 +380,6 @@ class VideoSession(AsyncSession):
             except ValueError:
                 l, c, ncomp = img.shape
                 color = True
-            zoom_l = l / 600
-            zoom_c = c / 800
-            zoom = max([zoom_l, zoom_c])
-            if zoom > 1:
-                img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
-            else:
-                zoom = 1.0
 
             # Convert color order if necessary
             if color and self.camera_list[cam_no].color_order == "BGR":
@@ -394,12 +387,13 @@ class VideoSession(AsyncSession):
 
             plt.figure()
             plt.imshow(img)
-            print("Click on bottom-left and top-right corners")
+            plt.title("Unprocessed image")
+            print("Click on top-left and bottom-right corners")
             bottom_left, top_right = plt.ginput(2)
-            zY0, zX0 = bottom_left
-            zY1, zX1 = top_right
-            print("ROI is", zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom)
-        return zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom
+            Y0, X0 = bottom_left
+            Y1, X1 = top_right
+            print("ROI is", X0, Y0, X1, Y1)
+        return X0, Y0, X1, Y1
 
     async def _live_preview(self, unprocessed=False):
         while self.running or any([not q.empty() for q in self.image_queues]):

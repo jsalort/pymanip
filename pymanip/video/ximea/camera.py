@@ -199,6 +199,18 @@ class Ximea_Camera(Camera):
         self.cam.set_offsetX(offset_x)
         self.cam.set_offsetY(offset_y)
 
+        # Print final ROI
+        print("ROI set to", offset_x, offset_x + width, offset_y, offset_y + height)
+
+    def get_roi(self):
+        """Get ROI
+        """
+        width = self.cam.get_width()
+        height = self.cam.get_height()
+        offset_x = self.cam.get_offsetX()
+        offset_y = self.cam.get_offsetY()
+        return offset_x, offset_x + width, offset_y, offset_y + height
+
     async def get_image(self, loop, image, timeout=5000):
         """Asynchronous version of xiapi.Camera.get_image method
         This function awaits for next image to be available in transport buffer.
