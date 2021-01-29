@@ -357,6 +357,54 @@ class VideoSession(AsyncSession):
             plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         plt.show()
 
+    def roi_finder(self, additionnal_trig=0):
+        if hasattr(self, "process_image"):
+            old_process_image = self.process_image
+            del self.process_image
+        else:
+            old_process_image = None
+        old_nframes = self.nframes
+        old_output_format = self.output_format
+        try:
+            self.nframes = 1
+            self.output_format = "png"
+            ts, count = asyncio.run(
+                self.main(keep_in_RAM=True, additionnal_trig=additionnal_trig)
+            )
+            for cam_no, img in enumerate(self.image_list):
+                try:
+                    l, c = img.shape
+                    color = False
+                except ValueError:
+                    l, c, ncomp = img.shape
+                    color = True
+                zoom_l = l / 600
+                zoom_c = c / 800
+                zoom = max([zoom_l, zoom_c])
+                if zoom > 1:
+                    img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
+                else:
+                    zoom = 1.0
+
+                # Convert color order if necessary
+                if color and self.camera_list[cam_no].color_order == "BGR":
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+                plt.figure()
+                plt.imshow(img)
+                print("Click on bottom-left and top-right corners")
+                bottom_left, top_right = plt.ginput(2)
+                zY0, zX0 = bottom_left
+                zY1, zX1 = top_right
+                print("ROI is", zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom)
+
+        finally:
+            if old_process_image is not None:
+                self.process_image = old_process_image
+            self.nframes = old_nframes
+            self.output_format = old_output_format
+        return zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom
+
     async def _live_preview(self):
         while self.running or any([not q.empty() for q in self.image_queues]):
             for cam_no, q in enumerate(self.image_queues):
