@@ -265,9 +265,11 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
-    async def main(self, keep_in_RAM=False):
+    async def main(self, keep_in_RAM=False, additionnal_trig=0):
         with self.trigger_gbf:
-            self.trigger_gbf.configure_burst(self.framerate, self.nframes)
+            self.trigger_gbf.configure_burst(
+                self.framerate, self.nframes + additionnal_trig
+            )
             self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
         acquisition_tasks = [
             self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
@@ -297,8 +299,8 @@ class VideoSession(AsyncSession):
 
         return camera_timestamps, camera_counter
 
-    def run(self):
-        ts, count = asyncio.run(self.main())
+    def run(self, additionnal_trig=0):
+        ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig))
         return ts, count
 
     def get_one_image(self):
