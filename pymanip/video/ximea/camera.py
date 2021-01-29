@@ -96,6 +96,12 @@ class Ximea_Camera(Camera):
         else:
             self.cam.set_trigger_source("XI_TRG_OFF")
 
+    def set_vertial_skipping(self, factor):
+        """Vertical skipping
+        """
+        self.cam.set_downsampling_type("XI_SKIPPING")
+        self.cam.set_decimation_vertical(factor)
+
     def set_limit_bandwidth(self, limit):
         """Enable limit bandwidth (useful if there are several cameras
         acquiring simultaneously).
