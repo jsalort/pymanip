@@ -32,7 +32,7 @@ except Exception:
 
 try:
     from pymanip.video.ximea import Ximea_Camera
-    
+
     has_ximea = True
 except Exception:
     has_ximea = False
@@ -176,6 +176,7 @@ def preview_ids(
             cam.set_frame_rate(framerate)
             cam.preview(backend, slice, zoom, rotate)
 
+
 def preview_ximea(
     num=None,
     backend="cv",
@@ -185,6 +186,7 @@ def preview_ximea(
     exposure_ms=1.0,
     rotate=0,
     white_balance=False,
+    roi=None,
 ):
 
     if not has_ximea:
@@ -192,6 +194,8 @@ def preview_ximea(
     else:
         with Ximea_Camera(num) as cam:
             cam.set_trigger_mode(TriggerMode)
-            cam.set_exposure_time(exposure_ms*1e-3)
+            cam.set_exposure_time(exposure_ms * 1e-3)
             cam.set_auto_white_balance(white_balance)
+            if roi is not None:
+                cam.set_roi(*roi)
             cam.preview(backend, slice, zoom, rotate)

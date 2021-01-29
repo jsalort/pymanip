@@ -115,6 +115,19 @@ class Ximea_Camera(Camera):
         """
         self.cam.set_downsampling(binning)
 
+    def set_roi(self, roiX0=0, roiY0=0, roiX1=0, roiY1=0):
+        r"""This method sets the positions of the upper left corner (X0,Y0) and lower right
+        (X1,Y1) corner of the ROI (region of interest) in pixels.
+        """
+        width = roiX1 - roiX0
+        height = roiY1 - roiY0
+        offset_x = roiX0
+        offset_y = roiY0
+        self.cam.set_width(width)
+        self.cam.set_height(height)
+        self.cam.set_offsetX(offset_x)
+        self.cam.set_offsetY(offset_y)
+
     async def get_image(self, loop, image, timeout=5000):
         """Asynchronous version of xiapi.Camera.get_image method
         This function awaits for next image to be available in transport buffer.

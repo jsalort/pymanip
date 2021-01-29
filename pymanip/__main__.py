@@ -8,7 +8,13 @@ from pathlib import Path
 from argparse import ArgumentParser
 from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
 from pymanip.util.gpib import scanGpib
-from pymanip.util.video import preview_pco, preview_avt, preview_andor, preview_ids, preview_ximea
+from pymanip.util.video import (
+    preview_pco,
+    preview_avt,
+    preview_andor,
+    preview_ids,
+    preview_ximea,
+)
 
 try:
     from pymanip.util.oscillo import Oscillo
@@ -410,6 +416,7 @@ if __name__ == "__main__":
                     exposure_ms,
                     rotate=rotate,
                     white_balance=args.whitebalance,
+                    roi=args.roi,
                 )
         else:
             print("Unknown camera type: ", args.camera_type)
