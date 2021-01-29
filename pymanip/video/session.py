@@ -273,25 +273,28 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
-    async def main(self, keep_in_RAM=False, additionnal_trig=0):
+    async def main(self, keep_in_RAM=False, additionnal_trig=0, live=False):
         with self.trigger_gbf:
-            self.trigger_gbf.configure_burst(
-                self.framerate, self.nframes + additionnal_trig
-            )
-            self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
+            if live:
+                self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
+            else:
+                self.trigger_gbf.configure_burst(
+                    self.framerate, self.nframes + additionnal_trig
+                )
+                self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
         acquisition_tasks = [
             self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
         ]
         clock_task = self._start_clock()
-        if self.output_format == "mp4":
-            save_tasks = [
+        if live:
+            save_tasks = [self._live_preview()]
+        elif self.output_format == "mp4":
+            save_tasks = [clock_task] + [
                 self._save_video(cam_no) for cam_no in range(len(self.camera_list))
             ]
         else:
-            save_tasks = [self._save_images(keep_in_RAM)]
-        await self.monitor(
-            *acquisition_tasks, clock_task, *save_tasks, server_port=None
-        )
+            save_tasks = [clock_task, self._save_images(keep_in_RAM)]
+        await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
 
@@ -309,6 +312,10 @@ class VideoSession(AsyncSession):
 
     def run(self, additionnal_trig=0):
         ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig))
+        return ts, count
+
+    def live(self):
+        ts, count = asyncio.run(self.main(live=True))
         return ts, count
 
     def get_one_image(self, additionnal_trig=0):
@@ -339,3 +346,45 @@ class VideoSession(AsyncSession):
             plt.figure()
             plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         plt.show()
+
+    async def _live_preview(self):
+        while self.running or any([not q.empty() for q in self.image_queues]):
+            for cam_no, q in enumerate(self.image_queues):
+                ndropped = -1
+                img = None
+                while not q.empty():
+                    img = q.get()
+                    self.add_entry(
+                        ts=img.metadata["timestamp"], count=img.metadata["counter"]
+                    )
+                    ndropped += 1
+                if img is not None:
+                    if ndropped > 0:
+                        print(ndropped, "frames dropped.")
+                    if hasattr(self, "process_image"):
+                        img = self.process_image(img)
+
+                    # Show only a 800x600 window (max)
+                    try:
+                        l, c = img.shape
+                        color = False
+                    except ValueError:
+                        l, c, ncomp = img.shape
+                        color = True
+                    zoom_l = l / 600
+                    zoom_c = c / 800
+                    zoom = max([zoom_l, zoom_c])
+                    if zoom > 1:
+                        img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
+
+                    # Convert color order if necessary
+                    if color and self.camera_list[cam_no].color_order == "RGB":
+                        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+                    # Show image and run cv2 event loop
+                    cv2.imshow(f"cam{cam_no:}", img)
+            k = cv2.waitKey(1)
+            if k:
+                self.ask_exit()
+            await asyncio.sleep(0.1)
+        cv2.destroyAllWindows()
