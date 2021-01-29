@@ -360,7 +360,7 @@ class VideoSession(AsyncSession):
     def roi_finder(self, additionnal_trig=0):
         if hasattr(self, "process_image"):
             old_process_image = self.process_image
-            del self.process_image
+            delattr(self, "process_image")
         else:
             old_process_image = None
         old_nframes = self.nframes
