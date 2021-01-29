@@ -28,6 +28,8 @@ class Ximea_Camera(Camera):
     color_order = "BGR"  # Ximea RGB mode is [blue][green][red] per the doc.
 
     def __init__(self, serial_number=None, pixelFormat=None):
+        """Constructor method
+        """
         # pour le moment on ouvre simplement la première caméra
         self.cam = xiapi.Camera()
         if serial_number is None:
@@ -47,6 +49,8 @@ class Ximea_Camera(Camera):
         print(f"Camera {self.name:} opened ({pixelFormat:})")
 
     def close(self):
+        """Close connection to the camera
+        """
         name = self.name
         self.cam.close_device()
         self.cam = None
@@ -87,7 +91,7 @@ class Ximea_Camera(Camera):
         self.cam.set_param("auto_wb", toggle)
 
     def set_trigger_mode(self, external):
-        """Set external trigger
+        """Set external trigger (edge rising).
         """
         if external:
             self.cam.set_gpi_mode("XI_GPI_TRIGGER")
@@ -97,7 +101,7 @@ class Ximea_Camera(Camera):
             self.cam.set_trigger_source("XI_TRG_OFF")
 
     def set_vertial_skipping(self, factor):
-        """Vertical skipping
+        """Set vertical skipping
         """
         self.cam.set_downsampling_type("XI_SKIPPING")
         self.cam.set_decimation_vertical(factor)
@@ -122,7 +126,7 @@ class Ximea_Camera(Camera):
         self.cam.set_downsampling(binning)
 
     def set_roi(self, roiX0=0, roiY0=0, roiX1=0, roiY1=0):
-        r"""This method sets the positions of the upper left corner (X0,Y0) and lower right
+        """This method sets the positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
         # Get bounds for width and height (with no offset)

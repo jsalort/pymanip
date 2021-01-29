@@ -1,6 +1,98 @@
 """Asynchronous acquisition session (:mod:`pymanip.video.session`)
 ==================================================================
 
+This module provides a high-level class, :class:`VideoSession`, to be used in acquisition scripts.
+Users should subclass :class:`VideoSession`, and add two methods: ``prepare_camera(self, cam)`` in which
+additionnal camera setup may be done, and ``process_image(self, img)`` in which possible image post-processing
+can be done.
+The ``prepare_camera`` method, if defined, is called before starting camera acquisition.
+The ``process_image`` method, if defined, is called before saving the image.
+
+The implementation allows simultaneous acquisition of several cameras, trigged by a function generator.
+Concurrent tasks are set up to grab images from the cameras to RAM memory, while a background task saves
+the images to the disk. The cameras, and the trigger, are released as soon as acquisition is finished, even if the images are
+still being written to the disk, which allows several scripts to be executed concurrently (if the host computer
+has enough RAM). The ``trigger_gbf`` object must implement ``configure_square()`` and ``configure_burst()`` methods
+to configure square waves and bursts, as well as ``trigger()`` method for software trigger. An exemple is
+:class:`fluidlab.instruments.funcgen.agilent_33220a.Agilent33220a`.
+
+A context manager must be used to ensure proper saving of the metadata to the database.
+
+**Example**
+
+.. code:: python
+
+   import numpy as np
+   import cv2
+
+   from pymanip.video.session import VideoSession
+   from pymanip.video.ximea import Ximea_Camera
+   from pymanip.instruments import Agilent33220a
+
+
+   class TLCSession(VideoSession):
+
+       def prepare_camera(self, cam):
+           # Set up camera (keep values as custom instance attributes)
+           self.exposure_time = 50e-3
+           self.decimation_factor = 2
+
+           cam.set_exposure_time(self.exposure_time)
+           cam.set_auto_white_balance(False)
+           cam.set_limit_bandwidth(False)
+           cam.set_vertial_skipping(self.decimation_factor)
+           cam.set_roi(1298, 1833, 2961, 2304)
+
+           # Save some metadata to the AsyncSession underlying database
+           self.save_parameter(
+               exposure_time=self.exposure_time,
+               decimation_factor=self.decimation_factor,
+           )
+
+       def process_image(self, img):
+           # On decimate manuellement dans la direction horizontale
+           img = img[:, ::self.decimation_factor, :]
+
+           # On redivise encore tout par 2
+           # image_size = (img.shape[0]//2, img.shape[1]//2)
+           # img = cv2.resize(img, image_size)
+
+           # Correction (fixe) de la balance des blancs
+           kR = 1.75
+           kG = 1.0
+           kB = 2.25
+           b, g, r = cv2.split(img)
+           img = np.array(
+               cv2.merge([kB*b, kG*g, kR*r]),
+               dtype=img.dtype,
+           )
+
+           # Rotation de 180°
+           img = cv2.rotate(img, cv2.ROTATE_180)
+
+           return img
+
+
+   with TLCSession(
+       Ximea_Camera(),
+       trigger_gbf=Agilent33220a("USB0::0x0957::0x0407::SG43000299::INSTR"),
+       framerate=24,
+       nframes=1000,
+       output_format="png",
+       ) as sesn:
+
+       # ROI helper (remove cam.set_roi in prepare_camera for correct usage)
+       # sesn.roi_finder()
+
+       # Single picture test
+       # sesn.show_one_image()
+
+       # Live preview
+       # ts, count = sesn.live()
+
+       # Run actual acquisition
+       ts, count = sesn.run(additionnal_trig=1)
+
 .. autoclass:: VideoSession
    :members:
    :private-members:
@@ -23,6 +115,22 @@ from pymanip.asyncsession import AsyncSession
 
 class VideoSession(AsyncSession):
     """This class represents a video acquisition session.
+
+    :param camera_or_camera_list: Camera(s) to be acquired
+    :type camera_or_camera_list: :class:`~pymanip.video.Camera` or list of :class:`~pymanip.video.Camera`
+    :param trigger_gbf: function generator to be used as trigger
+    :type trigger_gbf: :class:`~fluidlab.instruments.drivers.Driver`
+    :param framerate: desired framerate
+    :type framerate: float
+    :param nframes: desired number of frames
+    :type nframes: int
+    :param output_format: desired output image format, "bmp", "png", tif", or video format "mp4"
+    :type output_format: str
+    :param output_format_params: additionnal params to be passed to :func:`cv2.imwrite`
+    :type output_format_params: list
+    :param exist_ok: allows to override existing output folder
+    :type exist_ok: bool
+
     """
 
     def __init__(
@@ -117,6 +225,13 @@ class VideoSession(AsyncSession):
         self.initialising_cams = set(self.camera_list)
 
     async def _acquire_images(self, cam_no):
+        """Private instance method: image acquisition task.
+        This task asynchronously iterates over the given camera frames, and puts the obtained images
+        in a simple FIFO queue.
+
+        :param cam_no: camera index
+        :type cam_no: int
+        """
         with self.camera_list[cam_no] as cam:
             if hasattr(self, "prepare_camera"):
                 self.prepare_camera(cam)
@@ -151,6 +266,10 @@ class VideoSession(AsyncSession):
         print(f"{n:d} images acquired (cam {cam_no:}).")
 
     async def _start_clock(self):
+        """Private instance method: clock starting task.
+        This task waits for all the cameras to be ready for trigger, and then sends a software trig to
+        the function generator.
+        """
         while len(self.initialising_cams) > 0:
             await asyncio.sleep(0.1)
         with self.trigger_gbf:
@@ -158,6 +277,15 @@ class VideoSession(AsyncSession):
         return datetime.now().timestamp()
 
     async def _save_images(self, keep_in_RAM=False, unprocessed=False):
+        """Private instance method: image saving task.
+        This task checks the image FIFO queue. If an image is available, it is taken out of the queue and
+        saved to the disk.
+
+        :param keep_in_RAM: if set, images are not saved and kept in a list.
+        :type keep_in_RAM: bool
+        :param unprocessed: if set, the ``process_image`` method is not called.
+        :type unprocessed: bool
+        """
         loop = asyncio.get_event_loop()
         i = [0] * len(self.camera_list)
         pb = None
@@ -209,6 +337,20 @@ class VideoSession(AsyncSession):
             print(f"{ii:d} images saved (cam {cam_no:}).")
 
     def _convert_for_ffmpeg(self, cam_no, img, fmin, fmax, gain):
+        """Private instance method: image conversion for ffmpeg process.
+        This method prepares the input image to bytes to be sent to the ffmpeg pipe.
+
+        :param cam_no: camera index
+        :type cam_no: int
+        :param img: image to process
+        :type img: :class:`numpy.ndarray`
+        :param fmin: minimum level
+        :type fmin: int
+        :param fmax: maximum level
+        :type fmax: int
+        :param gain: gain
+        :type gain: float
+        """
         fff = 255 * gain * np.array(img - fmin, dtype=np.float64) / (fmax - fmin)
         fff[fff < 0] = 0
         fff[fff > 255] = 255
@@ -218,6 +360,16 @@ class VideoSession(AsyncSession):
         return ff.tostring()
 
     async def _save_video(self, cam_no, gain=1.0, unprocessed=False):
+        """Private instance method: video saving task.
+        This task waits for images in the FIFO queue, and sends them to ffmpeg via a pipe.
+
+        :param cam_no: camera index
+        :type cam_no: int
+        :param gain: gain
+        :type gain: float
+        :param unprocessed: if set, :meth:`process_image` method is not called
+        :type unprocessed: bool
+        """
         loop = asyncio.get_event_loop()
         command = None
         fmin = None
@@ -279,6 +431,20 @@ class VideoSession(AsyncSession):
     async def main(
         self, keep_in_RAM=False, additionnal_trig=0, live=False, unprocessed=False
     ):
+        """Main entry point for acquisition tasks. This asynchronous task can be called
+        with :func:`asyncio.run`, or combined with other user-defined tasks.
+
+        :param keep_in_RAM: do not save to disk, but keep images in a list
+        :type keep_in_RAM: bool
+        :param additionnal_trig: additionnal number of pulses sent to the camera
+        :type additionnal_trig: int
+        :param live: toggle live preview
+        :type live: bool
+        :param unprocessed: do not call :meth:`process_image` method.
+        :type unprocessed: bool
+        :return: camera_timestamps, camera_counter
+        :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
+        """
         with self.trigger_gbf:
             if live or self.nframes < 2:
                 self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
@@ -319,10 +485,19 @@ class VideoSession(AsyncSession):
         return camera_timestamps, camera_counter
 
     def run(self, additionnal_trig=0):
+        """Run the acquisition.
+
+        :param additionnal_trig: additionnal number of pulses sent to the camera
+        :type additionnal_trig: int
+        :return: camera_timestamps, camera_counter
+        :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
+        """
         ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig))
         return ts, count
 
     def live(self):
+        """Starts live preview.
+        """
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
@@ -337,6 +512,17 @@ class VideoSession(AsyncSession):
     def get_one_image(
         self, additionnal_trig=0, unprocessed=False, unpack_solo_cam=True
     ):
+        """Get one image from the camera(s).
+
+        :param additionnal_trig: additionnal number of pulses sent to the camera
+        :type additionnal_trig: int
+        :param unprocessed: do not call :meth:`process_image` method.
+        :type unprocessed: bool
+        :param unpack_solo_cam: if set, keep list on return, even if there is only one camera
+        :type unpack_solo_cam: bool
+        :return: image(s) from the camera(s)
+        :rtype: :class:`numpy.ndarray` or list of :class:`numpy.ndarray` (if multiple cameras, or ``unpack_solo_cam=False``).
+        """
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
@@ -359,6 +545,11 @@ class VideoSession(AsyncSession):
         return result
 
     def show_one_image(self, additionnal_trig=0):
+        """Get one image from the camera(s), and plot them with matplotlib.
+
+        :param additionnal_trig: additionnal number of pulses sent to the camera
+        :type additionnal_trig: int
+        """
         image = self.get_one_image(additionnal_trig)
         if isinstance(image, list):
             for img in image:
@@ -370,6 +561,15 @@ class VideoSession(AsyncSession):
         plt.show()
 
     def roi_finder(self, additionnal_trig=0):
+        """Helper to determine the ROI. This method grabs one unprocessed image from the camera(s),
+        and allows interactive selection of the region of interest.
+        Attention: it is assumed that the :meth:`prepare_camera` method did not already set the ROI.
+
+        :param additionnal_trig: additionnal number of pulses sent to the camera
+        :type additionnal_trig: int
+        :return: region of interest coordinates, X0, Y0, X1, Y1
+        :rtype: list of floats
+        """
         images = self.get_one_image(
             additionnal_trig, unprocessed=True, unpack_solo_cam=False
         )
@@ -396,6 +596,13 @@ class VideoSession(AsyncSession):
         return X0, Y0, X1, Y1
 
     async def _live_preview(self, unprocessed=False):
+        """Private instance method: live preview task.
+        This task checks the FIFO queue, drains it and shows the last frame of each camera using cv2.
+        If more than one frame is in the queues, the older frames are dropped.
+
+        :param unprocessed: do not call :meth:`process_image` method.
+        :type unprocessed: bool
+        """
         while self.running or any([not q.empty() for q in self.image_queues]):
             for cam_no, q in enumerate(self.image_queues):
                 ndropped = -1

@@ -39,7 +39,12 @@ extensions = [
     "sphinx.ext.todo",
 ]
 
-intersphinx_mapping = {"fluidlab": ("https://fluidlab.readthedocs.io/en/latest/", None)}
+intersphinx_mapping = {
+    "fluidlab": ("https://fluidlab.readthedocs.io/en/latest/", None),
+    "cv2": ("https://opencv-python.readthedocs.io/en/latest/", None),
+    "numpy": ("https://numpy.readthedocs.io/en/latest/", None),
+    "stdlib": ("https://docs.python.org/3/", None),
+}
 
 autodoc_mock_imports = [
     "AndorNeo",

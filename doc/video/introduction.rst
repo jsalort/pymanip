@@ -37,6 +37,10 @@ class. Most of the user-level useful documentation lies in the base class.
 Indeed, all the concrete implementation share the same API, so their internal 
 methods are implementation details.
 
+In addition, a high-level class, :class:`pymanip.video.session` is provided to
+build simple video acquisition scripts, with possible concurrent cameras trigged
+by a function generator.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents
@@ -44,6 +48,7 @@ methods are implementation details.
    basic
    asynchronous
    advanced
+   session
    implementation
    andor
    avt

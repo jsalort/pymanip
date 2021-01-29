@@ -1,0 +1,1 @@
+.. automodule:: pymanip.video.session
