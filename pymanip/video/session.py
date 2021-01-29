@@ -32,9 +32,12 @@ class VideoSession(AsyncSession):
         framerate,
         nframes,
         output_format,
+        output_format_params=None,
         output_path=None,
         exist_ok=False,
     ):
+        """Constructor method
+        """
         if isinstance(camera_or_camera_list, (list, tuple)):
             self.camera_list = camera_or_camera_list
         else:
@@ -45,6 +48,7 @@ class VideoSession(AsyncSession):
         if output_format not in ("png", "tif", "mp4", "jpg"):
             raise ValueError("output_format must be png, tif, jpg or mp4")
         self.output_format = output_format
+        self.output_format_params = output_format_params
 
         if output_path is None:
             current_date = datetime.today().strftime("%Y-%m-%d")
@@ -180,7 +184,11 @@ class VideoSession(AsyncSession):
                         self.image_list[cam_no].append(img)
                     else:
                         await loop.run_in_executor(
-                            None, cv2.imwrite, str(filepath), img, None
+                            None,
+                            cv2.imwrite,
+                            str(filepath),
+                            img,
+                            self.output_format_params,
                         )
                     i[cam_no] += 1
             if not self.running:
