@@ -376,7 +376,8 @@ class VideoSession(AsyncSession):
                     unprocessed=True,
                 )
             )
-            for cam_no, img in enumerate(self.image_list):
+            for cam_no, images in enumerate(self.image_list):
+                img = images[0]
                 try:
                     l, c = img.shape
                     color = False
