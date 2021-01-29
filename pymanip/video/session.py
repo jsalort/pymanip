@@ -148,6 +148,7 @@ class VideoSession(AsyncSession):
             self.acquisition_finished[cam_no] = True
             if all(self.acquisition_finished):
                 self.running = False
+        print(f"{n:d} images acquired (cam {cam_no:}).")
 
     async def _start_clock(self):
         while len(self.initialising_cams) > 0:
@@ -277,7 +278,7 @@ class VideoSession(AsyncSession):
 
     async def main(self, keep_in_RAM=False, additionnal_trig=0, live=False):
         with self.trigger_gbf:
-            if live:
+            if live or self.nframes < 2:
                 self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
             else:
                 self.trigger_gbf.configure_burst(
