@@ -45,8 +45,8 @@ class VideoSession(AsyncSession):
         self.trigger_gbf = trigger_gbf
         self.framerate = framerate
         self.nframes = nframes
-        if output_format not in ("png", "tif", "mp4", "jpg"):
-            raise ValueError("output_format must be png, tif, jpg or mp4")
+        if output_format not in ("png", "tif", "mp4", "jpg", "bmp"):
+            raise ValueError("output_format must be png, tif, jpg, bmp, or mp4")
         self.output_format = output_format
         self.output_format_params = output_format_params
 
