@@ -149,10 +149,13 @@ class VideoSession(AsyncSession):
             self.trigger_gbf.trigger()
         return datetime.now().timestamp()
 
-    async def _save_images(self):
+    async def _save_images(self, keep_in_RAM=False):
         loop = asyncio.get_event_loop()
         i = [0] * len(self.camera_list)
         pb = None
+
+        if keep_in_RAM:
+            self.image_list = [list() for _ in range(self.camera_list)]
 
         while True:
             if not self.running:
@@ -172,9 +175,12 @@ class VideoSession(AsyncSession):
                         self.output_folder
                         / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
                     )
-                    await loop.run_in_executor(
-                        None, cv2.imwrite, str(filepath), img, None
-                    )
+                    if keep_in_RAM:
+                        self.image_list[cam_no].append(img)
+                    else:
+                        await loop.run_in_executor(
+                            None, cv2.imwrite, str(filepath), img, None
+                        )
                     i[cam_no] += 1
             if not self.running:
                 i_min = min(i)
@@ -258,7 +264,7 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
-    async def main(self):
+    async def main(self, keep_in_RAM=False):
         with self.trigger_gbf:
             self.trigger_gbf.configure_burst(self.framerate, self.nframes)
             self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
@@ -271,7 +277,7 @@ class VideoSession(AsyncSession):
                 self._save_video(cam_no) for cam_no in range(len(self.camera_list))
             ]
         else:
-            save_tasks = [self._save_images()]
+            save_tasks = [self._save_images(keep_in_RAM)]
         await self.monitor(
             *acquisition_tasks, clock_task, *save_tasks, server_port=None
         )
@@ -292,3 +298,19 @@ class VideoSession(AsyncSession):
     def run(self):
         ts, count = asyncio.run(self.main())
         return ts, count
+
+    def get_one_image(self):
+        old_nframes = self.nframes
+        old_output_format = self.output_format
+        try:
+            self.nframes = 2
+            self.output_format = "png"
+            ts, count = asyncio.run(self.main(keep_in_RAM=True))
+            if len(self.camera_list) > 1:
+                result = [im[0] for im in self.image_list]
+            else:
+                result = self.image_list[0][0]
+        finally:
+            self.nframes = old_nframes
+            self.output_format = old_output_format
+        return result
