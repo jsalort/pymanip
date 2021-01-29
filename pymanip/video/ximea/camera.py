@@ -200,7 +200,7 @@ class Ximea_Camera(Camera):
         self.cam.set_offsetY(offset_y)
 
         # Print final ROI
-        print("ROI set to", offset_x, offset_x + width, offset_y, offset_y + height)
+        print("ROI set to", offset_x, offset_y, offset_x + width, offset_y + height)
 
     def get_roi(self):
         """Get ROI
