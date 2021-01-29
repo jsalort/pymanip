@@ -119,8 +119,16 @@ class Ximea_Camera(Camera):
         r"""This method sets the positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
+        width_increment = self.cam.get_width_increment()
+        height_increment = self.cam.get_height_increment()
         width = roiX1 - roiX0
         height = roiY1 - roiY0
+        if width % width_increment != 0:
+            print("Rounding ROI width with", width_increment, "pixel increments")
+            width -= width % width_increment
+        if height % height_increment != 0:
+            print("Rounding ROI height with", height_increment, "pixel increments")
+            height -= height % height_increment
         offset_x = roiX0
         offset_y = roiY0
         self.cam.set_width(width)
