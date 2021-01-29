@@ -334,14 +334,18 @@ class VideoSession(AsyncSession):
             self.output_format = old_output_format
         return ts, count
 
-    def get_one_image(self, additionnal_trig=0):
+    def get_one_image(self, additionnal_trig=0, unprocessed=False):
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
             self.nframes = 1
             self.output_format = "png"
             ts, count = asyncio.run(
-                self.main(keep_in_RAM=True, additionnal_trig=additionnal_trig)
+                self.main(
+                    keep_in_RAM=True,
+                    additionnal_trig=additionnal_trig,
+                    unprocessed=unprocessed,
+                )
             )
             if len(self.camera_list) > 1:
                 result = [im[0] for im in self.image_list]
@@ -364,49 +368,33 @@ class VideoSession(AsyncSession):
         plt.show()
 
     def roi_finder(self, additionnal_trig=0):
-        old_nframes = self.nframes
-        old_output_format = self.output_format
-        try:
-            self.nframes = 1
-            self.output_format = "png"
-            ts, count = asyncio.run(
-                self.main(
-                    keep_in_RAM=True,
-                    additionnal_trig=additionnal_trig,
-                    unprocessed=True,
-                )
-            )
-            for cam_no, images in enumerate(self.image_list):
-                img = images[0]
-                try:
-                    l, c = img.shape
-                    color = False
-                except ValueError:
-                    l, c, ncomp = img.shape
-                    color = True
-                zoom_l = l / 600
-                zoom_c = c / 800
-                zoom = max([zoom_l, zoom_c])
-                if zoom > 1:
-                    img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
-                else:
-                    zoom = 1.0
+        images = self.get_one_image(additionnal_trig, unprocessed=True)
+        for cam_no, img in enumerate(images):
+            try:
+                l, c = img.shape
+                color = False
+            except ValueError:
+                l, c, ncomp = img.shape
+                color = True
+            zoom_l = l / 600
+            zoom_c = c / 800
+            zoom = max([zoom_l, zoom_c])
+            if zoom > 1:
+                img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
+            else:
+                zoom = 1.0
 
-                # Convert color order if necessary
-                if color and self.camera_list[cam_no].color_order == "BGR":
-                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Convert color order if necessary
+            if color and self.camera_list[cam_no].color_order == "BGR":
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                plt.figure()
-                plt.imshow(img)
-                print("Click on bottom-left and top-right corners")
-                bottom_left, top_right = plt.ginput(2)
-                zY0, zX0 = bottom_left
-                zY1, zX1 = top_right
-                print("ROI is", zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom)
-
-        finally:
-            self.nframes = old_nframes
-            self.output_format = old_output_format
+            plt.figure()
+            plt.imshow(img)
+            print("Click on bottom-left and top-right corners")
+            bottom_left, top_right = plt.ginput(2)
+            zY0, zX0 = bottom_left
+            zY1, zX1 = top_right
+            print("ROI is", zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom)
         return zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom
 
     async def _live_preview(self, unprocessed=False):
