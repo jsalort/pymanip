@@ -285,14 +285,15 @@ class VideoSession(AsyncSession):
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
 
-        dt = camera_timestamps[1:] - camera_timestamps[:-1]
-        mean_dt = np.mean(dt)
-        mean_fps = 1.0 / mean_dt
-        min_dt = np.min(dt)
-        max_dt = np.max(dt)
-        min_fps = 1.0 / max_dt
-        max_fps = 1.0 / min_dt
-        print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3f})")
+        if camera_timestamps.size > 2:
+            dt = camera_timestamps[1:] - camera_timestamps[:-1]
+            mean_dt = np.mean(dt)
+            mean_fps = 1.0 / mean_dt
+            min_dt = np.min(dt)
+            max_dt = np.max(dt)
+            min_fps = 1.0 / max_dt
+            max_fps = 1.0 / min_dt
+            print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3f})")
 
         return camera_timestamps, camera_counter
 
