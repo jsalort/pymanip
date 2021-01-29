@@ -91,7 +91,7 @@ class Ximea_Camera(Camera):
         """
         if external:
             self.cam.set_gpi_mode("XI_GPI_TRIGGER")
-            self.cam.set_trigger_source("XI_TRG_EDGE_RISING")
+            self.cam.set_trigger_source("XI_TRG_LEVEL_HIGH")
             self.cam.set_trigger_selector("XI_TRG_SEL_EXPOSURE_START")
         else:
             self.cam.set_trigger_source("XI_TRG_OFF")
