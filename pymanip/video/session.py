@@ -230,7 +230,7 @@ class VideoSession(AsyncSession):
                         "-vcodec",
                         "rawvideo",
                         "-s",
-                        "{}x{}".format(*output_size),
+                        "{}x{}".format(output_size[1], output_size[0]),
                         "-pix_fmt",
                         "bgr24",
                         "-r",
