@@ -416,7 +416,7 @@ if __name__ == "__main__":
                     exposure_ms,
                     rotate=rotate,
                     white_balance=args.whitebalance,
-                    roi=args.roi,
+                    roi=args.ROI,
                 )
         else:
             print("Unknown camera type: ", args.camera_type)
