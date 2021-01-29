@@ -125,20 +125,77 @@ class Ximea_Camera(Camera):
         r"""This method sets the positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
+        # Get bounds for width and height (with no offset)
+        self.cam.set_offsetX(0)
+        self.cam.set_offsetY(0)
         width_increment = self.cam.get_width_increment()
+        width_minimum = self.cam.get_width_minimum()
+        width_maximum = self.cam.get_width_maximum()
         height_increment = self.cam.get_height_increment()
+        height_minimum = self.cam.get_height_minimum()
+        height_maximum = self.cam.get_height_maximum()
+
+        # Compute width and height
         width = roiX1 - roiX0
         height = roiY1 - roiY0
+
+        # Check bounds for width and height
+        if width < width_minimum:
+            print("Minimum width is", width_minimum, "(got", width, ")")
+            width = width_minimum
+        elif width > width_maximum:
+            print("Maximum width is", width_maximum, "(got", width, ")")
+            width = width_maximum
+        if height < height_minimum:
+            print("Minimum height is", height_minimum, "(got", height, ")")
+            height = height_minimum
+        elif height > height_maximum:
+            print("Maximum height is", height_maximum, "(got", height, ")")
+            height = height_maximum
         if width % width_increment != 0:
             print("Rounding ROI width with", width_increment, "pixel increments")
             width -= width % width_increment
         if height % height_increment != 0:
             print("Rounding ROI height with", height_increment, "pixel increments")
             height -= height % height_increment
-        offset_x = roiX0
-        offset_y = roiY0
+
+        # Set width and height
         self.cam.set_width(width)
         self.cam.set_height(height)
+
+        # Get bounds for offsets
+        offsetX_minimum = self.cam.get_offsetX_minimum()
+        offsetX_maximum = self.cam.get_offsetX_maximum()
+        offsetX_increment = self.cam.get_offsetX_increment()
+        offsetY_minimum = self.cam.get_offsetY_minimum()
+        offsetY_maximum = self.cam.get_offsetY_maximum()
+        offsetY_increment = self.cam.get_offsetY_increment()
+
+        # Compute offsets
+        offset_x = roiX0
+        offset_y = roiY0
+
+        # Check bounds for offsets
+        if offset_x < offsetX_minimum:
+            print("Minimum x-offset is", offsetX_minimum)
+            offset_x = offsetX_minimum
+        elif offset_x > offsetX_maximum:
+            print("Maximum x-offset is", offsetX_maximum)
+            offset_x = offsetX_maximum
+        if offset_x % offsetX_increment != 0:
+            print("Rounding x-offset to", offsetX_increment, "pixel increments")
+            offset_x -= offset_x % offsetX_increment
+        if offset_y < offsetY_minimum:
+            print("Minimum y-offset is", offsetY_minimum)
+            offset_y = offsetY_minimum
+        elif offset_y > offsetY_maximum:
+            print("Maximum y-offset is", offsetY_maximum)
+            offset_y = offsetY_maximum
+        if offset_y % offsetY_increment != 0:
+            print("Rounding y-offset to", offsetY_increment, "pixel increments")
+            offset_y -= offset_y % offsetY_increment
+
+        # Set offsets
         self.cam.set_offsetX(offset_x)
         self.cam.set_offsetY(offset_y)
 
