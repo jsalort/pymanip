@@ -303,13 +303,15 @@ class VideoSession(AsyncSession):
         ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig))
         return ts, count
 
-    def get_one_image(self):
+    def get_one_image(self, additionnal_trig=0):
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
-            self.nframes = 2
+            self.nframes = 1
             self.output_format = "png"
-            ts, count = asyncio.run(self.main(keep_in_RAM=True))
+            ts, count = asyncio.run(
+                self.main(keep_in_RAM=True, additionnal_trig=additionnal_trig)
+            )
             if len(self.camera_list) > 1:
                 result = [im[0] for im in self.image_list]
             else:
@@ -319,8 +321,8 @@ class VideoSession(AsyncSession):
             self.output_format = old_output_format
         return result
 
-    def show_one_image(self):
-        image = self.get_one_image()
+    def show_one_image(self, additionnal_trig=0):
+        image = self.get_one_image(additionnal_trig)
         if isinstance(image, list):
             for img in image:
                 plt.figure()
