@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime
 
 import numpy as np
+import matplotlib.pyplot as plt
 from progressbar import ProgressBar
 import cv2
 
@@ -155,7 +156,7 @@ class VideoSession(AsyncSession):
         pb = None
 
         if keep_in_RAM:
-            self.image_list = [list() for _ in range(self.camera_list)]
+            self.image_list = [list() for _ in range(len(self.camera_list))]
 
         while True:
             if not self.running:
@@ -314,3 +315,14 @@ class VideoSession(AsyncSession):
             self.nframes = old_nframes
             self.output_format = old_output_format
         return result
+
+    def show_one_image(self):
+        image = self.get_one_image()
+        if isinstance(image, list):
+            for img in image:
+                plt.figure()
+                plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        else:
+            plt.figure()
+            plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        plt.show()
