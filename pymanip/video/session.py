@@ -390,8 +390,8 @@ class VideoSession(AsyncSession):
             plt.title("Unprocessed image")
             print("Click on top-left and bottom-right corners")
             bottom_left, top_right = plt.ginput(2)
-            Y0, X0 = bottom_left
-            Y1, X1 = top_right
+            X0, Y0 = bottom_left
+            X1, Y1 = top_right
             print("ROI is", X0, Y0, X1, Y1)
         return X0, Y0, X1, Y1
 
