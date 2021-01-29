@@ -157,7 +157,7 @@ class VideoSession(AsyncSession):
             self.trigger_gbf.trigger()
         return datetime.now().timestamp()
 
-    async def _save_images(self, keep_in_RAM=False):
+    async def _save_images(self, keep_in_RAM=False, unprocessed=False):
         loop = asyncio.get_event_loop()
         i = [0] * len(self.camera_list)
         pb = None
@@ -177,7 +177,7 @@ class VideoSession(AsyncSession):
                     self.add_entry(
                         ts=img.metadata["timestamp"], count=img.metadata["counter"]
                     )
-                    if hasattr(self, "process_image"):
+                    if hasattr(self, "process_image") and not unprocessed:
                         img = await loop.run_in_executor(None, self.process_image, img)
                     filepath = (
                         self.output_folder
@@ -217,7 +217,7 @@ class VideoSession(AsyncSession):
             ff = cv2.cvtColor(ff, cv2.COLOR_RGB2BGR)
         return ff.tostring()
 
-    async def _save_video(self, cam_no, gain=1.0):
+    async def _save_video(self, cam_no, gain=1.0, unprocessed=False):
         loop = asyncio.get_event_loop()
         command = None
         fmin = None
@@ -230,7 +230,7 @@ class VideoSession(AsyncSession):
                 self.add_entry(
                     ts=img.metadata["timestamp"], count=img.metadata["counter"]
                 )
-                if hasattr(self, "process_image"):
+                if hasattr(self, "process_image") and not unprocessed:
                     img = await loop.run_in_executor(None, self.process_image, img)
                 if command is None:
                     output_size = img.shape
@@ -276,7 +276,9 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
-    async def main(self, keep_in_RAM=False, additionnal_trig=0, live=False):
+    async def main(
+        self, keep_in_RAM=False, additionnal_trig=0, live=False, unprocessed=False
+    ):
         with self.trigger_gbf:
             if live or self.nframes < 2:
                 self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
@@ -289,13 +291,17 @@ class VideoSession(AsyncSession):
             self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
         ]
         if live:
-            save_tasks = [self._live_preview()]
+            save_tasks = [self._live_preview(unprocessed)]
         elif self.output_format == "mp4":
             save_tasks = [self._start_clock()] + [
-                self._save_video(cam_no) for cam_no in range(len(self.camera_list))
+                self._save_video(cam_no, unprocessed=unprocessed)
+                for cam_no in range(len(self.camera_list))
             ]
         else:
-            save_tasks = [self._start_clock(), self._save_images(keep_in_RAM)]
+            save_tasks = [
+                self._start_clock(),
+                self._save_images(keep_in_RAM, unprocessed),
+            ]
         await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
@@ -358,18 +364,17 @@ class VideoSession(AsyncSession):
         plt.show()
 
     def roi_finder(self, additionnal_trig=0):
-        if hasattr(self, "process_image"):
-            old_process_image = self.process_image
-            delattr(self, "process_image")
-        else:
-            old_process_image = None
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
             self.nframes = 1
             self.output_format = "png"
             ts, count = asyncio.run(
-                self.main(keep_in_RAM=True, additionnal_trig=additionnal_trig)
+                self.main(
+                    keep_in_RAM=True,
+                    additionnal_trig=additionnal_trig,
+                    unprocessed=True,
+                )
             )
             for cam_no, img in enumerate(self.image_list):
                 try:
@@ -399,13 +404,11 @@ class VideoSession(AsyncSession):
                 print("ROI is", zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom)
 
         finally:
-            if old_process_image is not None:
-                self.process_image = old_process_image
             self.nframes = old_nframes
             self.output_format = old_output_format
         return zX0 * zoom, zY0 * zoom, zX1 * zoom, zY1 * zoom
 
-    async def _live_preview(self):
+    async def _live_preview(self, unprocessed=False):
         while self.running or any([not q.empty() for q in self.image_queues]):
             for cam_no, q in enumerate(self.image_queues):
                 ndropped = -1
@@ -419,7 +422,7 @@ class VideoSession(AsyncSession):
                 if img is not None:
                     if ndropped > 0:
                         print(ndropped, "frames dropped.", end="\r")
-                    if hasattr(self, "process_image"):
+                    if hasattr(self, "process_image") and not unprocessed:
                         img = self.process_image(img)
 
                     # Show only a 800x600 window (max)
