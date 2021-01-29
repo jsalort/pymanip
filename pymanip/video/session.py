@@ -334,7 +334,9 @@ class VideoSession(AsyncSession):
             self.output_format = old_output_format
         return ts, count
 
-    def get_one_image(self, additionnal_trig=0, unprocessed=False):
+    def get_one_image(
+        self, additionnal_trig=0, unprocessed=False, unpack_solo_cam=True
+    ):
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
@@ -347,7 +349,7 @@ class VideoSession(AsyncSession):
                     unprocessed=unprocessed,
                 )
             )
-            if len(self.camera_list) > 1:
+            if len(self.camera_list) > 1 or not unpack_solo_cam:
                 result = [im[0] for im in self.image_list]
             else:
                 result = self.image_list[0][0]
@@ -368,7 +370,9 @@ class VideoSession(AsyncSession):
         plt.show()
 
     def roi_finder(self, additionnal_trig=0):
-        images = self.get_one_image(additionnal_trig, unprocessed=True)
+        images = self.get_one_image(
+            additionnal_trig, unprocessed=True, unpack_solo_cam=False
+        )
         for cam_no, img in enumerate(images):
             try:
                 l, c = img.shape
