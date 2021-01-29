@@ -120,8 +120,10 @@ class VideoSession(AsyncSession):
         with self.camera_list[cam_no] as cam:
             if hasattr(self, "prepare_camera"):
                 self.prepare_camera(cam)
-            if cam_no == 0:
+            if cam_no == 0 and np.isfinite(self.nframes):
                 pb = ProgressBar(initial_value=0, min_value=0, max_value=self.nframes)
+            else:
+                pb = None
             gen = cam.acquisition_async(
                 self.nframes,
                 initialising_cams=self.initialising_cams,
@@ -132,7 +134,7 @@ class VideoSession(AsyncSession):
                 if im is not None:
                     self.image_queues[cam_no].put(im)
                     n = n + 1
-                    if cam_no == 0:
+                    if pb is not None:
                         pb.update(n)
                 else:
                     print("Camera timed out! Stopping...")
@@ -141,7 +143,7 @@ class VideoSession(AsyncSession):
                     success = await gen.asend(True)
                     if not success:
                         print("Unable to stop camera acquisition")
-            if cam_no == 0:
+            if pb is not None:
                 pb.finish()
             self.acquisition_finished[cam_no] = True
             if all(self.acquisition_finished):
@@ -285,15 +287,14 @@ class VideoSession(AsyncSession):
         acquisition_tasks = [
             self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
         ]
-        clock_task = self._start_clock()
         if live:
             save_tasks = [self._live_preview()]
         elif self.output_format == "mp4":
-            save_tasks = [clock_task] + [
+            save_tasks = [self._start_clock()] + [
                 self._save_video(cam_no) for cam_no in range(len(self.camera_list))
             ]
         else:
-            save_tasks = [clock_task, self._save_images(keep_in_RAM)]
+            save_tasks = [self._start_clock(), self._save_images(keep_in_RAM)]
         await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
@@ -315,7 +316,15 @@ class VideoSession(AsyncSession):
         return ts, count
 
     def live(self):
-        ts, count = asyncio.run(self.main(live=True))
+        old_nframes = self.nframes
+        old_output_format = self.output_format
+        try:
+            self.nframes = float("inf")
+            self.output_format = "png"
+            ts, count = asyncio.run(self.main(live=True))
+        finally:
+            self.nframes = old_nframes
+            self.output_format = old_output_format
         return ts, count
 
     def get_one_image(self, additionnal_trig=0):
@@ -360,7 +369,7 @@ class VideoSession(AsyncSession):
                     ndropped += 1
                 if img is not None:
                     if ndropped > 0:
-                        print(ndropped, "frames dropped.")
+                        print(ndropped, "frames dropped.", end="\r")
                     if hasattr(self, "process_image"):
                         img = self.process_image(img)
 
@@ -384,7 +393,7 @@ class VideoSession(AsyncSession):
                     # Show image and run cv2 event loop
                     cv2.imshow(f"cam{cam_no:}", img)
             k = cv2.waitKey(1)
-            if k:
+            if k != -1:
                 self.ask_exit()
             await asyncio.sleep(0.1)
         cv2.destroyAllWindows()
