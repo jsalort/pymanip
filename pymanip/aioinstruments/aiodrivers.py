@@ -39,6 +39,16 @@ def interface_from_string(name, default_physical_interface=None, **kwargs):
         from pymanip.interfaces.aioserial import AsyncSerialInterface
 
         return AsyncSerialInterface(name, **kwargs)
+    elif classname == "GPIBInterface":
+        from pymanip.interfaces.aiogpib import AsyncGPIBInterface
+
+        if name.startswith("GPIB"):
+            board_name, instrument_adress, *others = name.split("::")
+
+            board_adress = int(board_name[4:])
+            instrument_adress = int(instrument_adress)
+
+        return AsyncGPIBInterface(board_adress, instrument_adress)
 
     raise NotImplementedError()
 

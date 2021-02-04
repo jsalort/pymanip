@@ -1,5 +1,5 @@
-"""Asynchronous extension of :class:`fluidlab.interfaces.SerialInterface` (:mod:`pymanip.interfaces.aioserial`)
-===============================================================================================================
+"""Asynchronous extension of :class:`~fluidlab.interfaces.serial_inter.SerialInterface` (:mod:`pymanip.interfaces.aioserial`)
+=============================================================================================================================
 
 This module defines :class:`AsyncSerialInterface` as a subclass of :class:`fluidlab.interfaces.serial_inter.SerialInterface` and
 :class:`pymanip.interface.aiointer.AsyncQueryInterface`.

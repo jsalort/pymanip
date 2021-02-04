@@ -64,7 +64,7 @@ class AsyncQueryInterface(flinter.QueryInterface):
         """
         async with self.lock:
             await self.loop.run_in_executor(
-                None, self._write, *args, **kwargs
+                None, self._write, *args
             )  # must be rewritten if necessary in concrete class
 
     async def _aread(self, *args, **kwargs):
@@ -73,7 +73,7 @@ class AsyncQueryInterface(flinter.QueryInterface):
         In this basic class, it simply acquires the interface lock and runs the :meth:`_read` method in an executor.
         """
         async with self.lock:
-            data = await self.loop.run_in_executor(None, self._read, *args, **kwargs)
+            data = await self.loop.run_in_executor(None, self._read, *args)
         return data
 
     async def _aquery(self, command, time_delay=0.1, **kwargs):
