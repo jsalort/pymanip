@@ -100,7 +100,7 @@ class Ximea_Camera(Camera):
         else:
             self.cam.set_trigger_source("XI_TRG_OFF")
 
-    def set_vertial_skipping(self, factor):
+    def set_vertical_skipping(self, factor):
         """Set vertical skipping
         """
         self.cam.set_downsampling_type("XI_SKIPPING")
@@ -214,6 +214,12 @@ class Ximea_Camera(Camera):
         offset_x = self.cam.get_offsetX()
         offset_y = self.cam.get_offsetY()
         return offset_x, offset_x + width, offset_y, offset_y + height
+        
+    def set_frame_rate(self, framerate_fps):
+        """Sets the framerate in frames per seconds
+        """
+        self.cam.set_acq_timing_mode("XI_ACQ_TIMING_MODE_FRAME_RATE_LIMIT")
+        self.cam.set_framerate(framerate_fps)
 
     async def get_image(self, loop, image, timeout=5000):
         """Asynchronous version of xiapi.Camera.get_image method

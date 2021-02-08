@@ -219,7 +219,11 @@ class VideoSession(AsyncSession):
 
         super().__init__(session_name, delay_save=True)
         for cam in self.camera_list:
-            cam.set_trigger_mode(True)
+            if self.trigger_gbf is not None:
+                cam.set_trigger_mode(True)
+            else:
+                cam.set_trigger_mode(False)
+                cam.set_frame_rate(framerate)
         self.image_queues = [SimpleQueue() for _ in self.camera_list]
         self.acquisition_finished = [False] * len(self.camera_list)
         self.initialising_cams = set(self.camera_list)
@@ -445,14 +449,15 @@ class VideoSession(AsyncSession):
         :return: camera_timestamps, camera_counter
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
-        with self.trigger_gbf:
-            if live or self.nframes < 2:
-                self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
-            else:
-                self.trigger_gbf.configure_burst(
-                    self.framerate, self.nframes + additionnal_trig
-                )
-                self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
+        if self.trigger_gbf is not None:
+            with self.trigger_gbf:
+                if live or self.nframes < 2:
+                    self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
+                else:
+                    self.trigger_gbf.configure_burst(
+                        self.framerate, self.nframes + additionnal_trig
+                    )
+                    self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
         acquisition_tasks = [
             self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
         ]
@@ -464,10 +469,13 @@ class VideoSession(AsyncSession):
                 for cam_no in range(len(self.camera_list))
             ]
         else:
-            save_tasks = [
-                self._start_clock(),
-                self._save_images(keep_in_RAM, unprocessed),
-            ]
+            if self.trigger_gbf is not None:
+                save_tasks = [
+                    self._start_clock(),
+                    self._save_images(keep_in_RAM, unprocessed),
+                ]
+            else:
+                save_tasks = [self._save_images(keep_in_RAM, unprocessed)]
         await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
@@ -554,10 +562,18 @@ class VideoSession(AsyncSession):
         if isinstance(image, list):
             for img in image:
                 plt.figure()
-                plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                if img.ndim == 2:
+                    plt.imshow(img)
+                    plt.colorbar()
+                else:
+                    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         else:
             plt.figure()
-            plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            if image.ndim == 2:
+                plt.imshow(image)
+                plt.colorbar()
+            else:
+                plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         plt.show()
 
     def roi_finder(self, additionnal_trig=0):
@@ -603,6 +619,8 @@ class VideoSession(AsyncSession):
         :param unprocessed: do not call :meth:`process_image` method.
         :type unprocessed: bool
         """
+        minimum = None
+        maximum = None
         while self.running or any([not q.empty() for q in self.image_queues]):
             for cam_no, q in enumerate(self.image_queues):
                 ndropped = -1
@@ -623,6 +641,9 @@ class VideoSession(AsyncSession):
                     try:
                         l, c = img.shape
                         color = False
+                        minimum = np.min(img)
+                        maximum = np.max(img)
+                        maxint = np.iinfo(img.dtype).max
                     except ValueError:
                         l, c, ncomp = img.shape
                         color = True
@@ -633,8 +654,12 @@ class VideoSession(AsyncSession):
                         img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
 
                     # Convert color order if necessary
-                    if color and self.camera_list[cam_no].color_order == "RGB":
-                        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    if color:
+                        if self.camera_list[cam_no].color_order == "RGB":
+                            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    else:
+                        # if not in color, we rescale min max to first image (otherwise may appear black)
+                        img = (maxint // (maximum - minimum)) * (img - minimum)
 
                     # Show image and run cv2 event loop
                     cv2.imshow(f"cam{cam_no:}", img)
