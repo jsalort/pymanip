@@ -40,7 +40,7 @@ A context manager must be used to ensure proper saving of the metadata to the da
            cam.set_exposure_time(self.exposure_time)
            cam.set_auto_white_balance(False)
            cam.set_limit_bandwidth(False)
-           cam.set_vertial_skipping(self.decimation_factor)
+           cam.set_vertical_skipping(self.decimation_factor)
            cam.set_roi(1298, 1833, 2961, 2304)
 
            # Save some metadata to the AsyncSession underlying database
