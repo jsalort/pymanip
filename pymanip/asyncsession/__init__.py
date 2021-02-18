@@ -73,7 +73,7 @@ class AsyncSession:
 
     database_version = 3
 
-    def __init__(self, session_name=None, verbose=True, delay_save=False):
+    def __init__(self, session_name=None, verbose=True, delay_save=False, exist_ok=True):
         """Constructor method
         """
 
@@ -86,6 +86,8 @@ class AsyncSession:
                 session_name = session_name[:-3]
         elif delay_save:
             raise ValueError("Cannot delay_save if session_name is not specified")
+        if not exist_ok and os.path.exists(session_name + ".db"):
+            raise RuntimeError("File exists !")
         if session_name is None or delay_save:
             # For no name session, or in case of delay_save=True, then
             # the connection is in-memory
@@ -1100,7 +1102,7 @@ class AsyncSession:
         data = [
             {
                 "name": name,
-                "value": v[1],
+                "value": str(v[1]) if isinstance(v[1], bytes) else v[1],
                 "datestr": time.strftime(dateformat, time.localtime(v[0])),
             }
             for name, v in self.logged_last_values().items()
@@ -1111,7 +1113,7 @@ class AsyncSession:
         """This asynchronous method returns the HTTP response to a request for JSON data of the session
         parameters. Should not be called manually.
         """
-        params = {k: v for k, v in self.parameters().items() if not k.startswith("_")}
+        params = {k: (str(v) if isinstance(v, bytes) else v) for k, v in self.parameters().items() if not k.startswith("_")}
         return web.json_response(params)
 
     async def server_plot_page(self, request):
