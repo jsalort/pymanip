@@ -21,7 +21,7 @@ except ModuleNotFoundError:
     has_panda = False
 from pymanip.collection import Manip
 from pymanip import Session, SavedSession
-from pymanip.asyncsession import AsyncSession
+from pymanip.asyncsession import SavedAsyncSession
 from pymanip.mytime import dateformat
 
 
@@ -34,8 +34,7 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
     """
 
     if os.path.exists(sessionName + ".db"):
-        with AsyncSession(sessionName) as sesn:
-            sesn.print_description()
+        SavedAsyncSession(sessionName).print_description()
         return
 
     if sessionName.endswith(".hdf5"):
