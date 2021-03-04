@@ -1604,10 +1604,10 @@ class SavedAsyncSession:
             return sesn.parameters()
 
     def parameter(self, name):
-        return self.parameters[name]
+        return self.parameters()[name]
 
     def has_parameter(self, name):
-        return name in self.parameters
+        return name in self.parameters()
 
 
 if __name__ == "__main__":
