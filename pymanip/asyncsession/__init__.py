@@ -73,7 +73,14 @@ class AsyncSession:
 
     database_version = 3
 
-    def __init__(self, session_name=None, verbose=True, delay_save=False, exist_ok=True):
+    def __init__(
+        self,
+        session_name=None,
+        verbose=True,
+        delay_save=False,
+        exist_ok=True,
+        readonly=False,
+    ):
         """Constructor method
         """
 
@@ -93,11 +100,16 @@ class AsyncSession:
             # the connection is in-memory
             self.conn = sqlite3.connect(":memory:")
         else:
-            # Otherwise, the connection is on the disk for immediate writing
-            self.conn = sqlite3.connect(session_name + ".db")
+            # Otherwise, the connection is on the disk for immediate read/write
+            if readonly:
+                uri = "file:{path:}?mode=ro".format(path=session_name + ".db")
+                self.conn = sqlite3.connect(uri, uri=True)
+            else:
+                self.conn = sqlite3.connect(session_name + ".db")
         if delay_save and os.path.exists(session_name + ".db"):
             # Load existing database into in-memory database
-            disk_db = sqlite3.connect(session_name + ".db")
+            uri = "file:{path:}?mode=ro".format(path=session_name + ".db")
+            disk_db = sqlite3.connect(uri, uri=True)
             try:
                 with self.conn as c:
                     for line in disk_db.iterdump():
@@ -1113,7 +1125,11 @@ class AsyncSession:
         """This asynchronous method returns the HTTP response to a request for JSON data of the session
         parameters. Should not be called manually.
         """
-        params = {k: (str(v) if isinstance(v, bytes) else v) for k, v in self.parameters().items() if not k.startswith("_")}
+        params = {
+            k: (str(v) if isinstance(v, bytes) else v)
+            for k, v in self.parameters().items()
+            if not k.startswith("_")
+        }
         return web.json_response(params)
 
     async def server_plot_page(self, request):
