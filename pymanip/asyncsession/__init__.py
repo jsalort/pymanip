@@ -26,6 +26,7 @@ import pickle
 import warnings
 import inspect
 from pprint import pprint
+from functools import cached_property
 
 import sqlite3
 from datetime import datetime
@@ -84,31 +85,75 @@ class AsyncSession:
         """Constructor method
         """
 
-        self.session_name = session_name
-        self.custom_figures = None
-        self.delay_save = delay_save
         if session_name is not None:
             session_name = str(session_name)  # in case it is a Path object
             if session_name.endswith(".db"):
                 session_name = session_name[:-3]
         elif delay_save:
             raise ValueError("Cannot delay_save if session_name is not specified")
-        if not exist_ok and os.path.exists(session_name + ".db"):
+
+        self.session_name = session_name
+        self.verbose = verbose
+        self.exist_ok = exist_ok
+        self.readonly = readonly
+        self.delay_save = delay_save
+
+        self.custom_figures = None
+        self.figure_list = []
+        self.template_dir = os.path.join(os.path.dirname(__file__), "web")
+        self.static_dir = os.path.join(os.path.dirname(__file__), "web_static")
+        self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
+        self.conn = None
+
+    def save_database(self):
+        """This method is useful only if delay_save = True. Then, the database is kept in-memory for
+        the duration of the session. This method saves the database on the disk.
+        A new database file will be created with the content of the current
+        in-memory database.
+
+        This method is automatically called at the exit of the context manager.
+        """
+        if self.conn is None:
+            raise RuntimeError("AsyncSession is not opened!")
+
+        if self.delay_save:
+            try:
+                os.remove(str(self.session_name) + ".db")
+            except FileNotFoundError:
+                pass
+            disk_db = sqlite3.connect(str(self.session_name) + ".db")
+            try:
+                with disk_db as c:
+                    for line in self.conn.iterdump():
+                        c.execute(line)
+            finally:
+                disk_db.close()
+
+    def open(self):
+        """Opens database for reading or writting
+        """
+
+        if self.conn is not None:
+            raise RuntimeError("Already opened!")
+
+        if not self.exist_ok and os.path.exists(self.session_name + ".db"):
             raise RuntimeError("File exists !")
-        if session_name is None or delay_save:
+
+        if self.session_name is None or self.delay_save:
             # For no name session, or in case of delay_save=True, then
             # the connection is in-memory
             self.conn = sqlite3.connect(":memory:")
         else:
             # Otherwise, the connection is on the disk for immediate read/write
-            if readonly:
-                uri = "file:{path:}?mode=ro".format(path=session_name + ".db")
+            if self.readonly:
+                uri = "file:{path:}?mode=ro".format(path=self.session_name + ".db")
                 self.conn = sqlite3.connect(uri, uri=True)
             else:
-                self.conn = sqlite3.connect(session_name + ".db")
-        if delay_save and os.path.exists(session_name + ".db"):
+                self.conn = sqlite3.connect(self.session_name + ".db")
+
+        if self.delay_save and os.path.exists(self.session_name + ".db"):
             # Load existing database into in-memory database
-            uri = "file:{path:}?mode=ro".format(path=session_name + ".db")
+            uri = "file:{path:}?mode=ro".format(path=self.session_name + ".db")
             disk_db = sqlite3.connect(uri, uri=True)
             try:
                 with self.conn as c:
@@ -116,6 +161,7 @@ class AsyncSession:
                         c.execute(line)
             finally:
                 disk_db.close()
+
         with self.conn as c:
             tables = list(c.execute("SELECT name FROM sqlite_master;"))
             if not tables:
@@ -170,44 +216,26 @@ class AsyncSession:
                     """,
                     ("_session_creation_timestamp", datetime.now().timestamp()),
                 )
-            elif verbose:
+            elif self.verbose:
                 self.print_welcome()
-        self.figure_list = []
-        self.template_dir = os.path.join(os.path.dirname(__file__), "web")
-        self.static_dir = os.path.join(os.path.dirname(__file__), "web_static")
-        self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
 
-    def save_database(self):
-        """This method is useful only if delay_save = True. Then, the database is kept in-memory for
-        the duration of the session. This method saves the database on the disk.
-        A new database file will be created with the content of the current
-        in-memory database.
-
-        This method is automatically called at the exit of the context manager.
-        """
-        if self.delay_save:
-            try:
-                os.remove(str(self.session_name) + ".db")
-            except FileNotFoundError:
-                pass
-            disk_db = sqlite3.connect(str(self.session_name) + ".db")
-            try:
-                with disk_db as c:
-                    for line in self.conn.iterdump():
-                        c.execute(line)
-            finally:
-                disk_db.close()
+    def close(self):
+        if self.conn:
+            self.save_database()
+            self.conn.close()
+        self.conn = None
 
     def __enter__(self):
         """Context manager enter method
         """
+        if not self.conn:
+            self.open()
         return self
 
     def __exit__(self, type_, value, cb):
         """Context manager exit method
         """
-        self.save_database()
-        self.conn.close()
+        self.close()
 
     def get_version(self):
         """Returns current version of the database layout.
@@ -217,21 +245,17 @@ class AsyncSession:
             version = 1
         return version
 
-    @property
+    @cached_property
     def t0(self):
         """Session creation timestamp
         """
-        if hasattr(self, "_session_creation_timestamp"):
-            return self._session_creation_timestamp
         t0 = self.parameter("_session_creation_timestamp")
         if t0 is not None:
-            self._session_creation_timestamp = t0
             return t0
         logged_data = self.logged_first_values()
         if logged_data:
             t0 = min([v[0] for k, v in logged_data.items()])
             self.save_parameter(_session_creation_timestamp=t0)
-            self._session_creation_timestamp = t0
             return t0
         return 0
 
