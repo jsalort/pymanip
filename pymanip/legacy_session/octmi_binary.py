@@ -224,7 +224,7 @@ def read_string_var(f, verbose):
         fortran_vec = unpack("c" * num_elems, f.read(num_elems))
         var = np.array(fortran_vec).reshape(dv, order="F")
         if mdims == 2 and (dv[0] == 1 or dv[1] == 1):
-            var = var.flatten().tostring().decode("ascii")
+            var = var.flatten().tobytes().decode("ascii")
         if verbose:
             print("     string:", var)
     else:
