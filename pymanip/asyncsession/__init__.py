@@ -26,7 +26,11 @@ import pickle
 import warnings
 import inspect
 from pprint import pprint
-from functools import cached_property, lru_cache
+from functools import lru_cache
+try:
+    from functools import cached_property
+except ImportError:
+    from backports.cached_property import cached_property
 
 import sqlite3
 from datetime import datetime
@@ -1487,7 +1491,7 @@ class SavedAsyncSession:
 
     # General attributes
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def get_version(self):
         with self.session as sesn:
             return sesn.get_version()
@@ -1515,7 +1519,7 @@ class SavedAsyncSession:
 
     # Logged variables
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def logged_data(self):
         with self.session as sesn:
             return sesn.logged_data()
@@ -1526,7 +1530,7 @@ class SavedAsyncSession:
     def logged_variable(self, varname):
         return self.logged_data()[varname]
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def logged_last_values(self):
         last = dict()
         for name, data in self.logged_data().items():
@@ -1536,7 +1540,7 @@ class SavedAsyncSession:
             last[name] = (ts[-1], val[-1])
         return last
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def logged_first_values(self):
         first = dict()
         for name, data in self.logged_data().items():
@@ -1546,7 +1550,7 @@ class SavedAsyncSession:
             first[name] = (ts[0], val[0])
         return first
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def logged_data_fromtimestamp(self, name, timestamp):
         ts, val = self.logged_variable(name)
         for ind, tt in enumerate(ts):
@@ -1561,7 +1565,7 @@ class SavedAsyncSession:
 
     # Dataset
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def dataset_names(self):
         with self.session as sesn:
             return sesn.dataset_names()
@@ -1581,7 +1585,7 @@ class SavedAsyncSession:
         last_ts = self.dataset_times(name)[-1]
         return last_ts, self.dataset(name, ts=last_ts)
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def dataset_times(self, name):
         with self.session as sesn:
             sesn.dataset_times(name)
@@ -1598,7 +1602,7 @@ class SavedAsyncSession:
 
     # Parameters
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def parameters(self):
         with self.session as sesn:
             return sesn.parameters()
