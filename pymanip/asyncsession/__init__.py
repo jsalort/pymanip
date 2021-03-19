@@ -27,6 +27,7 @@ import warnings
 import inspect
 from pprint import pprint
 from functools import lru_cache
+
 try:
     from functools import cached_property
 except ImportError:
@@ -86,8 +87,7 @@ class AsyncSession:
         exist_ok=True,
         readonly=False,
     ):
-        """Constructor method
-        """
+        """Constructor method"""
 
         if session_name is not None:
             session_name = str(session_name)  # in case it is a Path object
@@ -134,8 +134,7 @@ class AsyncSession:
                 disk_db.close()
 
     def open(self):
-        """Opens database for reading or writting
-        """
+        """Opens database for reading or writting"""
 
         if self.conn is not None:
             raise RuntimeError("Already opened!")
@@ -230,20 +229,17 @@ class AsyncSession:
         self.conn = None
 
     def __enter__(self):
-        """Context manager enter method
-        """
+        """Context manager enter method"""
         if not self.conn:
             self.open()
         return self
 
     def __exit__(self, type_, value, cb):
-        """Context manager exit method
-        """
+        """Context manager exit method"""
         self.close()
 
     def get_version(self):
-        """Returns current version of the database layout.
-        """
+        """Returns current version of the database layout."""
         version = self.parameter("_database_version")
         if version is None:
             version = 1
@@ -251,8 +247,7 @@ class AsyncSession:
 
     @cached_property
     def t0(self):
-        """Session creation timestamp
-        """
+        """Session creation timestamp"""
         t0 = self.parameter("_session_creation_timestamp")
         if t0 is not None:
             return t0
@@ -265,14 +260,12 @@ class AsyncSession:
 
     @property
     def initial_timestamp(self):
-        """Session creation timestamp, identical to :attr:`pymanip.asyncsession.AsyncSession.t0`
-        """
+        """Session creation timestamp, identical to :attr:`pymanip.asyncsession.AsyncSession.t0`"""
         return self.t0
 
     @property
     def last_timestamp(self):
-        """Timestamp of the last recorded value
-        """
+        """Timestamp of the last recorded value"""
         ts = list()
         last_values = self.logged_last_values()
         if last_values:
@@ -295,8 +288,7 @@ class AsyncSession:
             cprint.blue("***   End date: " + end_string)
 
     def print_description(self):
-        """Prints the list of parameters, logged variables and datasets.
-        """
+        """Prints the list of parameters, logged variables and datasets."""
         version = self.get_version()
         print(
             self.session_name,
@@ -746,10 +738,14 @@ class AsyncSession:
         from_addr,
         to_addrs,
         host,
-        port=25,
+        port=None,
         subject=None,
         delay_hours=6,
         initial_delay_hours=None,
+        use_ssl_submission=False,
+        use_starttls=False,
+        user=None,
+        password=None,
     ):
         """This method returns an asynchronous task which sends an email at regular intervals.
         Such a task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
@@ -769,6 +765,15 @@ class AsyncSession:
         :type initial_delay_hours: float, optional
         """
 
+        if port is None:
+            if use_ssl_submission:
+                port = 465
+            elif use_starttls:
+                # Tough some servers can do starttls on port 25, but then the user must specify port=25
+                # as this is less common than on the submission port.
+                port = 587
+            else:
+                port = 25
         if self.session_name is None:
             title = "Pymanip session"
         else:
@@ -839,7 +844,28 @@ class AsyncSession:
                     filename="fig{:d}-{:}.png".format(fignum, datestr),
                 )
 
-            with smtplib.SMTP(host, port) as smtp:
+            if use_ssl_submission:
+                smtp_server = smtplib.SMTP_SSL(host, port)
+            else:
+                smtp_server = smtplib.SMTP(host, port)
+            with smtp_server as smtp:
+                if use_starttls:
+                    smtp.starttls()
+                if user and password:
+                    if not use_starttls and not use_ssl_submission:
+                        raise RuntimeError(
+                            "Do you really want to send password unencrypted?"
+                        )
+                    try:
+                        smtp.login(user, password)
+                    except smtplib.SMTPHeloError:
+                        print("The server didn’t reply properly to the HELO greeting.")
+                    except smtplib.SMTPAuthenticationError:
+                        print(
+                            "The server didn’t accept the username/password combination."
+                        )
+                    except smtplib.SMTPNotSupportedError:
+                        print("The AUTH command is not supported by the server.")
                 try:
                     smtp.send_message(msg)
                     print("Email sent!")
@@ -1273,8 +1299,7 @@ class AsyncSession:
             await asyncio.gather(self.figure_gui_update(), *tasks_final)
 
     def run(self, *tasks, server_port=6913, custom_routes=None, custom_figures=None):
-        """Synchronous call to :meth:`pymanip.asyncsession.AsyncSession.monitor`.
-        """
+        """Synchronous call to :meth:`pymanip.asyncsession.AsyncSession.monitor`."""
 
         asyncio.run(
             self.monitor(
@@ -1330,14 +1355,12 @@ class RemoteObserver:
     """
 
     def __init__(self, host, port=6913):
-        """Constructor method
-        """
+        """Constructor method"""
         self.host = host
         self.port = port
 
     def _get_request(self, apiname):
-        """Private method to send a GET request for the specified API name
-        """
+        """Private method to send a GET request for the specified API name"""
         url = "http://{host:}:{port:}/api/{api:}".format(
             host=self.host, port=self.port, api=apiname
         )
@@ -1349,8 +1372,7 @@ class RemoteObserver:
             raise
 
     def _post_request(self, apiname, params):
-        """Private method to send a POST request for the specified API name and params
-        """
+        """Private method to send a POST request for the specified API name and params"""
         url = "http://{host:}:{port:}/api/{api:}".format(
             host=self.host, port=self.port, api=apiname
         )
@@ -1453,8 +1475,7 @@ class SavedAsyncSession:
             cprint.blue("***   End date: " + end_string)
 
     def print_description(self):
-        """Prints the list of parameters, logged variables and datasets.
-        """
+        """Prints the list of parameters, logged variables and datasets."""
         version = self.get_version()
         print(
             self.session_name,
