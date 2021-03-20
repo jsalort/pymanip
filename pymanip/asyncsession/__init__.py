@@ -935,11 +935,13 @@ class AsyncSession:
         saved_figsize = self.parameter(param_key_figsize)
         if saved_figsize:
             saved_figsize = eval(saved_figsize)
-        plt.ion()
+        if not self.offscreen_figures:
+            plt.ion()
         fig = plt.figure(figsize=saved_figsize)
-        mngr = fig.canvas.manager
-        if saved_geom:
-            mngr.window.setGeometry(saved_geom)
+        if not self.offscreen_figures:
+            mngr = fig.canvas.manager
+            if saved_geom:
+                mngr.window.setGeometry(saved_geom)
         ax = fig.add_subplot(111)
         line_objects = dict()
         self.figure_list.append(fig)
@@ -997,7 +999,8 @@ class AsyncSession:
                                 pass
                         else:
                             ax.set_ylim(fixed_ylim)
-                        fig.show()
+                        if not self.offscreen_figures:
+                            fig.show()
                     last_update[x] = ts_x[-1]
                     last_update[y] = ts_y[-1]
             else:
@@ -1041,38 +1044,43 @@ class AsyncSession:
                             if fixed_ylim is not None:
                                 ax.set_ylim(fixed_ylim)
                             ax.legend()
-                            fig.show()
+                            if not self.offscreen_figures:
+                                fig.show()
                         last_update[name] = ts[-1]
             await asyncio.sleep(1)
 
-        # Saving figure positions
-        try:
-            geom = mngr.window.geometry()
-            figsize = tuple(fig.get_size_inches())
-            self.save_parameter(
-                **{param_key_window: str(geom), param_key_figsize: str(figsize)}
-            )
-        except AttributeError:
-            pass
+        if not self.offscreen_figures:
+            # Saving figure positions
+            try:
+                geom = mngr.window.geometry()
+                figsize = tuple(fig.get_size_inches())
+                self.save_parameter(
+                    **{param_key_window: str(geom), param_key_figsize: str(figsize)}
+                )
+            except AttributeError:
+                pass
 
     async def figure_gui_update(self):
         """This method returns an asynchronous task which updates the figures created by the
         :meth:`pymanip.asyncsession.AsyncSession.plot` tasks. This task is added automatically,
         and should not be used manually.
         """
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
-            while self.running:
-                figure_list = self.figure_list
-                if self.custom_figures:
-                    figure_list = figure_list + self.custom_figures
-                if figure_list:
-                    for fig in self.figure_list:
-                        fig.canvas.start_event_loop(0.7 / len(self.figure_list))
-                        await asyncio.sleep(0.3 / len(self.figure_list))
-                    await asyncio.sleep(0.05)
-                else:
-                    await asyncio.sleep(1.0)
+        if not self.offscreen_figures:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=MatplotlibDeprecationWarning)
+                while self.running:
+                    figure_list = self.figure_list
+                    if self.custom_figures:
+                        figure_list = figure_list + self.custom_figures
+                    if figure_list:
+                        for fig in self.figure_list:
+                            fig.canvas.start_event_loop(0.7 / len(self.figure_list))
+                            await asyncio.sleep(0.3 / len(self.figure_list))
+                        await asyncio.sleep(0.05)
+                    else:
+                        await asyncio.sleep(1.0)
+        else:
+            await asyncio.sleep(0.0)
 
     def ask_exit(self, *args, **kwargs):
         """This methods informs all tasks that the monitoring session should stop. Call this method if you
@@ -1228,7 +1236,12 @@ class AsyncSession:
         print("Task finished", corofunc)
 
     async def monitor(
-        self, *tasks, server_port=6913, custom_routes=None, custom_figures=None
+        self,
+        *tasks,
+        server_port=6913,
+        custom_routes=None,
+        custom_figures=None,
+        offscreen_figures=False,
     ):
         """This method runs the specified tasks, and opens a web-server for remote access and set up the tasks to run
         matplotlib event loops if necessary. This is the main
@@ -1247,9 +1260,12 @@ class AsyncSession:
         :type custom_routes: co-routine function, optional
         :param custom_figures: additional matplotlib figure object that needs to run the matplotlib event loop
         :type custom_figures: :class:`matplotlib.pyplot.Figure`, optional
+        :param offscreen_figures: if set, figures are not shown onscreen
+        :type offscreen_figures: bool, optional
         """
         loop = asyncio.get_event_loop()
         self.custom_figures = custom_figures
+        self.offscreen_figures = offscreen_figures
 
         # signal handling
         self.running = True
