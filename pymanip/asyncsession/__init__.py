@@ -1314,7 +1314,14 @@ class AsyncSession:
         else:
             await asyncio.gather(self.figure_gui_update(), *tasks_final)
 
-    def run(self, *tasks, server_port=6913, custom_routes=None, custom_figures=None):
+    def run(
+        self,
+        *tasks,
+        server_port=6913,
+        custom_routes=None,
+        custom_figures=None,
+        offscreen_figures=False,
+    ):
         """Synchronous call to :meth:`pymanip.asyncsession.AsyncSession.monitor`."""
 
         asyncio.run(
@@ -1323,6 +1330,7 @@ class AsyncSession:
                 server_port=server_port,
                 custom_routes=custom_routes,
                 custom_figures=custom_figures,
+                offscreen_figures=offscreen_figures,
             )
         )
 
