@@ -251,7 +251,7 @@ class VideoSession(AsyncSession):
             n = 0
             async for im in gen:
                 if im is not None:
-                    self.image_queues[cam_no].put(im)
+                    self.image_queues[cam_no].put(im.copy())
                     n = n + 1
                     if pb is not None:
                         pb.update(n)
@@ -433,7 +433,7 @@ class VideoSession(AsyncSession):
         print("ffmpeg has terminated.")
 
     async def main(
-        self, keep_in_RAM=False, additionnal_trig=0, live=False, unprocessed=False
+        self, keep_in_RAM=False, additionnal_trig=0, live=False, unprocessed=False, delay_save=False
     ):
         """Main entry point for acquisition tasks. This asynchronous task can be called
         with :func:`asyncio.run`, or combined with other user-defined tasks.
@@ -464,19 +464,30 @@ class VideoSession(AsyncSession):
         if live:
             save_tasks = [self._live_preview(unprocessed)]
         elif self.output_format == "mp4":
-            save_tasks = [self._start_clock()] + [
-                self._save_video(cam_no, unprocessed=unprocessed)
-                for cam_no in range(len(self.camera_list))
-            ]
+            save_tasks = [self._start_clock()]
+            if not delay_save:
+                save_tasks = save_tasks + [
+                    self._save_video(cam_no, unprocessed=unprocessed)
+                    for cam_no in range(len(self.camera_list))
+                ]
+            
         else:
             if self.trigger_gbf is not None:
-                save_tasks = [
-                    self._start_clock(),
-                    self._save_images(keep_in_RAM, unprocessed),
-                ]
+                save_tasks = [self._start_clock()]
             else:
-                save_tasks = [self._save_images(keep_in_RAM, unprocessed)]
+                save_tasks = []
+            if not delay_save:
+                save_tasks = save_tasks + [self._save_images(keep_in_RAM, unprocessed)]
+                
         await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
+        
+        if delay_save:
+            if self.output_format == "mp4":
+                for cam_no in range(len(self.camera_list)):
+                    await self._save_video(cam_no, unprocessed=unprocessed)
+            else:
+                await self._save_images(keep_in_RAM, unprocessed)
+                
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
 
@@ -492,7 +503,7 @@ class VideoSession(AsyncSession):
 
         return camera_timestamps, camera_counter
 
-    def run(self, additionnal_trig=0):
+    def run(self, additionnal_trig=0, delay_save=False):
         """Run the acquisition.
 
         :param additionnal_trig: additionnal number of pulses sent to the camera
@@ -500,7 +511,7 @@ class VideoSession(AsyncSession):
         :return: camera_timestamps, camera_counter
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
-        ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig))
+        ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig, delay_save=delay_save))
         return ts, count
 
     def live(self):
