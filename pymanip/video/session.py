@@ -440,8 +440,9 @@ class VideoSession(AsyncSession):
                 None,
                 cam.fast_acquisition_to_ram,
                 self.nframes,
-                initialising_cams=self.initialising_cams,
-                raise_on_timeout=False,
+                5000,  # timeout
+                self.initialising_cams,
+                False,  # raise_on_timeout
             )
         return ts, count, images
 
