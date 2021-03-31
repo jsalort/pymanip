@@ -123,7 +123,9 @@ class Photometrics_Camera(Camera):
                     print("Timeout while waiting for poll_frame")
                     break
                 return (
-                    frame.reshape(self.cam.__shape[1], self.cam.__shape[0]),
+                    frame.reshape(
+                        self.cam._Camera__shape[1], self.cam._Camera__shape[0]
+                    ),
                     fps,
                     frame_count,
                 )
