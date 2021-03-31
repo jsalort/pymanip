@@ -494,6 +494,7 @@ class VideoSession(AsyncSession):
                 for cam_no in range(len(self.camera_list))
             ]
             results = await asyncio.gather(*acquisition_tasks, self._start_clock())
+            self.running = False
 
             # Convert from lists to queues (no data copy involved)
             for cam_no, (ts_all, count_all, images_all) in zip(
