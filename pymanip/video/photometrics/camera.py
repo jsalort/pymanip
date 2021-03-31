@@ -215,8 +215,8 @@ class Photometrics_Camera(Camera):
         """
 
         n = 0
-        count = np.empty((self.nframes,))
-        ts = np.empty((self.nframes,))
+        count = np.empty((num,))
+        ts = np.empty((num,))
         images = list()
         try:
             self.cam.start_live()
