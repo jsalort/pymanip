@@ -122,10 +122,11 @@ class Photometrics_Camera(Camera):
                 except asyncio.TimeoutError:
                     print("Timeout while waiting for poll_frame")
                     break
+                frame["pixel_data"] = frame["pixel_data"].reshape(
+                    self.cam._Camera__shape[1], self.cam._Camera__shape[0]
+                )
                 return (
-                    frame.reshape(
-                        self.cam._Camera__shape[1], self.cam._Camera__shape[0]
-                    ),
+                    frame,
                     fps,
                     frame_count,
                 )
