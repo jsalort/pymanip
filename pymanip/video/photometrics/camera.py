@@ -232,9 +232,7 @@ class Photometrics_Camera(Camera):
                         frame,
                         fps,
                         frame_count,
-                    ) = (
-                        self.cam.poll_poll_frame()
-                    )  # already does a copy of the numpy array
+                    ) = self.cam.poll_frame()  # already does a copy of the numpy array
                 except CameraTimeout:
                     print("Camera timeout")
                     if raise_on_timeout:
