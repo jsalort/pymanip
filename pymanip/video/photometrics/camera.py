@@ -110,10 +110,10 @@ class Photometrics_Camera(Camera):
                 future = loop.run_in_executor(
                     None,
                     pvc.get_frame,
-                    self.cam.__handle,
-                    self.cam.__shape[0],
-                    self.cam.__shape[1],
-                    self.cam.__bits_per_pixel,
+                    self.cam._Camera__handle,
+                    self.cam._Camera__shape[0],
+                    self.cam._Camera__shape[1],
+                    self.cam._Camera__bits_per_pixel,
                 )
                 try:
                     frame, fps, frame_count = await asyncio.wait_for(
