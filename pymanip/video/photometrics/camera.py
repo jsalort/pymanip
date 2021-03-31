@@ -204,50 +204,67 @@ class Photometrics_Camera(Camera):
         if stop_signal:
             yield True
 
-    def fast_acquisition_to_ram(
-        self, num, timeout_ms=5000, initialising_cams=None, raise_on_timeout=True
+    async def empty_buffer(self, loop):
+        start = monotonic()
+        empty = False
+        n = 0
+        while (monotonic() - start) < 1.0:
+            future = loop.run_in_executor(
+                None,
+                self.cam.poll_frame
+            )
+            try:
+                _, _, _ = await asyncio.wait_for(future, timeout=0.5, loop=loop)
+                n = n + 1
+            except asyncio.TimeoutError:
+                empty = True
+                break
+        print(n, "frames removed from circular buffer")
+        if empty:
+            print("Circular buffer successfully emptied")
+        return empty
+
+    async def fast_acquisition_to_ram(
+        self, num, total_timeout_s=5*60, initialising_cams=None, raise_on_timeout=True
     ):
         """Fast method (without the overhead of run_in_executor and asynchronous generator), for acquisitions
         where concurrent saving is not an option (because the framerate is so much faster than writting time),
         so all frames are saved in RAM anyway.
-        This method can itself be run in an executor (allowing asynchronous triggering of the GBF when initialising_cams is
-        empty, as well as multiple camera acquisition).
         """
 
-        n = 0
         count = np.empty((num,))
         ts = np.empty((num,))
         images = list()
+        loop = asyncio.get_event_loop()
         try:
             self.cam.start_live()
-            # Apparently there is one frame on start of live mode that we want to disregard
-            # (obviously not triggered by the GBF, since the software trigger has not been
-            # sent yet; if no GBF is used, it does not matter to drop one frame)
-            _, _, _ = self.cam.poll_frame()
+            
+            if initialising_cams and self.get_trigger_mode():
+                await self.empty_buffer(loop)
 
-            while n < num:
-                if (
-                    n == 0
-                    and initialising_cams is not None
-                    and self in initialising_cams
-                ):
-                    initialising_cams.remove(self)
-                try:
-                    (
-                        frame,
-                        fps,
-                        frame_count,
-                    ) = self.cam.poll_frame()  # already does a copy of the numpy array
-                except CameraTimeout:
-                    print("Camera timeout")
-                    if raise_on_timeout:
-                        raise
-                    else:
-                        break
-                ts[n] = frame["meta_data"]["frame_header"]["timestampBOF"] / 1e12
-                count[n] = frame_count
-                n = n + 1
-                images.append(frame["pixel_data"])
+            def _sync_loop():
+                n = 0
+                while n < num:
+                    if (
+                        n == 0
+                        and initialising_cams is not None
+                        and self in initialising_cams
+                    ):
+                        initialising_cams.remove(self)
+                    frame, fps, frame_count = self.cam.poll_frame()
+                    ts[n] = frame["meta_data"]["frame_header"]["timestampEOF"] / 1e12
+                    count[n] = frame_count
+                    n = n + 1
+                    images.append(frame["pixel_data"])
+            future = loop.run_in_executor(None, _sync_loop)
+            try:
+                await asyncio.wait_for(future, timeout=total_timeout_s, loop=loop)
+            except asyncio.TimeoutError:
+                print("Camera timeout")
+                if raise_on_timeout:
+                    raise CameraTimeout
+            n = len(images)
+            print(n, "frames read.")
         finally:
             self.cam.finish()
 

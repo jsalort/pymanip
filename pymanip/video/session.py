@@ -103,7 +103,7 @@ A context manager must be used to ensure proper saving of the metadata to the da
 import asyncio
 from queue import SimpleQueue
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -280,7 +280,7 @@ class VideoSession(AsyncSession):
             self.trigger_gbf.trigger()
         return datetime.now().timestamp()
 
-    async def _save_images(self, keep_in_RAM=False, unprocessed=False):
+    async def _save_images(self, keep_in_RAM=False, unprocessed=False, no_save=False):
         """Private instance method: image saving task.
         This task checks the image FIFO queue. If an image is available, it is taken out of the queue and
         saved to the disk.
@@ -289,6 +289,8 @@ class VideoSession(AsyncSession):
         :type keep_in_RAM: bool
         :param unprocessed: if set, the ``process_image`` method is not called.
         :type unprocessed: bool
+        :param no_save: do not actually save (dry run), for testing purposes
+        :type no_save: bool
         """
         loop = asyncio.get_event_loop()
         i = [0] * len(self.camera_list)
@@ -309,15 +311,16 @@ class VideoSession(AsyncSession):
                     self.add_entry(
                         ts=img.metadata["timestamp"], count=img.metadata["counter"]
                     )
-                    if hasattr(self, "process_image") and not unprocessed:
-                        img = await loop.run_in_executor(None, self.process_image, img)
-                    filepath = (
-                        self.output_folder
-                        / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
-                    )
+                    if not no_save:
+                        if hasattr(self, "process_image") and not unprocessed:
+                            img = await loop.run_in_executor(None, self.process_image, img)
+                        filepath = (
+                            self.output_folder
+                            / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
+                        )
                     if keep_in_RAM:
                         self.image_list[cam_no].append(img)
-                    else:
+                    elif not no_save:
                         await loop.run_in_executor(
                             None,
                             cv2.imwrite,
@@ -432,15 +435,12 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
-    async def _fast_acquisition_to_ram(self, cam_no):
+    async def _fast_acquisition_to_ram(self, cam_no, total_timeout_s):
         """Private instance method: fast acquisition to ram task"""
-        loop = asyncio.get_event_loop()
         with self.camera_list[cam_no] as cam:
-            ts, count, images = await loop.run_in_executor(
-                None,
-                cam.fast_acquisition_to_ram,
+            ts, count, images = await cam.fast_acquisition_to_ram(
                 self.nframes,
-                5000,  # timeout
+                total_timeout_s,
                 self.initialising_cams,
                 False,  # raise_on_timeout
             )
@@ -453,6 +453,7 @@ class VideoSession(AsyncSession):
         live=False,
         unprocessed=False,
         delay_save=False,
+        no_save=False,
     ):
         """Main entry point for acquisition tasks. This asynchronous task can be called
         with :func:`asyncio.run`, or combined with other user-defined tasks.
@@ -489,10 +490,15 @@ class VideoSession(AsyncSession):
             print("Acquisition in fast mode to RAM")
 
             # Acquisition to RAM
+            total_timeout_s = 5 + (self.nframes / self.framerate)
             acquisition_tasks = [
-                self._fast_acquisition_to_ram(cam_no)
+                self._fast_acquisition_to_ram(cam_no, total_timeout_s)
                 for cam_no in range(len(self.camera_list))
             ]
+            dt_start = datetime.now()
+            dt_end = dt_start + timedelta(seconds=total_timeout_s)
+            print("Acquisition start time:", dt_start.strftime("%d-%m-%Y %H:%M:%S"))
+            print("              end time:", dt_end.strftime("%d-%m-%Y %H:%M:%S"))
             results = await asyncio.gather(*acquisition_tasks, self._start_clock())
             self.running = False
 
@@ -542,7 +548,7 @@ class VideoSession(AsyncSession):
                 for cam_no in range(len(self.camera_list)):
                     await self._save_video(cam_no, unprocessed=unprocessed)
             else:
-                await self._save_images(keep_in_RAM, unprocessed)
+                await self._save_images(keep_in_RAM, unprocessed, no_save)
 
         # Post-acquisition information
         _, camera_timestamps = self.logged_variable("ts")
@@ -560,7 +566,7 @@ class VideoSession(AsyncSession):
 
         return camera_timestamps, camera_counter
 
-    def run(self, additionnal_trig=0, delay_save=False):
+    def run(self, additionnal_trig=0, delay_save=False, no_save=False):
         """Run the acquisition.
 
         :param additionnal_trig: additionnal number of pulses sent to the camera
@@ -569,7 +575,7 @@ class VideoSession(AsyncSession):
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
         ts, count = asyncio.run(
-            self.main(additionnal_trig=additionnal_trig, delay_save=delay_save)
+            self.main(additionnal_trig=additionnal_trig, delay_save=delay_save, no_save=no_save)
         )
         return ts, count
 
