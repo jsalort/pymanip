@@ -22,7 +22,7 @@ from ximea.xidefs import XI_IMG_FORMAT, XI_TRG_SOURCE, XI_TRG_SELECTOR
 
 
 class Ximea_Camera(Camera):
-    """Concrete :class:`pymanip.video.Camera` class for AVT camera.
+    """Concrete :class:`pymanip.video.Camera` class for Ximea camera.
     """
 
     color_order = "BGR"  # Ximea RGB mode is [blue][green][red] per the doc.
