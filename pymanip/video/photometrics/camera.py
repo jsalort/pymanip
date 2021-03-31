@@ -220,6 +220,11 @@ class Photometrics_Camera(Camera):
         images = list()
         try:
             self.cam.start_live()
+            # Apparently there is one frame on start of live mode that we want to disregard
+            # (obviously not triggered by the GBF, since the software trigger has not been
+            # sent yet; if no GBF is used, it does not matter to drop one frame)
+            _, _, _ = self.cam.poll_frame()
+
             while n < num:
                 if (
                     n == 0
