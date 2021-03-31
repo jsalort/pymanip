@@ -204,6 +204,52 @@ class Photometrics_Camera(Camera):
         if stop_signal:
             yield True
 
+    def fast_acquisition_to_ram(
+        self, num, timeout_ms=5000, initialising_cams=None, raise_on_timeout=True
+    ):
+        """Fast method (without the overhead of run_in_executor and asynchronous generator), for acquisitions
+        where concurrent saving is not an option (because the framerate is so much faster than writting time),
+        so all frames are saved in RAM anyway.
+        This method can itself be run in an executor (allowing asynchronous triggering of the GBF when initialising_cams is
+        empty, as well as multiple camera acquisition).
+        """
+
+        n = 0
+        count = np.empty((self.nframes,))
+        ts = np.empty((self.nframes,))
+        images = list()
+        try:
+            self.cam.start_live()
+            while n < num:
+                if (
+                    n == 0
+                    and initialising_cams is not None
+                    and self in initialising_cams
+                ):
+                    initialising_cams.remove(self)
+                try:
+                    (
+                        frame,
+                        fps,
+                        frame_count,
+                    ) = (
+                        self.cam.poll_poll_frame()
+                    )  # already does a copy of the numpy array
+                except CameraTimeout:
+                    print("Camera timeout")
+                    if raise_on_timeout:
+                        raise
+                    else:
+                        break
+                ts[n] = frame["meta_data"]["frame_header"]["timestampBOF"] / 1e12
+                count[n] = frame_count
+                n = n + 1
+                images.append(frame["pixel_data"])
+        finally:
+            self.cam.finish()
+
+        return ts[:n], count[:n], images
+
 
 if __name__ == "__main__":
     with Photometrics_Camera() as cam:

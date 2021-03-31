@@ -111,6 +111,7 @@ from progressbar import ProgressBar
 import cv2
 
 from pymanip.asyncsession import AsyncSession
+from pymanip.video import MetadataArray
 
 
 class VideoSession(AsyncSession):
@@ -144,8 +145,7 @@ class VideoSession(AsyncSession):
         output_path=None,
         exist_ok=False,
     ):
-        """Constructor method
-        """
+        """Constructor method"""
         if isinstance(camera_or_camera_list, (list, tuple)):
             self.camera_list = camera_or_camera_list
         else:
@@ -432,8 +432,26 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
+    async def _fast_acquisition_to_ram(self, cam_no):
+        """Private instance method: fast acquisition to ram task"""
+        loop = asyncio.get_event_loop()
+        with self.camera_list[cam_no] as cam:
+            ts, count, images = await loop.run_in_executor(
+                None,
+                cam.fast_acquisition_to_ram,
+                self.nframes,
+                initialising_cams=self.initialising_cams,
+                raise_on_timeout=False,
+            )
+        return ts, count, images
+
     async def main(
-        self, keep_in_RAM=False, additionnal_trig=0, live=False, unprocessed=False, delay_save=False
+        self,
+        keep_in_RAM=False,
+        additionnal_trig=0,
+        live=False,
+        unprocessed=False,
+        delay_save=False,
     ):
         """Main entry point for acquisition tasks. This asynchronous task can be called
         with :func:`asyncio.run`, or combined with other user-defined tasks.
@@ -458,36 +476,73 @@ class VideoSession(AsyncSession):
                         self.framerate, self.nframes + additionnal_trig
                     )
                     self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
-        acquisition_tasks = [
-            self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
-        ]
-        if live:
-            save_tasks = [self._live_preview(unprocessed)]
-        elif self.output_format == "mp4":
-            save_tasks = [self._start_clock()]
-            if not delay_save:
-                save_tasks = save_tasks + [
-                    self._save_video(cam_no, unprocessed=unprocessed)
-                    for cam_no in range(len(self.camera_list))
-                ]
-            
+
+        if delay_save and all(
+            [
+                hasattr(self.camera_list[cam_no], "fast_acquisition_to_ram")
+                for cam_no in range(len(self.camera_list))
+            ]
+        ):
+            if live:
+                raise ValueError("delay_save and live are not compatible")
+            print("Acquisition in fast mode to RAM")
+
+            # Acquisition to RAM
+            acquisition_tasks = [
+                self._fast_acquisition_to_ram(cam_no)
+                for cam_no in range(len(self.camera_list))
+            ]
+            results = await asyncio.gather(*acquisition_tasks, self._start_clock())
+
+            # Convert from lists to queues (no data copy involved)
+            for cam_no, (ts_all, count_all, images_all) in zip(
+                range(len(self.camera_list)), results
+            ):
+                for ts, count, image in zip(ts_all, count_all, images_all):
+                    self.image_queues[cam_no].put(
+                        MetadataArray(
+                            image,
+                            metadata={
+                                "counter": count,
+                                "timestamp": ts,
+                            },
+                        )
+                    )
         else:
-            if self.trigger_gbf is not None:
+            acquisition_tasks = [
+                self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
+            ]
+            if live:
+                save_tasks = [self._live_preview(unprocessed)]
+            elif self.output_format == "mp4":
                 save_tasks = [self._start_clock()]
+                if not delay_save:
+                    save_tasks = save_tasks + [
+                        self._save_video(cam_no, unprocessed=unprocessed)
+                        for cam_no in range(len(self.camera_list))
+                    ]
+
             else:
-                save_tasks = []
-            if not delay_save:
-                save_tasks = save_tasks + [self._save_images(keep_in_RAM, unprocessed)]
-                
-        await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
-        
+                if self.trigger_gbf is not None:
+                    save_tasks = [self._start_clock()]
+                else:
+                    save_tasks = []
+                if not delay_save:
+                    save_tasks = save_tasks + [
+                        self._save_images(keep_in_RAM, unprocessed)
+                    ]
+
+            await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
+
+        # Post-acquisition save if the save_tasks were not included (in fast mode, or in regular mode)
         if delay_save:
             if self.output_format == "mp4":
                 for cam_no in range(len(self.camera_list)):
                     await self._save_video(cam_no, unprocessed=unprocessed)
             else:
                 await self._save_images(keep_in_RAM, unprocessed)
-                
+
+        # Post-acquisition information
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
 
@@ -511,12 +566,13 @@ class VideoSession(AsyncSession):
         :return: camera_timestamps, camera_counter
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
-        ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig, delay_save=delay_save))
+        ts, count = asyncio.run(
+            self.main(additionnal_trig=additionnal_trig, delay_save=delay_save)
+        )
         return ts, count
 
     def live(self):
-        """Starts live preview.
-        """
+        """Starts live preview."""
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
