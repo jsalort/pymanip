@@ -438,6 +438,8 @@ class VideoSession(AsyncSession):
     async def _fast_acquisition_to_ram(self, cam_no, total_timeout_s):
         """Private instance method: fast acquisition to ram task"""
         with self.camera_list[cam_no] as cam:
+            if hasattr(self, "prepare_camera"):
+                self.prepare_camera(cam)
             ts, count, images = await cam.fast_acquisition_to_ram(
                 self.nframes,
                 total_timeout_s,

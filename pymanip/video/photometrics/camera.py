@@ -31,7 +31,7 @@ class Photometrics_Camera(Camera):
 
         readout_port is camera mode:
             - readout_port = 0 ("Sensitivity") 12 bits, max fps = 88
-            - readout_port = 1 ("Speed") 8 bits, max fps = 100
+            - readout_port = 1 ("Speed") 8 bits, max fps = 500
             - readout_port = 2 ("Dynamic Range") 16 bits, max fps = 83
         """
         global pvc_initialized
