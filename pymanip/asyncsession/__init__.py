@@ -844,10 +844,17 @@ class AsyncSession:
                     filename="fig{:d}-{:}.png".format(fignum, datestr),
                 )
 
-            if use_ssl_submission:
-                smtp_server = smtplib.SMTP_SSL(host, port)
-            else:
-                smtp_server = smtplib.SMTP(host, port)
+            try:
+                if use_ssl_submission:
+                    smtp_server = smtplib.SMTP_SSL(host, port)
+                else:
+                    smtp_server = smtplib.SMTP(host, port)
+            except Exception as e:
+                print("Unable to connect to SMTP server")
+                print(e)
+                await self.sleep(60, verbose=False)
+                continue
+
             with smtp_server as smtp:
                 if use_starttls:
                     smtp.starttls()
