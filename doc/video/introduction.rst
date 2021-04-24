@@ -5,8 +5,9 @@ The :mod:`pymanip.video` module provides tools to help with camera acquisition. 
 use the third-party :mod:`pymba` module bindings to the AVT Vimba_ SDK for 
 AVT cameras, the third-party :mod:`pyAndorNeo` module bindings to the
 Andor_ SDK3 library for the Andor Camera, the third-party :mod:`pyueye` module
-bindings to the IDS ueye library, and the Python module provided by Ximea_ for the
-Ximea cameras.
+bindings to the IDS ueye library, the Python module provided by Ximea_ for the
+Ximea cameras, and PyVCAM_ wrapper for Photometrics camera.
+
 We wrote our own bindings to the Pixelfly_ library for the PCO camera.
 Beware that the code works for us, but there is no garantee that it will work with
 your camera models.
@@ -22,15 +23,16 @@ underlying libraries.
 
 The useful concrete classes are given in this table:
 
-=============  ==========================================
+=============  =======================================================
 Camera type    Concrete class
-=============  ==========================================
+=============  =======================================================
 AVT            :class:`pymanip.video.avt.AVT_Camera`
 PCO            :class:`pymanip.video.pco.PCO_Camera`
 Andor          :class:`pymanip.video.andor.Andor_Camera`
 IDS            :class:`pymanip.video.ids.IDS_Camera`
 Ximea          :class:`pymanip.video.ximea.Ximea_Camera`
-=============  ==========================================
+Photometrics   :class:`pymanip.video.photometrics.Photometrics_Camera`
+=============  =======================================================
 
 They all are sub-classes of the :class:`pymanip.video.Camera` abstract base
 class. Most of the user-level useful documentation lies in the base class.
@@ -55,6 +57,7 @@ by a function generator.
    pco
    ids
    ximea
+   photometrics
 
 .. _Andor: https://www.scivision.dev/andor-neo-windows-sdk3-install/
 
@@ -63,3 +66,5 @@ by a function generator.
 .. _Pixelfly: https://www.pco.de/software/
 
 .. _Ximea: https://www.ximea.com/support/wiki/apis/Python_inst_win
+
+.. _PyVCAM: https://github.com/Photometrics/PyVCAM

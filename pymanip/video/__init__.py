@@ -363,7 +363,7 @@ class Camera:
                 else:
                     img = (maxint // (maximum - minimum)) * (im - minimum)
                 img = cv2.resize(img, (int(c * zoom), int(l * zoom)))
-                if self.color_order == "RGB":
+                if color and self.color_order == "RGB":
                     # OpenCV works in BGR order.
                     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 cv2.imshow(name, img)
@@ -492,7 +492,7 @@ class Camera:
 
         # instantiate generator
         if not hasattr(self, "preview_generator"):
-            self.preview_generator = self.acquisition(timeout=5, raise_on_timeout=False)
+            self.preview_generator = self.acquisition(timeout=1000, raise_on_timeout=False)
 
         if just_started:
             self.bkgrd = None

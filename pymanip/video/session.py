@@ -103,7 +103,7 @@ A context manager must be used to ensure proper saving of the metadata to the da
 import asyncio
 from queue import SimpleQueue
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -111,6 +111,7 @@ from progressbar import ProgressBar
 import cv2
 
 from pymanip.asyncsession import AsyncSession
+from pymanip.video import MetadataArray
 
 
 class VideoSession(AsyncSession):
@@ -144,8 +145,7 @@ class VideoSession(AsyncSession):
         output_path=None,
         exist_ok=False,
     ):
-        """Constructor method
-        """
+        """Constructor method"""
         if isinstance(camera_or_camera_list, (list, tuple)):
             self.camera_list = camera_or_camera_list
         else:
@@ -251,7 +251,7 @@ class VideoSession(AsyncSession):
             n = 0
             async for im in gen:
                 if im is not None:
-                    self.image_queues[cam_no].put(im)
+                    self.image_queues[cam_no].put(im.copy())
                     n = n + 1
                     if pb is not None:
                         pb.update(n)
@@ -280,7 +280,7 @@ class VideoSession(AsyncSession):
             self.trigger_gbf.trigger()
         return datetime.now().timestamp()
 
-    async def _save_images(self, keep_in_RAM=False, unprocessed=False):
+    async def _save_images(self, keep_in_RAM=False, unprocessed=False, no_save=False):
         """Private instance method: image saving task.
         This task checks the image FIFO queue. If an image is available, it is taken out of the queue and
         saved to the disk.
@@ -289,6 +289,8 @@ class VideoSession(AsyncSession):
         :type keep_in_RAM: bool
         :param unprocessed: if set, the ``process_image`` method is not called.
         :type unprocessed: bool
+        :param no_save: do not actually save (dry run), for testing purposes
+        :type no_save: bool
         """
         loop = asyncio.get_event_loop()
         i = [0] * len(self.camera_list)
@@ -309,15 +311,16 @@ class VideoSession(AsyncSession):
                     self.add_entry(
                         ts=img.metadata["timestamp"], count=img.metadata["counter"]
                     )
-                    if hasattr(self, "process_image") and not unprocessed:
-                        img = await loop.run_in_executor(None, self.process_image, img)
-                    filepath = (
-                        self.output_folder
-                        / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
-                    )
+                    if not no_save:
+                        if hasattr(self, "process_image") and not unprocessed:
+                            img = await loop.run_in_executor(None, self.process_image, img)
+                        filepath = (
+                            self.output_folder
+                            / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
+                        )
                     if keep_in_RAM:
                         self.image_list[cam_no].append(img)
-                    else:
+                    elif not no_save:
                         await loop.run_in_executor(
                             None,
                             cv2.imwrite,
@@ -432,8 +435,27 @@ class VideoSession(AsyncSession):
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         print("ffmpeg has terminated.")
 
+    async def _fast_acquisition_to_ram(self, cam_no, total_timeout_s):
+        """Private instance method: fast acquisition to ram task"""
+        with self.camera_list[cam_no] as cam:
+            if hasattr(self, "prepare_camera"):
+                self.prepare_camera(cam)
+            ts, count, images = await cam.fast_acquisition_to_ram(
+                self.nframes,
+                total_timeout_s,
+                self.initialising_cams,
+                False,  # raise_on_timeout
+            )
+        return ts, count, images
+
     async def main(
-        self, keep_in_RAM=False, additionnal_trig=0, live=False, unprocessed=False
+        self,
+        keep_in_RAM=False,
+        additionnal_trig=0,
+        live=False,
+        unprocessed=False,
+        delay_save=False,
+        no_save=False,
     ):
         """Main entry point for acquisition tasks. This asynchronous task can be called
         with :func:`asyncio.run`, or combined with other user-defined tasks.
@@ -458,25 +480,79 @@ class VideoSession(AsyncSession):
                         self.framerate, self.nframes + additionnal_trig
                     )
                     self.save_parameter(fps=self.framerate, num_imgs=self.nframes)
-        acquisition_tasks = [
-            self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
-        ]
-        if live:
-            save_tasks = [self._live_preview(unprocessed)]
-        elif self.output_format == "mp4":
-            save_tasks = [self._start_clock()] + [
-                self._save_video(cam_no, unprocessed=unprocessed)
+
+        if delay_save and all(
+            [
+                hasattr(self.camera_list[cam_no], "fast_acquisition_to_ram")
                 for cam_no in range(len(self.camera_list))
             ]
+        ):
+            if live:
+                raise ValueError("delay_save and live are not compatible")
+            print("Acquisition in fast mode to RAM")
+
+            # Acquisition to RAM
+            total_timeout_s = 5 + (self.nframes / self.framerate)
+            acquisition_tasks = [
+                self._fast_acquisition_to_ram(cam_no, total_timeout_s)
+                for cam_no in range(len(self.camera_list))
+            ]
+            dt_start = datetime.now()
+            dt_end = dt_start + timedelta(seconds=total_timeout_s)
+            print("Acquisition start time:", dt_start.strftime("%d-%m-%Y %H:%M:%S"))
+            print("              end time:", dt_end.strftime("%d-%m-%Y %H:%M:%S"))
+            results = await asyncio.gather(*acquisition_tasks, self._start_clock())
+            self.running = False
+
+            # Convert from lists to queues (no data copy involved)
+            for cam_no, (ts_all, count_all, images_all) in zip(
+                range(len(self.camera_list)), results
+            ):
+                for ts, count, image in zip(ts_all, count_all, images_all):
+                    self.image_queues[cam_no].put(
+                        MetadataArray(
+                            image,
+                            metadata={
+                                "counter": count,
+                                "timestamp": ts,
+                            },
+                        )
+                    )
         else:
-            if self.trigger_gbf is not None:
-                save_tasks = [
-                    self._start_clock(),
-                    self._save_images(keep_in_RAM, unprocessed),
-                ]
+            acquisition_tasks = [
+                self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
+            ]
+            if live:
+                save_tasks = [self._live_preview(unprocessed)]
+            elif self.output_format == "mp4":
+                save_tasks = [self._start_clock()]
+                if not delay_save:
+                    save_tasks = save_tasks + [
+                        self._save_video(cam_no, unprocessed=unprocessed)
+                        for cam_no in range(len(self.camera_list))
+                    ]
+
             else:
-                save_tasks = [self._save_images(keep_in_RAM, unprocessed)]
-        await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
+                if self.trigger_gbf is not None:
+                    save_tasks = [self._start_clock()]
+                else:
+                    save_tasks = []
+                if not delay_save:
+                    save_tasks = save_tasks + [
+                        self._save_images(keep_in_RAM, unprocessed)
+                    ]
+
+            await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
+
+        # Post-acquisition save if the save_tasks were not included (in fast mode, or in regular mode)
+        if delay_save:
+            if self.output_format == "mp4":
+                for cam_no in range(len(self.camera_list)):
+                    await self._save_video(cam_no, unprocessed=unprocessed)
+            else:
+                await self._save_images(keep_in_RAM, unprocessed, no_save)
+
+        # Post-acquisition information
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
 
@@ -492,7 +568,7 @@ class VideoSession(AsyncSession):
 
         return camera_timestamps, camera_counter
 
-    def run(self, additionnal_trig=0):
+    def run(self, additionnal_trig=0, delay_save=False, no_save=False):
         """Run the acquisition.
 
         :param additionnal_trig: additionnal number of pulses sent to the camera
@@ -500,12 +576,13 @@ class VideoSession(AsyncSession):
         :return: camera_timestamps, camera_counter
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
-        ts, count = asyncio.run(self.main(additionnal_trig=additionnal_trig))
+        ts, count = asyncio.run(
+            self.main(additionnal_trig=additionnal_trig, delay_save=delay_save, no_save=no_save)
+        )
         return ts, count
 
     def live(self):
-        """Starts live preview.
-        """
+        """Starts live preview."""
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:

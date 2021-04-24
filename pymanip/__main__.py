@@ -14,6 +14,7 @@ from pymanip.util.video import (
     preview_andor,
     preview_ids,
     preview_ximea,
+    preview_photometrics,
 )
 
 try:
@@ -416,6 +417,22 @@ if __name__ == "__main__":
                     exposure_ms,
                     rotate=rotate,
                     white_balance=args.whitebalance,
+                    roi=args.ROI,
+                )
+        elif args.camera_type.upper() in ("PHOTOMETRICS", "TELEDYNE", "KINETIX"):
+            if args.list:
+                from pyvcam.camera import Camera as PVCamera
+                print(PVCamera.get_available_camera_names())
+            else:
+                preview_photometrics(
+                    board,
+                    tk,
+                    slice,
+                    zoom,
+                    Trigger,
+                    exposure_ms,
+                    bitdepth,
+                    rotate=rotate,
                     roi=args.ROI,
                 )
         else:

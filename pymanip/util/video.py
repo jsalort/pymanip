@@ -37,6 +37,13 @@ try:
 except Exception:
     has_ximea = False
 
+try:
+    from pymanip.video.photometrics import Photometrics_Camera
+    has_photometrics = True
+except Exception as e:
+    has_photometrics = False
+    photometrics_exc = e
+
 from contextlib import ExitStack
 import asyncio
 
@@ -199,4 +206,35 @@ def preview_ximea(
                 cam.set_auto_white_balance(white_balance)
             if roi is not None:
                 cam.set_roi(*roi)
+            cam.preview(backend, slice, zoom, rotate)
+
+def preview_photometrics(
+    num=0,
+    backend="cv",
+    slice=None,
+    zoom=1.0,
+    TriggerMode=None,
+    exposure_ms=1.0,
+    bitdepth=12,
+    rotate=0,
+    roi=None,
+):
+    """Bitdepth is 8, 12 or 16. Then we choose readout_port "Speed" (1), "Sensitivity" (0) or "Dynamic Range" (2)
+    """
+    if not has_photometrics:
+        print("Photometrics bindings are not available.")
+        raise photometrics_exc
+    else:
+        if bitdepth == 8:
+            readout_port = 1
+        elif bitdepth == 12:
+            readout_port = 0
+        elif bitdepth == 16:
+            readout_port = 2
+        with Photometrics_Camera(num, readout_port) as cam:
+            cam.set_exposure_time(exposure_ms * 1e-3)
+            try:
+                cam.set_trigger_mode(TriggerMode)
+            except RuntimeError:
+                pass
             cam.preview(backend, slice, zoom, rotate)
