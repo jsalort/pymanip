@@ -5,6 +5,5 @@
    :members:
    :private-members:
    :show-inheritance:
-   
-"""
 
+"""

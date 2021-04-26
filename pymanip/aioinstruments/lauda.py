@@ -9,6 +9,7 @@ import fluidlab.instruments.chiller.lauda as fl_lauda
 from pymanip.aioinstruments.aiodrivers import AsyncDriver
 from pymanip.aioinstruments.aiofeatures import AsyncValue
 
+
 class AsyncLauda(AsyncDriver, fl_lauda.Lauda):
     async def __aenter__(self):
         try:
@@ -22,13 +23,13 @@ class AsyncLauda(AsyncDriver, fl_lauda.Lauda):
             await asyncio.sleep(5.0)
             await super().__aenter__()
         identification = await self.interface.aquery("TYPE\r")
-        identification = identification.decode('ascii')
+        identification = identification.decode("ascii")
         if identification not in fl_lauda.Lauda.Models:
             if len(identification) > 0:
                 raise fl_lauda.LaudaException("Unsupported model: " + identification)
 
             else:
-                raise fl_Lauda.LaudaException(
+                raise fl_lauda.LaudaException(
                     "Cannot communicate with Lauda on " + str(self.port)
                 )
 
@@ -37,11 +38,11 @@ class AsyncLauda(AsyncDriver, fl_lauda.Lauda):
             print("Identification: " + identification)
         return self
 
+
 class AsyncLaudaValue(AsyncValue, fl_lauda.LaudaValue):
-    
     async def aget(self):
         result = await super().aget()
-        result = result.decode('ascii')
+        result = result.decode("ascii")
         if len(result) < 1:
             print("result =", result)
             raise fl_lauda.LaudaException("Erreur de communication")
@@ -49,23 +50,23 @@ class AsyncLaudaValue(AsyncValue, fl_lauda.LaudaValue):
             raise fl_lauda.LaudaException("Erreur Lauda: " + result)
         else:
             return float(result)
-    
+
     async def aset(self, value):
         command = self.command_set.format(value).encode("ascii")
         await self._interface.awrite(command)
         await asyncio.sleep(self.pause_instrument)
         confirmation = await self._interface.aread()
-        confirmation = confirmation.decode('ascii')
+        confirmation = confirmation.decode("ascii")
         if confirmation != "OK":
             print(confirmation)
             raise fl_lauda.LaudaException("Erreur de communication")
 
+
 class AsyncLaudaOnOffValue(AsyncLaudaValue, fl_lauda.LaudaOnOffValue):
-    
     async def aget(self):
         possible_answers = {
             0: True,  # Stand-by false, Device ON
-            1: False, # Stand-by true, Device OFF
+            1: False,  # Stand-by true, Device OFF
         }
         if self._driver.rom in fl_lauda.LaudaOnOffValue.Supported_ROM:
             resultat = await super().aget()
@@ -76,26 +77,26 @@ class AsyncLaudaOnOffValue(AsyncLaudaValue, fl_lauda.LaudaOnOffValue):
         else:
             # Those cannot go to stand-by, and are always on
             return True
-            
+
     async def aset(self, value):
         present_state = await self.aget()
         if bool(value) is bool(present_state):
             print("Chiller already on this state")
             return
         if value:
-            command = "START\r".encode('ascii')
+            command = "START\r".encode("ascii")
         else:
-            command = "STOP\r".encode('ascii')
+            command = "STOP\r".encode("ascii")
         await self._interface.awrite(command)
         await asyncio.sleep(self.pause_instrument)
         confirmation = await self._interface.aread()
-        confirmation = confirmation.decode('ascii')
+        confirmation = confirmation.decode("ascii")
         if confirmation != "OK":
             print(confirmation)
             raise fl_lauda.LaudaException("Erreur de communication")
-            
-class AsyncLaudaStatValue(AsyncValue, fl_lauda.LaudaStatValue):
 
+
+class AsyncLaudaStatValue(AsyncValue, fl_lauda.LaudaStatValue):
     async def aget(self):
         result = await super().aget()
         if len(result) < 3:
@@ -113,7 +114,8 @@ class AsyncLaudaStatValue(AsyncValue, fl_lauda.LaudaStatValue):
                 "controllererror1": True if (result[3] == "1") else False,
                 "controllererror2": True if (result[4] == "1") else False,
             }
-            
+
+
 afeatures = [
     AsyncLaudaValue(
         "setpoint", command_get="IN_SP_00\r", command_set="OUT_SP_00 {:.2f}\r"

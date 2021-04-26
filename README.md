@@ -12,7 +12,7 @@ pymanip is the main package that we use for data acquisition and monitoring of
 our experimental systems in the Convection group at 
 [Laboratoire de physique de l'ENS de Lyon](http://www.ens-lyon.fr/PHYSIQUE).
 It can be seen as an extension
-of the [FluidLab](http://bitbucket.org/fluiddyn/fluidlab) module, which it heavily uses.
+of the [FluidLab](https://foss.heptapod.net/fluiddyn/fluidlab) module, which it heavily uses.
 It is available freely under the French 
 [CECILL-B license](https://cecill.info/licences/Licence_CeCILL-B_V1-en.html)
 in the hope that it can be useful to others. But it is provided AS IS, without any warranty as to
