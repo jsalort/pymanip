@@ -99,6 +99,7 @@ class AsyncLaudaOnOffValue(AsyncLaudaValue, fl_lauda.LaudaOnOffValue):
 class AsyncLaudaStatValue(AsyncValue, fl_lauda.LaudaStatValue):
     async def aget(self):
         result = await super().aget()
+        result = str(result)
         if len(result) < 3:
             raise fl_lauda.LaudaException("Erreur de communication")
 
@@ -124,6 +125,10 @@ afeatures = [
     AsyncLaudaValue("temperature", command_get="IN_PV_00\r"),
     AsyncLaudaValue("waterlevel", command_get="IN_PV_05\r"),
     AsyncLaudaOnOffValue(),
+    AsyncLaudaValue(
+        "status",
+        command_get="STATUS\r",
+    ),  # 0: OK, -1: Fault
 ]
 
 AsyncLauda._build_class_with_features(afeatures)
