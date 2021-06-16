@@ -51,7 +51,7 @@ import json
 
 try:
     import PyQt5.QtCore
-except ModuleNotFoundError:
+except (ModuleNotFoundError, FileNotFoundError):
     pass
 
 from fluiddyn.util.terminal_colors import cprint
