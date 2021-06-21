@@ -219,11 +219,13 @@ class VideoSession(AsyncSession):
 
         super().__init__(session_name, delay_save=True)
         for cam in self.camera_list:
-            if self.trigger_gbf is not None:
+            if self.trigger_gbf is not None or self.trigger_gbf is True:
                 cam.set_trigger_mode(True)
             else:
                 cam.set_trigger_mode(False)
                 cam.set_frame_rate(framerate)
+        if self.trigger_gbf is True:
+            self.trigger_gbf = None
         self.image_queues = [SimpleQueue() for _ in self.camera_list]
         self.acquisition_finished = [False] * len(self.camera_list)
         self.initialising_cams = set(self.camera_list)
@@ -274,10 +276,12 @@ class VideoSession(AsyncSession):
         This task waits for all the cameras to be ready for trigger, and then sends a software trig to
         the function generator.
         """
+        print("clock task")
         while len(self.initialising_cams) > 0:
             await asyncio.sleep(0.1)
         with self.trigger_gbf:
             self.trigger_gbf.trigger()
+            print("trigger sent")
         return datetime.now().timestamp()
 
     async def _save_images(self, keep_in_RAM=False, unprocessed=False, no_save=False):
