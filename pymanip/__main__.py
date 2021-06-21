@@ -134,6 +134,9 @@ parser_oscillo.add_argument(
     metavar="daqmx",
     default="daqmx",
 )
+parser_oscillo.add_argument(
+    "-p", "--serialport", help="Arduino Serial port", metavar="port", default=None
+)
 
 # Create parser for "video"
 parser_video = subparsers.add_parser(
@@ -278,8 +281,15 @@ if __name__ == "__main__":
         if args.channel:
             channel = args.channel
         else:
-            chansel = ChannelSelector()
-            backend, channel = chansel.gui_select()
+            if backend == "arduino":
+                channel = [int(input("Arduino Analog input pin? "))]
+            else:
+                chansel = ChannelSelector()
+                backend, channel = chansel.gui_select()
+        if args.serialport:
+            serialport = args.serialport
+        elif backend == "arduino":
+            serialport = input("Serial port (COM3, /dev/ttyS3, ...)? ")
         if args.sampling:
             sampling = float(args.sampling)
         else:
@@ -287,9 +297,20 @@ if __name__ == "__main__":
         if args.range:
             range_ = float(args.range)
         else:
-            range_ = 10.0
+            range_ = 5.0 if backend == "arduino" else 10.0
+        if backend == "arduino":
+            backend_args = [serialport]
+        else:
+            backend_args = None
         oscillo = Oscillo(
-            channel, sampling, range_, trigger, int(args.trigsource), backend=backend
+            channel,
+            sampling,
+            5.0 if backend == "arduino" else range_,
+            trigger,
+            int(args.trigsource),
+            backend=backend,
+            backend_args=backend_args,
+            N=128 if backend == "arduino" else 1024,
         )
         oscillo.run()
     elif args.command == "video":
@@ -422,6 +443,7 @@ if __name__ == "__main__":
         elif args.camera_type.upper() in ("PHOTOMETRICS", "TELEDYNE", "KINETIX"):
             if args.list:
                 from pyvcam.camera import Camera as PVCamera
+
                 print(PVCamera.get_available_camera_names())
             else:
                 preview_photometrics(

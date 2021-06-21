@@ -32,6 +32,10 @@ try:
 except ImportError:
     pass
 
+from pymanip.aiodaq.arduino import ArduinoSystem
+
+Backends["arduino"] = ArduinoSystem
+
 
 class Oscillo:
     def __init__(
@@ -42,17 +46,20 @@ class Oscillo:
         trigger_level=None,
         trigsource=None,
         backend="daqmx",
+        backend_args=None,
+        N=1024,
     ):
         if backend not in Backends:
             raise ValueError(f"Backend {backend:} is not available.")
         self.backend = backend
+        self.backend_args = backend_args
         self.channel_list = channel_list
         self.sampling = sampling
         self.volt_range = volt_range
         self.ignore_voltrange_submit = False
         self.trigger_level = trigger_level
         self.trigger_source = trigsource
-        self.N = 1024
+        self.N = N
         plt.ion()
         self.fig = plt.figure()
         # left, bottom, width, height
@@ -411,7 +418,10 @@ class Oscillo:
     def create_system(self):
         if self.system is not None:
             self.system.close()
-        self.system = Backends[self.backend]()
+        if self.backend_args:
+            self.system = Backends[self.backend](*self.backend_args)
+        else:
+            self.system = Backends[self.backend]()
         self.ai_channels = list()
         for chan in self.channel_list:
             ai_chan = self.system.add_channel(
@@ -431,7 +441,7 @@ class Oscillo:
 
     async def run_acqui(self):
         self.create_system()
-        try:
+        with self.system:
             while self.running:
                 while self.ask_pause_acqui and self.running:
                     self.paused = True
@@ -547,9 +557,6 @@ class Oscillo:
                             pp = np.abs(np.fft.fft(d - np.mean(d)))
                             ii = np.argmax(pp)
                             self.box_freq[chan].set_val("{:.5f}".format(ff[ii]))
-
-        finally:
-            self.system.close()
 
     def ask_exit(self, *args, **kwargs):
         self.running = False
