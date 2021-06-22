@@ -7,7 +7,7 @@ folder).
 """
 import asyncio
 import warnings
-from time import monotonic
+from time import monotonic, sleep
 
 import numpy as np
 
@@ -48,6 +48,8 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
                 print("Connection established", line)
                 break
             print(line)
+        sleep(0.1)
+        return self
 
     async def __aenter__(self):
         await super().__aenter__()
@@ -55,6 +57,7 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
         good = False
         while (monotonic() - start) < 5.0:
             identification = await self.interface.aread()
+            identification = identification.decode("ascii").strip()
             if identification.startswith("GBF"):
                 print("Connection to Arduino", identification)
                 good = True
@@ -63,17 +66,23 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
             await asyncio.sleep(0.1)
         if not good:
             raise RuntimeError("Timeout connecting to Arduino GBF")
+        await asyncio.sleep(0.1)
         return self
 
     def close(self):
         pass
+
+    def flush(self):
+        while line := self.interface.readline().decode("ascii").strip():
+            print(line)
 
     def add_channel(
         self, channel_name, terminal_config=TerminalConfig.RSE, voltage_range=5.0
     ):
         if hasattr(channel_name, "startswith") and channel_name.startswith("ai"):
             channel_name = channel_name[2:]
-        self.channels.append(int(channel_name))
+        pin_num = int(channel_name)
+        self.channels = [str(pin_num)]
         if terminal_config != TerminalConfig.RSE:
             warnings.warn("Only RSE is supported")
         if voltage_range != 5.0:
@@ -95,7 +104,7 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
     def start(self):
         delay_us = int(1e6 / self.sample_rate)
         self.interface.write(
-            f"read_analog {self.channels[-1]:d} {self.samples_per_chan:d} {self.trigger_level:.1f} {delay_us:d}\n"
+            f"read_analog {self.channels[0]:} {self.samples_per_chan:d} {self.trigger_level:.1f} {delay_us:d}\n"
         )
         self.running = True
 
@@ -113,30 +122,31 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
                 line = await self.interface.aread()
                 line = line.decode("ascii").strip()
                 if line.startswith("read_voltage_window FINISHED"):
-                    print(line, "breaking")
+                    print(line, "(breaking)")
                     break
                 data.append(float(line))
             except ValueError:
                 if not line:
-                    print("no data, breaking")
+                    print("no data (breaking)")
                     break
-                print(line, "continuing")
+                print(line, "(continuing)")
                 continue
             if tmo and monotonic() - start > tmo:
                 raise TimeoutException()
         self.reading = False
-        print("Data read =", data)
-        print("Data size =", len(data))
-        return np.array(data)
+        if data:
+            return np.array(data)
+        return None
 
-    async def generate_pulse(self, npulses, delay_seconds, pin_output=None):
+    async def agenerate_pulse(self, npulses, delay_seconds, pin_output=None):
         pin = pin_output if pin_output is not None else self.pin_output
         delay_us = int(1e6 * delay_seconds)
         await self.interface.awrite(
             f"pulse {pin:d} {npulses:d} {delay_us:d}\n".encode("ascii")
         )
         while True:
-            line = await self.interface.aread().decode("ascii").strip()
+            line = await self.interface.aread()
+            line = line.decode("ascii").strip()
             if line:
                 print(line)
                 if line.startswith("single_pulse_generator FINISHED"):
@@ -157,12 +167,50 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
         self.freq = freq
         self.ncycles = ncycles
 
-    def trigger(self):
+    def trigger(self, wait_completion=False):
         delay_us = int(1e6 / self.freq)
         self.interface.write(
             f"pulse {self.pin_output:d} {self.ncycles:d} {delay_us:d}\n"
         )
+        while wait_completion and (
+            line := self.interface.readline().decode("ascii").strip()
+        ):
+            print(line)
+            if line.startswith("single_pulse_generator FINISHED"):
+                break
 
     def configure_square(self, freq):
         delay_us = int(1e6 / freq)
         self.interface.write(f"continuous {self.pin_output:d} {delay_us:d}\n")
+
+    def write_digital(self, pin_num, value):
+        if pin_num < 2 or pin_num > 13:
+            raise ValueError("Valid pins are between 2 and 13.")
+        if value not in (0, 1):
+            raise ValueError("Valid values are 0 or 1.")
+        self.interface.write(f"write_digital {pin_num:d} {value:d}\n")
+        start = monotonic()
+        while line := self.interface.readline().decode("ascii").strip():
+            print(line)
+            if not line or line.startswith("write_digital FINISHED"):
+                break
+            if monotonic() - start > 5:
+                print("Timeout reading from Arduino")
+                break
+
+    async def awrite_digital(self, pin_num, value):
+        if pin_num < 2 or pin_num > 13:
+            raise ValueError("Valid pins are between 2 and 13.")
+        if value not in (0, 1):
+            raise ValueError("Valid values are 0 or 1.")
+        await self.interface.awrite(f"write_digital {pin_num:d} {value:d}\n")
+        start = monotonic()
+        while True:
+            line = await self.interface.aread()
+            line = line.decode("ascii").strip()
+            print(line)
+            if not line or line.startswith("digital_write"):
+                break
+            if monotonic() - start > 5:
+                print("Timeout reading from Arduino")
+                break

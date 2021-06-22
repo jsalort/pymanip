@@ -457,7 +457,10 @@ class Oscillo:
                 self.last_trigged = self.system.last_read
                 self.ax.cla()
                 if len(self.channel_list) == 1:
-                    self.ax.plot(self.t, data, "-")
+                    try:
+                        self.ax.plot(self.t, data, "-")
+                    except ValueError:
+                        print("Inconsistent data")
                 elif len(self.channel_list) > 1:
                     for d in data:
                         self.ax.plot(self.t, d, "-")
