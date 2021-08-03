@@ -72,7 +72,10 @@ class Photometrics_Camera(Camera):
         Possible modes are available in self.cam.exp_modes.
         """
         if external:
-            self.cam.exp_mode = "Edge Trigger"
+            if self.cam.readout_port != 1:
+                self.cam.exp_mode = "Edge Trigger"
+            else:
+                print("Fast mode cannot work with external trigger")
         else:
             self.cam.exp_mode = "Internal Trigger"
 
