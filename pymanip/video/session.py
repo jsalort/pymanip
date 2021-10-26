@@ -144,6 +144,8 @@ class VideoSession(AsyncSession):
         output_format_params=None,
         output_path=None,
         exist_ok=False,
+        timeout=None,
+        burst_mode=True,
     ):
         """Constructor method"""
         if isinstance(camera_or_camera_list, (list, tuple)):
@@ -157,7 +159,9 @@ class VideoSession(AsyncSession):
             raise ValueError("output_format must be png, tif, jpg, bmp, or mp4")
         self.output_format = output_format
         self.output_format_params = output_format_params
-
+        self.timeout = timeout
+        self.burst_mode = burst_mode
+        
         if output_path is None:
             current_date = datetime.today().strftime("%Y-%m-%d")
             base_dir = Path(".") / current_date
@@ -249,6 +253,7 @@ class VideoSession(AsyncSession):
                 self.nframes,
                 initialising_cams=self.initialising_cams,
                 raise_on_timeout=False,
+                timeout=self.timeout,
             )
             n = 0
             async for im in gen:
@@ -477,7 +482,7 @@ class VideoSession(AsyncSession):
         """
         if self.trigger_gbf is not None:
             with self.trigger_gbf:
-                if live or self.nframes < 2:
+                if live or self.nframes < 2 or not self.burst_mode:
                     self.trigger_gbf.configure_square(0.0, 5.0, freq=self.framerate)
                 else:
                     self.trigger_gbf.configure_burst(
@@ -559,6 +564,9 @@ class VideoSession(AsyncSession):
         # Post-acquisition information
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
+        
+        if isinstance(camera_timestamps[0], str):
+            camera_timestamps = np.array([datetime.fromisoformat(ts).timestamp() for ts in camera_timestamps])
 
         if camera_timestamps.size > 2:
             dt = camera_timestamps[1:] - camera_timestamps[:-1]

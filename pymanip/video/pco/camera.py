@@ -274,7 +274,7 @@ class PCO_Camera(Camera):
                 self.set_trigger_mode(0x0002)
             else:
                 self.set_trigger_mode(0x0000)
-        if mode in pf.PCO_TriggerModeDescription:
+        elif mode in pf.PCO_TriggerModeDescription:
             pf.PCO_SetTriggerMode(self.handle, mode)
         else:
             for key, val in pf.PCO_TriggerModeDescription.items():
