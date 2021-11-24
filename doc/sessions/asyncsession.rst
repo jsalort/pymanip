@@ -14,6 +14,9 @@ human (connection from a web browser [#f1]_), or by a machine using the
 It has methods to access the data for processing during the experiment, or post-processing
 after the experiment is finished.
 
+Read-only access to the asyncsession data can be achieved with the :class:`pymanip.asyncsession.SavedAsyncSession`
+class.
+
 For synchronous session, one can still use the deprecated classes from :mod:`pymanip.session`,
 but these will no longer be updated, therefore the asynchronous session should now always be
 preferred.

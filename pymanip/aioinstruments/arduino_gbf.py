@@ -102,6 +102,8 @@ class AsyncArduino(AsyncDriver, AcquisitionCard):
         self.trigger_level = trigger_level
 
     def start(self):
+        if not hasattr(self, "trigger_level"):
+            self.configure_trigger()
         delay_us = int(1e6 / self.sample_rate)
         self.interface.write(
             f"read_analog {self.channels[0]:} {self.samples_per_chan:d} {self.trigger_level:.1f} {delay_us:d}\n"
