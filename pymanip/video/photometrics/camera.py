@@ -212,10 +212,7 @@ class Photometrics_Camera(Camera):
         empty = False
         n = 0
         while (monotonic() - start) < 1.0:
-            future = loop.run_in_executor(
-                None,
-                self.cam.poll_frame
-            )
+            future = loop.run_in_executor(None, self.cam.poll_frame)
             try:
                 _, _, _ = await asyncio.wait_for(future, timeout=0.5, loop=loop)
                 n = n + 1
@@ -228,7 +225,7 @@ class Photometrics_Camera(Camera):
         return empty
 
     async def fast_acquisition_to_ram(
-        self, num, total_timeout_s=5*60, initialising_cams=None, raise_on_timeout=True
+        self, num, total_timeout_s=5 * 60, initialising_cams=None, raise_on_timeout=True
     ):
         """Fast method (without the overhead of run_in_executor and asynchronous generator), for acquisitions
         where concurrent saving is not an option (because the framerate is so much faster than writting time),
@@ -241,7 +238,7 @@ class Photometrics_Camera(Camera):
         loop = asyncio.get_event_loop()
         try:
             self.cam.start_live()
-            
+
             if initialising_cams and self.get_trigger_mode():
                 await self.empty_buffer(loop)
 
@@ -259,6 +256,7 @@ class Photometrics_Camera(Camera):
                     count[n] = frame_count
                     n = n + 1
                     images.append(frame["pixel_data"])
+
             future = loop.run_in_executor(None, _sync_loop)
             try:
                 await asyncio.wait_for(future, timeout=total_timeout_s, loop=loop)

@@ -39,6 +39,7 @@ except Exception:
 
 try:
     from pymanip.video.photometrics import Photometrics_Camera
+
     has_photometrics = True
 except Exception as e:
     has_photometrics = False
@@ -208,6 +209,7 @@ def preview_ximea(
                 cam.set_roi(*roi)
             cam.preview(backend, slice, zoom, rotate)
 
+
 def preview_photometrics(
     num=0,
     backend="cv",
@@ -219,8 +221,7 @@ def preview_photometrics(
     rotate=0,
     roi=None,
 ):
-    """Bitdepth is 8, 12 or 16. Then we choose readout_port "Speed" (1), "Sensitivity" (0) or "Dynamic Range" (2)
-    """
+    """Bitdepth is 8, 12 or 16. Then we choose readout_port "Speed" (1), "Sensitivity" (0) or "Dynamic Range" (2)"""
     if not has_photometrics:
         print("Photometrics bindings are not available.")
         raise photometrics_exc
@@ -237,4 +238,6 @@ def preview_photometrics(
                 cam.set_trigger_mode(TriggerMode)
             except RuntimeError:
                 pass
+            if roi is not None:
+                cam.set_roi(*roi)
             cam.preview(backend, slice, zoom, rotate)
