@@ -14,6 +14,7 @@ The documentation for the PVCAM SDK is available `online <https://www.photometri
 
 from time import monotonic
 import asyncio
+from importlib.metadata import version, PackageNotFoundError
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
 
@@ -22,6 +23,15 @@ from pyvcam.camera import Camera as PVCamera
 
 pvc_initialized = False
 
+try:
+    pyvcam_version = version("pyvcam")
+except PackageNotFoundError:
+    print("PyVCam Package not found. Camera acquisition may not work.")
+    pyvcam_version = None
+    
+if pyvcam_version is not None and pyvcam_version != '2.1.5':
+    print("This module was tested with pyvcam 2.1.5")
+    print("Installed version is", pyvcam_version)
 
 class Photometrics_Camera(Camera):
     """Concrete :class:`pymanip.video.Camera` class for Photometrics camera."""
@@ -101,7 +111,20 @@ class Photometrics_Camera(Camera):
         """This method sets the positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
-        self.cam.roi = (roiX0, roiY0, roiX1, roiY1)
+        
+        # pyvcam set_roi appends a new ROI, and takes 
+        #    s1(int) Serial coordinate 1, 
+        #    p1(int) parallel coordinate 1,
+        #    width(int): num pixels in serial direction,
+        #    height(int) num pixels in parallel direction
+        #
+        
+        
+        width = roiX1 - roiX0
+        height = roiY1 - roiY0
+        
+        self.cam.reset_rois()
+        self.cam.set_roi(roiX0, roiY0, width, height)
 
     async def get_image(self, loop, timeout):
         start_time = monotonic()
@@ -112,11 +135,10 @@ class Photometrics_Camera(Camera):
             else:
                 future = loop.run_in_executor(
                     None,
-                    pvc.get_frame,
-                    self.cam._Camera__handle,
-                    self.cam._Camera__shape[0],
-                    self.cam._Camera__shape[1],
-                    self.cam._Camera__bits_per_pixel,
+                    self.cam.poll_frame,
+                    -1,    # wait forever
+                    True, # oldest frame
+                    False, # no copy
                 )
                 try:
                     frame, fps, frame_count = await asyncio.wait_for(
@@ -125,9 +147,7 @@ class Photometrics_Camera(Camera):
                 except asyncio.TimeoutError:
                     print("Timeout while waiting for poll_frame")
                     break
-                frame["pixel_data"] = frame["pixel_data"].reshape(
-                    self.cam._Camera__shape[1], self.cam._Camera__shape[0]
-                )
+                
                 return (
                     frame,
                     fps,
