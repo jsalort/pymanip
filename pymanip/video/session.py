@@ -325,7 +325,7 @@ class VideoSession(AsyncSession):
                             img = await loop.run_in_executor(None, self.process_image, img)
                         filepath = (
                             self.output_folder
-                            / f"img-cam{cam_no:d}-{(i[cam_no]+1):04d}.{self.output_format:}"
+                            / f"img-cam{cam_no:d}-{(i[cam_no]+1):05d}.{self.output_format:}"
                         )
                     if keep_in_RAM:
                         self.image_list[cam_no].append(img)
@@ -542,7 +542,7 @@ class VideoSession(AsyncSession):
                     ]
 
             else:
-                if self.trigger_gbf is not None:
+                if self.trigger_gbf is not None and self.burst_mode:
                     save_tasks = [self._start_clock()]
                 else:
                     save_tasks = []
