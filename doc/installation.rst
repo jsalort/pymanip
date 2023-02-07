@@ -34,18 +34,18 @@ Download and install
 --------------------
 
 We recommand to install FluidLab_ and :mod:`pymanip` from the repositories, i.e. FluidLab_ from Heptapod and
-:mod:`pymanip` from GitHub, and to use the `develop` sub-command on the setup file to easily pull updates from the
+:mod:`pymanip` from GitHub, and to use the `-e` option of `pip install` to easily pull updates from the
 repositories:
 
 .. code-block:: bash
 
     $ hg clone https://foss.heptapod.net/fluiddyn/fluidlab
     $ cd fluidlab
-    $ python setup.py develop
+    $ python -m pip install -e .
     $ cd ..
     $ git clone https://github.com/jsalort/pymanip.git
     $ cd pymanip
-    $ python setup.py develop
+    $ python -m pip install -e .
 
 However, it is also possible to install from PyPI:
 

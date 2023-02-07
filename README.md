@@ -51,6 +51,6 @@ or can be installed from github
 ```
 git clone https://github.com/jsalort/pymanip.git
 cd pymanip
-python setup.py develop
+python -m pip install -e .
 ```
 

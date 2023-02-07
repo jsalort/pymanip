@@ -272,10 +272,13 @@ class PCO_Camera(Camera):
         if isinstance(mode, bool):
             if mode:
                 self.set_trigger_mode(0x0002)
+                print("Trigger mode set to 0x0002 (external expoure start & software trigger")
             else:
                 self.set_trigger_mode(0x0000)
-        if mode in pf.PCO_TriggerModeDescription:
+                print("Trigger mode set to 0x0000 (auto sequence)")
+        elif mode in pf.PCO_TriggerModeDescription:
             pf.PCO_SetTriggerMode(self.handle, mode)
+            print(f"Trigger mode set to {mode:}")
         else:
             for key, val in pf.PCO_TriggerModeDescription.items():
                 if val == mode:
@@ -283,6 +286,7 @@ class PCO_Camera(Camera):
             else:
                 raise ValueError("Unknown trigger mode : " + str(mode))
             pf.PCO_SetTriggerMode(self.handle, key)
+            print(f"Trigger mode set to {key:}")
 
     def set_delay_exposuretime(self, delay=None, exposuretime=None):
         """This method sets both the delay and the exposure time.

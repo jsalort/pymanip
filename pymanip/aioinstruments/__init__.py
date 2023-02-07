@@ -12,3 +12,4 @@ from .tdk_lambda import AsyncTdkLambda
 from .julabo import AsyncJulabo
 from .tti_cpx400dp import AsyncTtiCpx400dp
 from .lauda import AsyncLauda
+from .arduino_gbf import AsyncArduino
