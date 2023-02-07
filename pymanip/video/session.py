@@ -728,8 +728,8 @@ class VideoSession(AsyncSession):
                     except ValueError:
                         l, c, ncomp = img.shape
                         color = True
-                    zoom_l = l / 600
-                    zoom_c = c / 800
+                    zoom_l = l / 1000 #600
+                    zoom_c = c / 1000 #800
                     zoom = max([zoom_l, zoom_c])
                     if zoom > 1:
                         img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
