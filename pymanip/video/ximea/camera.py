@@ -11,21 +11,79 @@ This module implements the :class:`pymanip.video.ximea.Ximea_Camera` using the
 
 """
 
+from pathlib import Path
 import asyncio
 import ctypes
+import ctypes.wintypes as wintypes
 
 import numpy as np
 from pymanip.video import MetadataArray, Camera, CameraTimeout
 
 from ximea import xiapi
-from ximea.xidefs import XI_IMG_FORMAT, XI_TRG_SOURCE, XI_TRG_SELECTOR
+from ximea.xidefs import XI_IMG_FORMAT, XI_TRG_SOURCE, XI_TRG_SELECTOR, XI_IMG, XI_COLOR_FILTER_ARRAY
 
+ximea_base = Path(r"C:\XIMEA")
+xiapi_dng_store_dll = ximea_base / "DNG Store" / "binX64" / "xiapi_dng_store.dll"
+if xiapi_dng_store_dll.exists():
+    xiapi_dng_store = ctypes.CDLL(str(xiapi_dng_store_dll))
+else:
+    print("DNG Store DLL not found. DNG will not be available.")
+
+XI_RETURN = ctypes.c_int
+
+class XI_DNG_METADATA(ctypes.Structure):
+    _fields_ = [
+        # required parameters
+        ("cfa", ctypes.c_int),  # bayer matrix type
+        ("maxPixelValue", ctypes.c_int),  # maximum pixel value, important for 16-bit image formats (i.e. 255 for 8-bit formats)
+        # optional parameters
+        ("cameraModelName", ctypes.c_char * 256),  # camera model name, encoded in UTF8
+        ("cameraSerialNumber", ctypes.c_char * 256),
+        ("cameraUserId", ctypes.c_char * 256),  # camera ID given by the user, encoded in UTF8
+        ("autoExposureOn", ctypes.c_int),  # 1: on, 0: off, -1: N/A
+        ("autoWhiteBalanceOn", ctypes.c_int),  # 1: on, 0: off, -1: N/A
+        ("whiteBalanceR", ctypes.c_float),  # white balance coefficients
+        ("whiteBalanceG", ctypes.c_float),
+        ("whiteBalanceB", ctypes.c_float),
+        ("lensAperture", ctypes.c_float),
+        ("lensFocalLength", ctypes.c_float),
+        ("acqTimeYear", ctypes.c_int),
+        ("acqTimeMonth", ctypes.c_int),
+        ("acqTimeDay", ctypes.c_int),
+        ("acqTimeHour", ctypes.c_int),
+        ("acqTimeMinute", ctypes.c_int),
+        ("acqTimeSecond", ctypes.c_int),
+    ]
+    
+    def as_dict(self):
+        for bayer_matrix_name, value in XI_COLOR_FILTER_ARRAY.items():
+            if value == self.cfa:
+                break
+        else:
+            bayer_matrix_name = f"Unknown ({value:})"
+        return {
+            "cfa": bayer_matrix_name,
+            "maxPixelValue": self.maxPixelValue,
+            "cameraModelName": self.cameraModelName,
+            "cameraSerialNumber": self.cameraSerialNumber,
+            "cameraUserId": self.cameraUserId,
+            "autoExposureOn": {1: True, -1: False}.get(self.autoExposureOn, None),
+            "autoWhiteBalanceOn": {1: True, -1: False}.get(self.autoWhiteBalanceOn, None),
+            "whiteBalanceR": self.whiteBalanceR,
+            "whiteBalanceG": self.whiteBalanceG,
+            "whiteBalanceB": self.whiteBalanceB,
+            "lensAperture": self.lensAperture,
+            "acqTimeYear": self.acqTimeYear,
+            "acqTimeMonth": self.acqTimeMonth,
+            "acqTimeDay": self.acqTimeDay,
+            "acqTimeHour": self.acqTimeHour,
+            "acqTimeMinute": self.acqTimeMinute,
+            "acqTimeSecond": self.acqTimeSecond,
+        }
 
 class Ximea_Camera(Camera):
     """Concrete :class:`pymanip.video.Camera` class for Ximea camera.
     """
-
-    color_order = "BGR"  # Ximea RGB mode is [blue][green][red] per the doc.
 
     def __init__(self, serial_number=None, pixelFormat=None):
         """Constructor method
@@ -46,6 +104,18 @@ class Ximea_Camera(Camera):
                 f"Wrong pixelFormat. Possible values are {set(XI_IMG_FORMAT.keys()):}"
             )
         self.cam.set_imgdataformat(pixelFormat)
+        self.pixelFormat = pixelFormat
+        if self.cam.is_iscolor():
+            if pixelFormat in ("XI_RGB24", ):
+                self.color_order = "BGR"  # Ximea RGB mode is [blue][green][red] per the doc.
+            elif pixelFormat in ("XI_RAW8", "XI_RAW16"):
+                cfa = self.cam.get_cfa()
+                assert cfa == "XI_CFA_BAYER_GBRG"
+                self.color_order = "BayerGR"
+            else:
+                self.color_order = None
+        else:
+            self.color_order = None
         print(f"Camera {self.name:} opened ({pixelFormat:})")
 
     def close(self):
@@ -252,10 +322,17 @@ class Ximea_Camera(Camera):
         raw=False,
         initialising_cams=None,
         raise_on_timeout=True,
+        wait_before_stopping=None,
     ):
         """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the Ximea camera.
 
         timeout in milliseconds.
+        
+        :param raw: if True, returns the XI_IMG object instead of a numpy array.
+        :type raw: bool (optional)
+        :param wait_before_stopping: async function to be awaited before stopping the acquisition_async
+        :type wait_before_stopping: async function (optional)
+        
         """
         loop = asyncio.get_event_loop()
         if timeout is None:
@@ -282,17 +359,60 @@ class Ximea_Camera(Camera):
                             break
                         else:
                             continue
-                stop_signal = yield MetadataArray(
-                    img.get_image_data_numpy(),  # no copy
-                    metadata={
+                if raw:
+                    img.metadata = {
                         "counter": count,
                         "timestamp": img.tsSec + img.tsUSec * 1e-6,
-                    },
-                )
+                    }
+                    stop_signal = yield img
+                else:
+                    stop_signal = yield MetadataArray(
+                        img.get_image_data_numpy(),  # no copy
+                        metadata={
+                            "counter": count,
+                            "timestamp": img.tsSec + img.tsUSec * 1e-6,
+                        },
+                    )
                 count += 1
                 if stop_signal:
                     break
         finally:
+            if wait_before_stopping is not None:
+                print()
+                print("Wait before releasing the camera...")
+                await wait_before_stopping()
             self.cam.stop_acquisition()
         if stop_signal:
             yield True
+            
+    def xidngFillMetadataFromCameraParams(self):
+        """Fills entire metadata structure with current camera parameter values obtained from xiGetParam calls.
+        """
+        f = xiapi_dng_store.xidngFillMetadataFromCameraParams
+        f.argtypes = (wintypes.HANDLE, ctypes.POINTER(XI_DNG_METADATA))
+        f.restype = XI_RETURN
+        metadata = XI_DNG_METADATA()
+        ret_code = f(self.cam.handle, ctypes.byref(metadata))
+        return metadata
+    
+    def xidngStore(self, filename, img, camera_metadata):
+        """Saves the image into the file in DNG image file format. Does not support images in planar RGB and Transport formats.
+        """
+        f = xiapi_dng_store.xidngStore
+        f.argtypes = (ctypes.c_char_p, ctypes.POINTER(XI_IMG), ctypes.POINTER(XI_DNG_METADATA))
+        f.restype = XI_RETURN
+        ret_code = f(ctypes.create_string_buffer(str(filename).encode('utf-8')), ctypes.byref(img), ctypes.byref(camera_metadata))
+        return ret_code
+    
+    async def save_dng(self, filename, img, camera_metadata=None):
+        if camera_metadata is None:
+            camera_metadata = self.xidngFillMetadataFromCameraParams()
+        loop = asyncio.get_event_loop()
+        ret_code = await loop.run_in_executor(
+            None,
+            self.xidngStore,
+            filename,
+            img,
+            camera_metadata,
+        )
+        return ret_code

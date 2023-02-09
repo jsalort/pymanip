@@ -155,8 +155,8 @@ class VideoSession(AsyncSession):
         self.trigger_gbf = trigger_gbf
         self.framerate = framerate
         self.nframes = nframes
-        if output_format not in ("png", "tif", "mp4", "jpg", "bmp"):
-            raise ValueError("output_format must be png, tif, jpg, bmp, or mp4")
+        if output_format not in ("png", "tif", "mp4", "jpg", "bmp", "dng"):
+            raise ValueError("output_format must be png, tif, jpg, bmp, dng, or mp4")
         self.output_format = output_format
         self.output_format_params = output_format_params
         self.timeout = timeout
@@ -234,13 +234,15 @@ class VideoSession(AsyncSession):
         self.acquisition_finished = [False] * len(self.camera_list)
         self.initialising_cams = set(self.camera_list)
 
-    async def _acquire_images(self, cam_no):
+    async def _acquire_images(self, cam_no, live=False):
         """Private instance method: image acquisition task.
         This task asynchronously iterates over the given camera frames, and puts the obtained images
         in a simple FIFO queue.
 
         :param cam_no: camera index
         :type cam_no: int
+        :param live: if True, images are converted to numpy array even if self.output_format = 'dng'
+        :type live: bool, optional
         """
         with self.camera_list[cam_no] as cam:
             if hasattr(self, "prepare_camera"):
@@ -249,16 +251,31 @@ class VideoSession(AsyncSession):
                 pb = ProgressBar(initial_value=0, min_value=0, max_value=self.nframes)
             else:
                 pb = None
-            gen = cam.acquisition_async(
-                self.nframes,
-                initialising_cams=self.initialising_cams,
-                raise_on_timeout=False,
-                timeout=self.timeout,
-            )
+            if self.output_format == "dng" and not live:
+                gen = cam.acquisition_async(
+                    self.nframes,
+                    initialising_cams=self.initialising_cams,
+                    raise_on_timeout=False,
+                    timeout=self.timeout,
+                    raw=True,
+                    wait_before_stopping=self._save_images_finished,
+                )
+            else:
+                gen = cam.acquisition_async(
+                    self.nframes,
+                    initialising_cams=self.initialising_cams,
+                    raise_on_timeout=False,
+                    timeout=self.timeout,
+                )
             n = 0
             async for im in gen:
                 if im is not None:
-                    self.image_queues[cam_no].put(im.copy())
+                    if self.output_format != "dng" or live:
+                        self.image_queues[cam_no].put(im.copy())
+                    else:
+                        # For DNG files, we need to keep the original Image object
+                        # (at least for Ximea which are the only supported cameras now)
+                        self.image_queues[cam_no].put(im)
                     n = n + 1
                     if pb is not None:
                         pb.update(n)
@@ -276,6 +293,14 @@ class VideoSession(AsyncSession):
                 self.running = False
         print(f"{n:d} images acquired (cam {cam_no:}).")
 
+    async def _save_images_finished(self):
+        """Awaits all images in queue have been saved.
+        """
+        while (not all([q.empty() for q in self.image_queues])) or self.saving:
+            self.running = False
+            await asyncio.sleep(1.0)
+        print("Image saving complete.")
+        
     async def _start_clock(self):
         """Private instance method: clock starting task.
         This task waits for all the cameras to be ready for trigger, and then sends a software trig to
@@ -301,6 +326,7 @@ class VideoSession(AsyncSession):
         :param no_save: do not actually save (dry run), for testing purposes
         :type no_save: bool
         """
+        self.saving = False
         loop = asyncio.get_event_loop()
         i = [0] * len(self.camera_list)
         pb = None
@@ -314,8 +340,10 @@ class VideoSession(AsyncSession):
                     break
             for cam_no, q in enumerate(self.image_queues):
                 if q.empty():
+                    self.saving = False
                     await asyncio.sleep(0.1)
                 else:
+                    self.saving = True  # is True is an image is being saved (i.e. queue might be empty but task not finished)
                     img = q.get()
                     self.add_entry(
                         ts=img.metadata["timestamp"], count=img.metadata["counter"]
@@ -330,13 +358,17 @@ class VideoSession(AsyncSession):
                     if keep_in_RAM:
                         self.image_list[cam_no].append(img)
                     elif not no_save:
-                        await loop.run_in_executor(
-                            None,
-                            cv2.imwrite,
-                            str(filepath),
-                            img,
-                            self.output_format_params,
-                        )
+                        if self.output_format == "dng":
+                            await self.camera_list[cam_no].save_dng(str(filepath), img)
+                        else:
+                            await loop.run_in_executor(
+                                None,
+                                cv2.imwrite,
+                                str(filepath),
+                                img,
+                                self.output_format_params,
+                            )
+                    self.saving = False
                     i[cam_no] += 1
             if not self.running:
                 i_min = min(i)
@@ -529,7 +561,7 @@ class VideoSession(AsyncSession):
                     )
         else:
             acquisition_tasks = [
-                self._acquire_images(cam_no) for cam_no in range(len(self.camera_list))
+                self._acquire_images(cam_no, live=live) for cam_no in range(len(self.camera_list))
             ]
             if live:
                 save_tasks = [self._live_preview(unprocessed)]
@@ -725,30 +757,35 @@ class VideoSession(AsyncSession):
                         print(ndropped, "frames dropped.", end="\r")
                     if hasattr(self, "process_image") and not unprocessed:
                         img = self.process_image(img)
-
-                    # Show only a 800x600 window (max)
-                    try:
+                        
+                    if hasattr(self.camera_list[cam_no], "color_order") and self.camera_list[cam_no].color_order is not None:
+                        color = True
+                        try:
+                            l, c, ncomp = img.shape  # RGB or BGR mode
+                        except:
+                            l, c = img.shape  # Raw non-de-bayerized mode
+                    else:
                         l, c = img.shape
                         color = False
                         minimum = np.min(img)
                         maximum = np.max(img)
                         maxint = np.iinfo(img.dtype).max
-                    except ValueError:
-                        l, c, ncomp = img.shape
-                        color = True
-                    zoom_l = l / 1000 #600
-                    zoom_c = c / 1000 #800
-                    zoom = max([zoom_l, zoom_c])
-                    if zoom > 1:
-                        img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
-
-                    # Convert color order if necessary
+                        
                     if color:
                         if self.camera_list[cam_no].color_order == "RGB":
                             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                        elif self.camera_list[cam_no].color_order == "BayerGR":
+                            img = cv2.cvtColor(img, cv2.COLOR_BayerGR2BGR)
+                        else:
+                            raise NotImplementedError
                     else:
                         # if not in color, we rescale min max to first image (otherwise may appear black)
                         img = (maxint // (maximum - minimum)) * (img - minimum)
+                    zoom_l = l / 900
+                    zoom_c = c / 900
+                    zoom = max([zoom_l, zoom_c])
+                    if zoom > 1:
+                        img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
 
                     # Show image and run cv2 event loop
                     cv2.imshow(f"cam{cam_no:}", img)
