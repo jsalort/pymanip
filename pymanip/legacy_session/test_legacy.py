@@ -1,4 +1,4 @@
-from importlib.resources import path
+from importlib.resources import files, as_file
 
 import numpy as np
 
@@ -14,7 +14,8 @@ def test_octave_binary():
 
     """
 
-    with path(example, "essai.octave") as p:
+    exemple_source = files(example).joinpath("essai.octave")
+    with as_file(exemple_source) as p:
         data = read_octave_binary(p)
 
     assert "A" in data
@@ -33,7 +34,8 @@ def test_octmi_session():
 
     """
 
-    with path(example, "essai2_MIstate.octave") as p:
+    exemple_source = files(example).joinpath("essai2_MIstate.octave")
+    with as_file(exemple_source) as p:
         dirpath = p.parent
         data = read_OctMI_session(str(dirpath / "essai2"))
 
@@ -57,7 +59,8 @@ def test_octmi_dat():
 
     """
 
-    with path(example, "essai2_MI.dat") as p:
+    example_source = files(example).joinpath("essai2_MI.dat")
+    with as_file(example_source) as p:
         dirpath = p.parent
         data = load_octmi_dat(str(dirpath / "essai2"))
 

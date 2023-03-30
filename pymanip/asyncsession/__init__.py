@@ -42,7 +42,7 @@ import sqlite3
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.cbook import mplDeprecation as MatplotlibDeprecationWarning
+from matplotlib import MatplotlibDeprecationWarning
 
 import asyncio
 from aiohttp import web
