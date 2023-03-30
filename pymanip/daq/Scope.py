@@ -13,7 +13,7 @@ from niScope import Scope
 from platform import platform
 import time
 import pymanip.mytime as MI
-from collections import Iterable
+from collections.abc import Iterable
 from fluiddyn.util.terminal_colors import cprint
 
 

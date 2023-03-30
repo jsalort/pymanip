@@ -6,11 +6,12 @@ This module defines utility function to interact with pymanip sessions
 
 import sys
 import time
+from datetime import datetime
 import os
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.dates import AutoDateFormatter, AutoDateLocator, epoch2num
+from matplotlib.dates import AutoDateFormatter, AutoDateLocator, date2num
 from fluiddyn.util.terminal_colors import cprint
 
 try:
@@ -63,7 +64,7 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
         MI.describe()
     if var_to_plot is not None:
         if var_to_plot in MI.log_variable_list():
-            t = epoch2num(MI.log("t"))
+            t = date2num(datetime.fromtimestamp(MI.log("t")))
             vardata = MI.log(var_to_plot)
             fig = plt.figure()
             xtick_locator = AutoDateLocator()
