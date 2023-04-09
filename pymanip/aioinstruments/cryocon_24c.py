@@ -16,3 +16,6 @@ from pymanip.aioinstruments.aiosocket import AsyncSocketInstrument
 
 class AsyncCryocon24c(AsyncIEC60488, AsyncSocketInstrument, fl_cryocon.Cryocon24c):
     pass
+
+
+loop_output_power_to_power = fl_cryocon.loop_output_power_to_power
