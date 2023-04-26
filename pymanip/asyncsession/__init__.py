@@ -383,7 +383,7 @@ class AsyncSession:
                 # non numérique dans la colonne)
                 # donc j'ajoute astype pour pas que le mauvais type se propage sur le timestamp
                 # et garder le même comportant que l'ancien code sur les anciens fichiers
-                result[name] = ts_val[:, 0].astype(int), ts_val[:, 1]
+                result[name] = ts_val[:, 0].astype(float), ts_val[:, 1]
         return result
 
     def logged_variable(self, varname):
