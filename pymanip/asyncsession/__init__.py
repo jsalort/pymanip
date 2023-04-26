@@ -378,7 +378,12 @@ class AsyncSession:
                 ts_val = np.array(
                     [(r.timestamp, r.value) for r in data if r.name == name]
                 )
-                result[name] = ts_val[:, 0], ts_val[:, 1]
+                # L'ancienne version acceptait de façon incorrecte une value string
+                # (i.e. il n'y avait pas de check et sqlite3 acceptait de mettre une valeur
+                # non numérique dans la colonne)
+                # donc j'ajoute astype pour pas que le mauvais type se propage sur le timestamp
+                # et garder le même comportant que l'ancien code sur les anciens fichiers
+                result[name] = ts_val[:, 0].astype(int), ts_val[:, 1]
         return result
 
     def logged_variable(self, varname):
