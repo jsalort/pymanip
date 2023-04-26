@@ -1645,7 +1645,8 @@ class SavedAsyncSession:
     @lru_cache(maxsize=128)
     def dataset_times(self, name):
         with self.session as sesn:
-            sesn.dataset_times(name)
+            dt = sesn.dataset_times(name)
+        return dt
 
     def dataset(self, name, ts=None, n=None):
         if ts is None:
