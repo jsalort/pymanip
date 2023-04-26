@@ -34,7 +34,7 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
     It can be accessed from the CLI tool ManipInfo
     """
 
-    if os.path.exists(sessionName + ".db"):
+    if sessionName.endswith(".db") or os.path.exists(sessionName + ".db"):
         SavedAsyncSession(sessionName).print_description()
         return
 

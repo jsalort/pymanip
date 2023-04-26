@@ -2,7 +2,7 @@ import os
 import asyncio
 import pytest
 import numpy as np
-from pymanip.asyncsession import AsyncSession
+from pymanip.asyncsession import AsyncSession, SavedAsyncSession
 
 
 def test_logged_variables():
@@ -59,12 +59,14 @@ def test_run_monitor_equivalence():
         assert sesn.toto == 1
 
 
-def test_parameters(tmpdir):
+def test_parameters(tmp_path):
     async def dummy(sesn):
         sesn.ask_exit()
         await asyncio.sleep(0.001)
 
-    with AsyncSession(os.path.join(tmpdir, "test_asyncsession")) as sesn:
+    tmp_path.mkdir(exist_ok=True)
+
+    with AsyncSession(tmp_path / "test_asyncsession.db") as sesn:
         params = {"c": 3e8, "pi": 3.14}
         sesn.save_parameter(params, a=1, b=2)
         sesn.save_parameter(d=10)
@@ -72,7 +74,7 @@ def test_parameters(tmpdir):
 
     sesn = None
 
-    with AsyncSession(os.path.join(tmpdir, "test_asyncsession")) as sesn:
+    with AsyncSession(tmp_path / "test_asyncsession.db") as sesn:
         a = sesn.parameter("a")
         params = sesn.parameters()
 
@@ -94,7 +96,7 @@ def test_datasets():
     async def task(sesn):
         sesn.add_dataset(a=[1, 2, 3, 4])
         sesn.add_dataset(c=[1, 2, 3])
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
         sesn.add_dataset(b=np.array([5, 6, 7, 8]))
         sesn.add_dataset(c=[4, 5, 6])
         sesn.ask_exit()
@@ -113,3 +115,21 @@ def test_datasets():
         assert t_b - t_a >= 0.001
         t_last, data_last = sesn.dataset_last_data("c")
         assert data_last == [4, 5, 6]
+
+
+def test_delay_save(tmpdir):
+    async def task(sesn):
+        for a in range(50):
+            sesn.add_entry(a=a)
+            await asyncio.sleep(0.001)
+        sesn.ask_exit()
+
+    with AsyncSession(os.path.join(tmpdir, "test_delay"), delay_save=True) as sesn:
+        sesn.run(task, server_port=None)
+
+    with AsyncSession(os.path.join(tmpdir, "test_delay"), delay_save=True) as sesn:
+        sesn.run(task, server_port=None)
+
+    sesn = SavedAsyncSession(os.path.join(tmpdir, "test_delay"))
+    ts, a = sesn["a"]
+    assert (a == np.array(list(range(50)) * 2)).all()

@@ -23,6 +23,7 @@ remote computer. There is also one class for read-only access to previous sessio
 
 """
 
+from pathlib import Path
 import signal
 import time
 import sys
@@ -37,14 +38,13 @@ try:
     from functools import cached_property
 except ImportError:
     from backports.cached_property import cached_property
-
-import sqlite3
 from datetime import datetime
+import asyncio
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import MatplotlibDeprecationWarning
 
-import asyncio
 from aiohttp import web
 import aiohttp_jinja2
 import jinja2
@@ -54,6 +54,9 @@ from email.message import EmailMessage
 import requests
 import json
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 try:
     import PyQt5.QtCore
 except (ModuleNotFoundError, FileNotFoundError):
@@ -61,6 +64,16 @@ except (ModuleNotFoundError, FileNotFoundError):
 
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
+
+from pymanip.asyncsession.database_v3 import (
+    LogName,
+    Log,
+    DatasetName,
+    Dataset,
+    Parameter,
+    create_tables,
+    copy_table,
+)
 
 __all__ = ["AsyncSession"]
 
@@ -82,7 +95,7 @@ class AsyncSession:
     :type delay_save: bool, optional
     """
 
-    database_version = 3
+    database_version = 3.1
 
     def __init__(
         self,
@@ -95,15 +108,52 @@ class AsyncSession:
         """Constructor method"""
 
         if session_name is not None:
-            session_name = str(session_name)  # in case it is a Path object
-            if session_name.endswith(".db"):
-                session_name = session_name[:-3]
-        elif delay_save:
-            raise ValueError("Cannot delay_save if session_name is not specified")
+            if isinstance(session_name, Path):
+                self.session_path = session_name
+                self.session_name = self.session_path.name
+                if self.session_name.endswith(".db"):
+                    self.Session_name = self.session_name[:-3]
+            else:
+                if not session_name.endswith(".db"):
+                    self.session_path = Path(session_name + ".db")
+                    self.session_name = session_name
+                else:
+                    self.session_path = Path(session_name)
+                    self.session_name = session_name[:-3]
+        else:
+            self.session_name = None
+            self.session_path = None
+            if delay_save:
+                raise ValueError("Cannot delay_save if session_name is not specified")
 
-        self.session_name = session_name
+        if self.session_path is not None and not delay_save:
+            if not exist_ok and self.session_path.exists():
+                raise RuntimeError("File exists !")
+            self.engine = create_engine(
+                "sqlite:///" + str(self.session_path.absolute()),
+                echo=False,
+            )
+        else:
+            self.engine = create_engine(
+                "sqlite://",
+                echo=False,
+            )
+        self.Session = sessionmaker(bind=self.engine)
+
+        if delay_save:
+            # Load existing database into in-memory database
+            self.disk_engine = create_engine(
+                "sqlite:///" + str(self.session_path.absolute()),
+                echo=False,
+            )
+            self.disk_Session = sessionmaker(bind=self.disk_engine)
+            if self.session_path.exists():
+                create_tables(self.engine)
+                with self.disk_Session() as input_session, self.Session() as output_session:
+                    for table in (LogName, Log, DatasetName, Dataset, Parameter):
+                        copy_table(input_session, output_session, table)
+
         self.verbose = verbose
-        self.exist_ok = exist_ok
         self.readonly = readonly
         self.delay_save = delay_save
 
@@ -114,6 +164,36 @@ class AsyncSession:
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
         self.conn = None
 
+    def __enter__(self):
+        """Context manager enter method"""
+        if not self.readonly:
+            new = create_tables(self.engine)
+        else:
+            new = False
+        if self.verbose and not new:
+            self.print_welcome()
+        if new:
+            with self.Session() as session:
+                session.add(
+                    Parameter(
+                        name="_database_version",
+                        value=AsyncSession.database_version,
+                    )
+                )
+                session.add(
+                    Parameter(
+                        name="_session_creation_timestamp",
+                        value=datetime.now().timestamp(),
+                    )
+                )
+                session.commit()
+        return self
+
+    def __exit__(self, type_, value, cb):
+        """Context manager exit method"""
+        if self.delay_save:
+            self.save_database()
+
     def save_database(self):
         """This method is useful only if delay_save = True. Then, the database is kept in-memory for
         the duration of the session. This method saves the database on the disk.
@@ -122,126 +202,12 @@ class AsyncSession:
 
         This method is automatically called at the exit of the context manager.
         """
-        if self.conn is None:
-            raise RuntimeError("AsyncSession is not opened!")
-
         if self.delay_save:
-            try:
-                os.remove(str(self.session_name) + ".db")
-            except FileNotFoundError:
-                pass
-            disk_db = sqlite3.connect(str(self.session_name) + ".db")
-            try:
-                with disk_db as c:
-                    for line in self.conn.iterdump():
-                        c.execute(line)
-            finally:
-                disk_db.close()
-
-    def open(self):
-        """Opens database for reading or writting"""
-
-        if self.conn is not None:
-            raise RuntimeError("Already opened!")
-
-        if not self.exist_ok and os.path.exists(self.session_name + ".db"):
-            raise RuntimeError("File exists !")
-
-        if self.session_name is None or self.delay_save:
-            # For no name session, or in case of delay_save=True, then
-            # the connection is in-memory
-            self.conn = sqlite3.connect(":memory:")
-        else:
-            # Otherwise, the connection is on the disk for immediate read/write
-            if self.readonly:
-                uri = "file:{path:}?mode=ro".format(path=self.session_name + ".db")
-                self.conn = sqlite3.connect(uri, uri=True)
-            else:
-                self.conn = sqlite3.connect(self.session_name + ".db")
-
-        if self.delay_save and os.path.exists(self.session_name + ".db"):
-            # Load existing database into in-memory database
-            uri = "file:{path:}?mode=ro".format(path=self.session_name + ".db")
-            disk_db = sqlite3.connect(uri, uri=True)
-            try:
-                with self.conn as c:
-                    for line in disk_db.iterdump():
-                        c.execute(line)
-            finally:
-                disk_db.close()
-
-        with self.conn as c:
-            tables = list(c.execute("SELECT name FROM sqlite_master;"))
-            if not tables:
-                c.execute(
-                    """
-                    CREATE TABLE log_names (
-                    name TEXT);
-                    """
-                )
-                c.execute(
-                    """
-                    CREATE TABLE log (
-                    timestamp INT,
-                    name TEXT,
-                    value REAL);
-                    """
-                )
-                c.execute(
-                    """
-                    CREATE TABLE dataset_names (
-                    name TEXT);
-                    """
-                )
-                c.execute(
-                    """
-                    CREATE TABLE dataset (
-                    timestamp INT,
-                    name TEXT,
-                    data BLOB);
-                    """
-                )
-                c.execute(
-                    """
-                    CREATE TABLE parameters (
-                        name TEXT,
-                        value REAL);
-                    """
-                )
-                c.execute(
-                    """
-                    INSERT INTO parameters
-                    (name, value)
-                    VALUES (?,?);
-                    """,
-                    ("_database_version", AsyncSession.database_version),
-                )
-                c.execute(
-                    """
-                    INSERT INTO parameters
-                    (name, value)
-                    VALUES (?,?);
-                    """,
-                    ("_session_creation_timestamp", datetime.now().timestamp()),
-                )
-            elif self.verbose:
-                self.print_welcome()
-
-    def close(self):
-        if self.conn:
-            self.save_database()
-            self.conn.close()
-        self.conn = None
-
-    def __enter__(self):
-        """Context manager enter method"""
-        if not self.conn:
-            self.open()
-        return self
-
-    def __exit__(self, type_, value, cb):
-        """Context manager exit method"""
-        self.close()
+            create_tables(self.disk_engine)
+            with self.Session() as input_session, self.disk_Session() as output_session:
+                for table in (LogName, Log, DatasetName, Dataset, Parameter):
+                    output_session.query(table).delete()
+                    copy_table(input_session, output_session, table)
 
     def get_version(self):
         """Returns current version of the database layout."""
@@ -342,20 +308,21 @@ class AsyncSession:
         :param \\**kwargs: name-value to be added in the database
         :type \\**kwargs: float, optional
         """
+        if self.readonly:
+            raise RuntimeError("Cannot add entry to readonly session")
         ts = datetime.now().timestamp()
         data = dict()
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.conn as c:
-            cursor = c.cursor()
-            cursor.execute("SELECT name FROM log_names;")
-            names = set([d[0] for d in cursor.fetchall()])
+        with self.Session() as session:
+            names = {r.name for r in session.query(LogName).all()}
             for key, val in data.items():
                 if key not in names:
-                    c.execute("INSERT INTO log_names VALUES (?);", (key,))
+                    session.add(LogName(name=key))
                     names.add(key)
-                c.execute("INSERT INTO log VALUES (?,?,?);", (ts, key, val))
+                session.add(Log(timestamp=ts, name=key, value=val))
+            session.commit()
 
     def add_dataset(self, *args, **kwargs):
         """This method adds arrays, or other pickable objects, as “datasets” into the
@@ -367,23 +334,23 @@ class AsyncSession:
         :param \\**kwargs: name-value to be added in the database
         :type \\**kwargs: object, optional
         """
+        if self.readonly:
+            raise RuntimeError("Cannot add dataset to readonly session")
         ts = datetime.now().timestamp()
         data = dict()
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.conn as c:
-            cursor = c.cursor()
-            cursor.execute("SELECT name FROM dataset_names;")
-            names = set([d[0] for d in cursor.fetchall()])
+        with self.Session() as session:
+            names = {r.name for r in session.query(DatasetName).all()}
             for key, val in data.items():
                 if key not in names:
-                    c.execute("INSERT INTO dataset_names VALUES (?);", (key,))
+                    session.add(DatasetName(name=key))
                     names.add(key)
-                c.execute(
-                    "INSERT INTO dataset VALUES (?,?,?);",
-                    (ts, key, pickle.dumps(val, protocol=4)),
+                session.add(
+                    Dataset(timestamp=ts, name=key, data=pickle.dumps(val, protocol=4))
                 )
+            session.commit()
 
     def logged_variables(self):
         """This method returns a set of the names of the scalar variables currently stored
@@ -392,11 +359,8 @@ class AsyncSession:
         :return: names of scalar variables
         :rtype: set
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute("SELECT name FROM log_names;")
-            data = c.fetchall()
-        names = set([d[0] for d in data])
+        with self.Session() as session:
+            names = {r.name for r in session.query(LogName).all()}
         return names
 
     def logged_data(self):
@@ -406,10 +370,15 @@ class AsyncSession:
         :return: all scalar variable values
         :rtype: dict
         """
-        names = self.logged_variables()
         result = dict()
-        for name in names:
-            result[name] = self.__getitem__(name)
+        with self.Session() as session:
+            data = session.query(Log).all()
+            names = {r.name for r in session.query(LogName).all()}
+            for name in names:
+                ts_val = np.array(
+                    [(r.timestamp, r.value) for r in data if r.name == name]
+                )
+                result[name] = ts_val[:, 0], ts_val[:, 1]
         return result
 
     def logged_variable(self, varname):
@@ -426,20 +395,10 @@ class AsyncSession:
         >>> ts, val = sesn.logged_variable('T_Pt_bas')
 
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute(
-                """
-                      SELECT timestamp, value FROM log
-                      WHERE name='{:}';
-                      """.format(
-                    varname
-                )
-            )
-            data = c.fetchall()
-        t = np.array([d[0] for d in data])
-        v = np.array([d[1] for d in data])
-        return t, v
+        with self.Session() as session:
+            data = session.query(Log).filter_by(name=varname).all()
+            ts_val = np.array([(r.timestamp, r.value) for r in data])
+        return ts_val[:, 0], ts_val[:, 1]
 
     def logged_first_values(self):
         """This method returns a dictionnary holding the first logged value of all scalar
@@ -448,22 +407,20 @@ class AsyncSession:
         :return: first values
         :rtype: dict
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute("SELECT name FROM log_names;")
-            names = set([d[0] for d in c.fetchall()])
-            result = dict()
+        result = dict()
+        with self.Session() as session:
+            names = {r.name for r in session.query(LogName).all()}
             for name in names:
-                c.execute(
-                    """SELECT timestamp, value FROM log
-                             WHERE name='{:}'
-                             ORDER BY timestamp ASC
-                             LIMIT 1;
-                          """.format(
-                        name
-                    )
+                r = (
+                    session.query(Log)
+                    .filter_by(name=name)
+                    .order_by(Log.timestamp.asc())
+                    .first()
                 )
-                result[name] = c.fetchone()
+                if r is not None:
+                    result[name] = (r.timestamp, r.value)
+                else:
+                    result[name] = None
         return result
 
     def logged_last_values(self):
@@ -473,22 +430,20 @@ class AsyncSession:
         :return: last logged values
         :rtype: dict
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute("SELECT name FROM log_names;")
-            names = set([d[0] for d in c.fetchall()])
-            result = dict()
+        result = dict()
+        with self.Session() as session:
+            names = {r.name for r in session.query(LogName).all()}
             for name in names:
-                c.execute(
-                    """SELECT timestamp, value FROM log
-                             WHERE name='{:}'
-                             ORDER BY timestamp DESC
-                             LIMIT 1;
-                          """.format(
-                        name
-                    )
+                r = (
+                    session.query(Log)
+                    .filter_by(name=name)
+                    .order_by(Log.timestamp.desc())
+                    .first()
                 )
-                result[name] = c.fetchone()
+                if r is not None:
+                    result[name] = (r.timestamp, r.value)
+                else:
+                    result[name] = None
         return result
 
     def logged_data_fromtimestamp(self, name, timestamp):
@@ -502,20 +457,16 @@ class AsyncSession:
         :return: the timestamps, and values of the specified variable
         :rtype: tuple of two numpy arrays
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute(
-                """SELECT timestamp, value FROM log
-                         WHERE name='{:}' AND timestamp > {:}
-                         ORDER BY timestamp ASC;
-                      """.format(
-                    name, timestamp
-                )
+        with self.Session() as session:
+            data = (
+                session.query(Log)
+                .filter_by(name=name)
+                .filter(Log.timestamp >= timestamp)
+                .order_by(Log.timestamp)
+                .all()
             )
-            data = c.fetchall()
-        t = np.array([d[0] for d in data if d[1] is not None])
-        v = np.array([d[1] for d in data if d[1] is not None])
-        return t, v
+            ts_val = np.array([(r.timestamp, r.value) for r in data])
+        return ts_val[:, 0], ts_val[:, 1]
 
     def dataset_names(self):
         """This method returns the names of the datasets currently stored in the session
@@ -524,14 +475,9 @@ class AsyncSession:
         :return: names of datasets
         :rtype: set
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            try:
-                c.execute("SELECT name from dataset_names;")
-                data = c.fetchall()
-            except sqlite3.OperationalError:
-                return set()
-        return set([d[0] for d in data])
+        with self.Session() as session:
+            names = {r.name for r in session.query(DatasetName).all()}
+        return names
 
     def datasets(self, name):
         """This method returns a generator which will yield all timestamps and datasets
@@ -554,27 +500,15 @@ class AsyncSession:
         >>> datas = [d for ts, d in sesn.datasets('toto')]
 
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            try:
-                c.execute("SELECT name from dataset_names;")
-                data = c.fetchall()
-            except sqlite3.OperationalError:
-                data = set()
-            names = set([d[0] for d in data])
+        with self.Session() as session:
+            names = {r.name for r in session.query(DatasetName).all()}
             if name not in names:
                 print("Possible dataset names are", names)
                 raise ValueError(f'Bad dataset name "{name:}"')
-            it = c.execute(
-                """SELECT timestamp, data FROM dataset
-                              WHERE name='{:}'
-                              ORDER BY timestamp ASC;
-                           """.format(
-                    name
-                )
-            )
-            for row in it:
-                yield row[0], pickle.loads(row[1])
+            for row in (
+                session.query(Dataset).filter_by(name=name).order_by(Dataset.timestamp)
+            ):
+                yield row.timestamp, pickle.loads(row.data)
 
     def dataset_last_data(self, name):
         """This method returns the last recorded dataset under the specified name.
@@ -584,8 +518,16 @@ class AsyncSession:
         :return: dataset value
         :rtype: object
         """
-        last_ts = self.dataset_times(name)[-1]
-        return last_ts, self.dataset(name, ts=last_ts)
+        with self.Session() as session:
+            r = (
+                session.query(Dataset)
+                .filter_by(name=name)
+                .order_by(Dataset.timestamp.desc())
+                .first()
+            )
+            if r is not None:
+                return r.timestamp, pickle.loads(r.data)
+        return None, None
 
     def dataset_times(self, name):
         """This method returns the timestamp of the recorded dataset under the specified
@@ -596,17 +538,14 @@ class AsyncSession:
         :return: array of timestamps
         :rtype: :class:`numpy.ndarray`
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            it = c.execute(
-                """SELECT timestamp FROM dataset
-                              WHERE name='{:}'
-                              ORDER BY timestamp ASC;
-                           """.format(
-                    name
-                )
+        with self.Session() as session:
+            data = (
+                session.query(Dataset)
+                .filter_by(name=name)
+                .order_by(Dataset.timestamp)
+                .all()
             )
-            t = np.array([v[0] for v in it])
+            t = np.array([r.timestamp for r in data])
         return t
 
     def dataset(self, name, ts=None, n=None):
@@ -623,22 +562,16 @@ class AsyncSession:
         :rtype: object
         """
 
-        if ts is None:
+        with self.Session() as session:
+            q = session.query(Dataset).filter_by(name=name)
+            if ts is not None:
+                q = q.filter_by(timestamp=ts)
+            q = q.order_by(Dataset.timestamp)
+            rows = q.all()
             if n is None:
-                ts, data = self.dataset_last_data(name)
-                return data
+                data = pickle.loads(rows[-1].data)
             else:
-                ts = self.dataset_times(name)[n]
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute(
-                """SELECT data FROM dataset
-                         WHERE name='{:}' AND timestamp='{:}';
-                      """.format(
-                    name, ts
-                )
-            )
-            data = pickle.loads(c.fetchone()[0])
+                data = pickle.loads(rows[n].data)
         return data
 
     def save_parameter(self, *args, **kwargs):
@@ -652,40 +585,25 @@ class AsyncSession:
         :param \\**kwargs: name-value to be added in the database
         :type \\**kwargs: float, optional
         """
+        if self.readonly:
+            raise RuntimeError("Cannot save parameter on readonly session")
         data = dict()
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.conn as conn:
-            c = conn.cursor()
+        with self.Session() as session:
             for key, val in data.items():
-                c.execute(
-                    """SELECT rowid FROM parameters
-                             WHERE name='{:}';
-                          """.format(
-                        key
-                    )
-                )
-                rowid = c.fetchone()
-                if rowid is not None:
-                    rowid = rowid[0]
-                    c.execute(
-                        """
-                        REPLACE INTO parameters
-                        (rowid, name, value)
-                        VALUES (?,?,?);
-                        """,
-                        (rowid, key, val),
-                    )
+                r = session.query(Parameter).filter_by(name=key).one_or_none()
+                if r is not None:
+                    r.value = val
                 else:
-                    c.execute(
-                        """
-                        INSERT INTO parameters
-                        (name, value)
-                        VALUES (?,?);
-                        """,
-                        (key, val),
+                    session.add(
+                        Parameter(
+                            name=key,
+                            value=val,
+                        )
                     )
+            session.commit()
 
     def parameter(self, name):
         """This method retrieve the value of the specified parameter.
@@ -695,19 +613,10 @@ class AsyncSession:
         :return: value of the parameter
         :rtype: float
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute(
-                """
-                      SELECT value FROM parameters
-                      WHERE name='{:}';
-                      """.format(
-                    name
-                )
-            )
-            data = c.fetchone()
-            if data:
-                return data[0]
+        with self.Session() as session:
+            data = session.query(Parameter).filter_by(name=name).one_or_none()
+            if data is not None:
+                return data.value
         return None
 
     def has_parameter(self, name):
@@ -726,11 +635,8 @@ class AsyncSession:
         :return: parameters
         :rtype: dict
         """
-        with self.conn as conn:
-            c = conn.cursor()
-            c.execute("SELECT * FROM parameters;")
-            data = c.fetchall()
-        return {d[0]: d[1] for d in data}
+        with self.Session() as session:
+            return {r.name: r.value for r in session.query(Parameter).all()}
 
     def __getitem__(self, key):
         """Implement the evaluation of self[varname] as a shortcut to obtain timestamp and values for a given
@@ -1494,10 +1400,7 @@ class SavedAsyncSession:
         self.verbose = verbose
         self.session = AsyncSession(session_name, verbose=False, readonly=True)
         if verbose:
-            try:
-                self.print_welcome()
-            except sqlite3.OperationalError:
-                print("Warning: unable to open database for session", session_name)
+            self.print_welcome()
 
     def print_welcome(self):
         """Prints informative start date/end date message. If verbose is True, this method
