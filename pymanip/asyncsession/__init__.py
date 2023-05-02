@@ -1461,12 +1461,12 @@ class SavedAsyncSession:
         with self.session as sesn:
             return sesn.get_version()
 
-    @property
+    @cached_property
     def t0(self):
         with self.session as sesn:
             return sesn.t0
 
-    @property
+    @cached_property
     def initial_timestamp(self):
         return self.t0
 
