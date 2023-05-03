@@ -21,7 +21,7 @@ from pymanip.asyncsession.asyncsession import AsyncSession
 from pymanip.mytime import dateformat
 
 
-class SavedAsyncSession:
+class _SavedAsyncSession:
     """This class implements the same methods as AsyncSession with readonly mode, but with
     caching enabled. Also, the file is opened on demand. No context manager is necessary.
     """
@@ -205,3 +205,8 @@ class SavedAsyncSession:
 
     def has_parameter(self, name):
         return name in self.parameters()
+
+
+@lru_cache
+def SavedAsyncSession(session_name, verbose=True):
+    return _SavedAsyncSession(session_name, verbose=verbose)
