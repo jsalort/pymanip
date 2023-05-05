@@ -19,7 +19,12 @@ import pickle
 import warnings
 import inspect
 from pprint import pprint
-from functools import lru_cache, cached_property
+from functools import lru_cache
+
+try:
+    from functools import cached_property
+except ImportError:
+    from backports.cached_property import cached_property
 from datetime import datetime
 import asyncio
 

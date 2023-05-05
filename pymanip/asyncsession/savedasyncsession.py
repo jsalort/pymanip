@@ -10,7 +10,12 @@ This module defines a class for read-only access to previous session,
 
 """
 
-from functools import lru_cache, cached_property
+from functools import lru_cache
+
+try:
+    from functools import cached_property
+except ImportError:
+    from backports.cached_property import cached_property
 import time
 
 import numpy as np
