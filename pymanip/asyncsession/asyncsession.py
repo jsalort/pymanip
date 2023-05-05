@@ -455,8 +455,12 @@ class AsyncSession:
                 .order_by(Log.timestamp)
                 .all()
             )
+            nrows = len(data)
             ts_val = np.array([(r.timestamp, r.value) for r in data])
-        return ts_val[:, 0], ts_val[:, 1]
+        if nrows > 0:
+            return ts_val[:, 0], ts_val[:, 1]
+        else:
+            return np.array([]), np.array([])
 
     def dataset_names(self):
         """This method returns the names of the datasets currently stored in the session

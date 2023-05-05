@@ -212,6 +212,6 @@ class _SavedAsyncSession:
         return name in self.parameters()
 
 
-@lru_cache
+@lru_cache(maxsize=128)
 def SavedAsyncSession(session_name, verbose=True):
     return _SavedAsyncSession(session_name, verbose=verbose)
