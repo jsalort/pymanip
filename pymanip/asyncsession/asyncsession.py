@@ -301,7 +301,7 @@ class AsyncSession:
             data.update(a)
         data.update(kwargs)
         with self.Session() as session:
-            names = {r.name for r in session.query(LogName).all()}
+            names = {name for name, in session.query(LogName.name)}
             for key, val in data.items():
                 if key not in names:
                     session.add(LogName(name=key))
@@ -327,7 +327,7 @@ class AsyncSession:
             data.update(a)
         data.update(kwargs)
         with self.Session() as session:
-            names = {r.name for r in session.query(DatasetName).all()}
+            names = {name for name, in session.query(DatasetName.name)}
             for key, val in data.items():
                 if key not in names:
                     session.add(DatasetName(name=key))
@@ -345,7 +345,7 @@ class AsyncSession:
         :rtype: set
         """
         with self.Session() as session:
-            names = {r.name for r in session.query(LogName).all()}
+            names = {name for name, in session.query(LogName.name)}
         return names
 
     def logged_data(self):
@@ -356,18 +356,17 @@ class AsyncSession:
         :rtype: dict
         """
         result = dict()
-        with self.Session() as session:
-            data = session.query(Log).all()
-            names = {r.name for r in session.query(LogName).all()}
+        with self.Session() as sesn:
+            names = {name for name, in sesn.query(LogName.name)}
             for name in names:
                 ts_val = np.array(
-                    [(r.timestamp, r.value) for r in data if r.name == name]
+                    [
+                        (timestamp, value)
+                        for timestamp, value in sesn.query(
+                            Log.timestamp, Log.value
+                        ).filter_by(name=name)
+                    ]
                 )
-                # L'ancienne version acceptait de façon incorrecte une value string
-                # (i.e. il n'y avait pas de check et sqlite3 acceptait de mettre une valeur
-                # non numérique dans la colonne)
-                # donc j'ajoute astype pour pas que le mauvais type se propage sur le timestamp
-                # et garder le même comportant que l'ancien code sur les anciens fichiers
                 result[name] = ts_val[:, 0].astype(float), ts_val[:, 1]
         return result
 
@@ -386,8 +385,14 @@ class AsyncSession:
 
         """
         with self.Session() as session:
-            data = session.query(Log).filter_by(name=varname).all()
-            ts_val = np.array([(r.timestamp, r.value) for r in data])
+            ts_val = np.array(
+                [
+                    (timestamp, value)
+                    for timestamp, value in session.query(
+                        Log.timestamp, Log.value
+                    ).filter_by(name=varname)
+                ]
+            )
         return ts_val[:, 0], ts_val[:, 1]
 
     def logged_first_values(self):
@@ -399,7 +404,7 @@ class AsyncSession:
         """
         result = dict()
         with self.Session() as session:
-            names = {r.name for r in session.query(LogName).all()}
+            names = {name for name, in session.query(LogName.name)}
             for name in names:
                 r = (
                     session.query(Log)
@@ -422,7 +427,7 @@ class AsyncSession:
         """
         result = dict()
         with self.Session() as session:
-            names = {r.name for r in session.query(LogName).all()}
+            names = {name for name, in session.query(LogName.name)}
             for name in names:
                 r = (
                     session.query(Log)
@@ -448,15 +453,16 @@ class AsyncSession:
         :rtype: tuple of two numpy arrays
         """
         with self.Session() as session:
-            data = (
-                session.query(Log)
-                .filter_by(name=name)
-                .filter(Log.timestamp >= timestamp)
-                .order_by(Log.timestamp)
-                .all()
+            ts_val = np.array(
+                [
+                    (timestamp, value)
+                    for timestamp, value in session.query(Log.timestamp, Log.value)
+                    .filter_by(name=name)
+                    .filter(Log.timestamp >= timestamp)
+                    .order_by(Log.timestamp)
+                ]
             )
-            nrows = len(data)
-            ts_val = np.array([(r.timestamp, r.value) for r in data])
+            nrows = len(ts_val)
         if nrows > 0:
             return ts_val[:, 0], ts_val[:, 1]
         else:
@@ -470,7 +476,7 @@ class AsyncSession:
         :rtype: set
         """
         with self.Session() as session:
-            names = {r.name for r in session.query(DatasetName).all()}
+            names = {name for name, in session.query(DatasetName.name)}
         return names
 
     def datasets(self, name):
@@ -495,14 +501,16 @@ class AsyncSession:
 
         """
         with self.Session() as session:
-            names = {r.name for r in session.query(DatasetName).all()}
+            names = {name for name, in session.query(DatasetName.name)}
             if name not in names:
                 print("Possible dataset names are", names)
                 raise ValueError(f'Bad dataset name "{name:}"')
-            for row in (
-                session.query(Dataset).filter_by(name=name).order_by(Dataset.timestamp)
+            for timestamp, data in (
+                session.query(Dataset.timestamp, Dataset.data)
+                .filter_by(name=name)
+                .order_by(Dataset.timestamp)
             ):
-                yield row.timestamp, pickle.loads(row.data)
+                yield timestamp, pickle.loads(data)
 
     def dataset_last_data(self, name):
         """This method returns the last recorded dataset under the specified name.
@@ -533,13 +541,14 @@ class AsyncSession:
         :rtype: :class:`numpy.ndarray`
         """
         with self.Session() as session:
-            data = (
-                session.query(Dataset)
-                .filter_by(name=name)
-                .order_by(Dataset.timestamp)
-                .all()
+            t = np.array(
+                [
+                    timestamp
+                    for timestamp, in session.query(Dataset.timestamp)
+                    .filter_by(name=name)
+                    .order_by(Dataset.timestamp)
+                ]
             )
-            t = np.array([r.timestamp for r in data])
         return t
 
     def dataset(self, name, ts=None, n=None):
@@ -630,7 +639,10 @@ class AsyncSession:
         :rtype: dict
         """
         with self.Session() as session:
-            return {r.name: r.value for r in session.query(Parameter).all()}
+            return {
+                name: value
+                for name, value in session.query(Parameter.name, Parameter.value)
+            }
 
     def __getitem__(self, key):
         """Implement the evaluation of self[varname] as a shortcut to obtain timestamp and values for a given
