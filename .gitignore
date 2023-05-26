@@ -6,6 +6,7 @@ MANIFEST
 __pycache__
 .ipynb_checkpoints
 _build
+build
 
 # Metadata
 .DS_Store
