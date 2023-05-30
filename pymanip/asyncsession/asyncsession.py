@@ -945,12 +945,15 @@ class AsyncSession:
                                 ax.set_xlim((x[0], x[-1]))
                             if fixed_ylim is None:
                                 ylim = ax.get_ylim()
-                                if ylim[1] < np.max(y) or ylim[0] > np.min(y):
-                                    ylim = (
-                                        min((ylim[0], np.min(y))),
-                                        max((ylim[1], np.max(y))),
-                                    )
-                                    ax.set_ylim(ylim)
+                                try:
+                                    if ylim[1] < np.max(y) or ylim[0] > np.min(y):
+                                        ylim = (
+                                            min((ylim[0], np.min(y))),
+                                            max((ylim[1], np.max(y))),
+                                        )
+                                        ax.set_ylim(ylim)
+                                except TypeError:
+                                    pass
                         else:
                             # print('initial plot')
                             x = (ts - ts0) / 3600
