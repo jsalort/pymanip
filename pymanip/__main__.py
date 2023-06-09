@@ -143,7 +143,9 @@ parser_video = subparsers.add_parser(
     "video", help="Display video preview for specified camera"
 )
 parser_video.add_argument(
-    "camera_type", help="Camera type: PCO, AVT, DC1394, IDS", metavar="camera_type"
+    "camera_type",
+    help="Camera type: PCO, AVT, Andor, Ximea, IDS, Photometrics",
+    metavar="camera_type",
 )
 parser_video.add_argument(
     "-l", "--list", help="List available cameras", action="store_true"

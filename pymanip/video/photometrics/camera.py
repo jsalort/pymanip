@@ -28,10 +28,11 @@ try:
 except PackageNotFoundError:
     print("PyVCam Package not found. Camera acquisition may not work.")
     pyvcam_version = None
-    
-if pyvcam_version is not None and pyvcam_version != '2.1.5':
+
+if pyvcam_version is not None and pyvcam_version != "2.1.5":
     print("This module was tested with pyvcam 2.1.5")
     print("Installed version is", pyvcam_version)
+
 
 class Photometrics_Camera(Camera):
     """Concrete :class:`pymanip.video.Camera` class for Photometrics camera."""
@@ -55,7 +56,7 @@ class Photometrics_Camera(Camera):
             if num == cam_num:
                 break
         else:
-            raise (f"Unable to find camera num {cam_num:}.")
+            raise RuntimeError(f"Unable to find camera num {cam_num:}.")
         self.cam = cam
         self.cam.open()
         self.cam.readout_port = readout_port
@@ -111,18 +112,17 @@ class Photometrics_Camera(Camera):
         """This method sets the positions of the upper left corner (X0,Y0) and lower right
         (X1,Y1) corner of the ROI (region of interest) in pixels.
         """
-        
-        # pyvcam set_roi appends a new ROI, and takes 
-        #    s1(int) Serial coordinate 1, 
+
+        # pyvcam set_roi appends a new ROI, and takes
+        #    s1(int) Serial coordinate 1,
         #    p1(int) parallel coordinate 1,
         #    width(int): num pixels in serial direction,
         #    height(int) num pixels in parallel direction
         #
-        
-        
+
         width = roiX1 - roiX0
         height = roiY1 - roiY0
-        
+
         self.cam.reset_rois()
         self.cam.set_roi(roiX0, roiY0, width, height)
 
@@ -136,9 +136,9 @@ class Photometrics_Camera(Camera):
                 future = loop.run_in_executor(
                     None,
                     self.cam.poll_frame,
-                    -1,    # wait forever
-                    True, # oldest frame
-                    False, # no copy
+                    -1,  # wait forever
+                    True,  # oldest frame
+                    False,  # no copy
                 )
                 try:
                     frame, fps, frame_count = await asyncio.wait_for(
@@ -147,7 +147,7 @@ class Photometrics_Camera(Camera):
                 except asyncio.TimeoutError:
                     print("Timeout while waiting for poll_frame")
                     break
-                
+
                 return (
                     frame,
                     fps,
