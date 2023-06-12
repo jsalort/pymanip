@@ -18,8 +18,6 @@ import os.path
 import pickle
 import warnings
 import inspect
-from pprint import pprint
-from functools import lru_cache
 
 try:
     from functools import cached_property
@@ -42,20 +40,16 @@ from email.message import EmailMessage
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-try:
-    import PyQt5.QtCore
-except (ModuleNotFoundError, FileNotFoundError):
-    pass
-
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
 
-from pymanip.asyncsession.database_v3 import (
+from pymanip.asyncsession.database_v4 import (
     LogName,
     Log,
     DatasetName,
     Dataset,
     Parameter,
+    Metadata,
     create_tables,
     copy_table,
 )
@@ -80,7 +74,7 @@ class AsyncSession:
     :type delay_save: bool, optional
     """
 
-    database_version = 3.1
+    database_version = 4.0
 
     def __init__(
         self,
@@ -135,7 +129,14 @@ class AsyncSession:
             if self.session_path.exists():
                 create_tables(self.engine)
                 with self.disk_Session() as input_session, self.Session() as output_session:
-                    for table in (LogName, Log, DatasetName, Dataset, Parameter):
+                    for table in (
+                        LogName,
+                        Log,
+                        DatasetName,
+                        Dataset,
+                        Parameter,
+                        Metadata,
+                    ):
                         copy_table(input_session, output_session, table)
 
         self.verbose = verbose
@@ -190,7 +191,7 @@ class AsyncSession:
         if self.delay_save:
             create_tables(self.disk_engine)
             with self.Session() as input_session, self.disk_Session() as output_session:
-                for table in (LogName, Log, DatasetName, Dataset, Parameter):
+                for table in (LogName, Log, DatasetName, Dataset, Parameter, Metadata):
                     output_session.query(table).delete()
                     copy_table(input_session, output_session, table)
 
@@ -577,8 +578,30 @@ class AsyncSession:
                 data = pickle.loads(rows[n].data)
         return data
 
+    def save_metadata(self, *args, **kwargs):
+        """This method saves a text parameter into the database."""
+        if self.readonly:
+            raise RuntimeError("Cannot save metadata on readonly session")
+        data = dict()
+        for a in args:
+            data.update(a)
+        data.update(kwargs)
+        with self.Session() as session:
+            for key, val in data.items():
+                r = session.query(Metadata).filter_by(name=key).one_or_none()
+                if r is not None:
+                    r.value = val
+                else:
+                    session.add(
+                        Metadata(
+                            name=key,
+                            value=val,
+                        )
+                    )
+            session.commit()
+
     def save_parameter(self, *args, **kwargs):
-        """This methods saves a scalar parameter into the database. Unlike scalar values
+        """This method saves a scalar parameter into the database. Unlike scalar values
         saved by the :meth:`pymanip.asyncsession.AsyncSession.add_entry` method, such parameter
         can only hold one value, and does not have an associated timestamp.
         Parameters can be passed as dictionnaries, or keyword arguments.
@@ -608,8 +631,16 @@ class AsyncSession:
                     )
             session.commit()
 
+    def metadata(self, name):
+        """This method retrives the value of the specified metadata."""
+        with self.Session() as session:
+            data = session.query(Metadata).filter_by(name=name).one_or_none()
+            if data is not None:
+                return data.value
+        return None
+
     def parameter(self, name):
-        """This method retrieve the value of the specified parameter.
+        """This method retrieves the value of the specified parameter.
 
         :param name: name of the parameter to retrieve
         :type name: str
@@ -622,6 +653,10 @@ class AsyncSession:
                 return data.value
         return None
 
+    def has_metadata(self, name):
+        """This method returns True if the specified metadata exists in the session database."""
+        return self.metadata(name) is not None
+
     def has_parameter(self, name):
         """This method returns True if specified parameter exists in the session database.
 
@@ -631,6 +666,14 @@ class AsyncSession:
         :rtype: bool
         """
         return self.parameter(name) is not None
+
+    def metadatas(self):
+        """This method returns all metadata."""
+        with self.Session() as session:
+            return {
+                name: value
+                for name, value in session.query(Metadata.name, Metadata.value)
+            }
 
     def parameters(self):
         """This method returns all parameter name and values.
@@ -853,10 +896,10 @@ class AsyncSession:
             param_key_figsize = "_figsize_" + "_".join(varnames)
             xymode = False
         last_update = {k: 0 for k in varnames}
-        saved_geom = self.parameter(param_key_window)
+        saved_geom = self.metadata(param_key_window)
         if saved_geom:
             saved_geom = eval(saved_geom)
-        saved_figsize = self.parameter(param_key_figsize)
+        saved_figsize = self.metadata(param_key_figsize)
         if saved_figsize:
             saved_figsize = eval(saved_figsize)
         if not self.offscreen_figures:
@@ -981,7 +1024,7 @@ class AsyncSession:
             try:
                 geom = mngr.window.geometry()
                 figsize = tuple(fig.get_size_inches())
-                self.save_parameter(
+                self.save_metadata(
                     **{param_key_window: str(geom), param_key_figsize: str(figsize)}
                 )
             except AttributeError:
