@@ -40,6 +40,11 @@ from email.message import EmailMessage
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+try:
+    import PyQt5.QtCore  # noqa: F401
+except (ModuleNotFoundError, FileNotFoundError):
+    pass
+
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
 
