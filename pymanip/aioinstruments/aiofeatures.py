@@ -126,6 +126,10 @@ class AsyncIntValue(AsyncNumberValue, flfeatures.IntValue):
     pass
 
 
+class AsyncStringValue(AsyncValue, flfeatures.StringValue):
+    pass
+
+
 class AsyncRegisterValue(AsyncNumberValue, flfeatures.RegisterValue):
     async def aget_as_number(self):
         value = await self._interface.aquery(self.command_get)
