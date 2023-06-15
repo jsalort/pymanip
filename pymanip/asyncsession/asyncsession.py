@@ -48,18 +48,31 @@ except (ModuleNotFoundError, FileNotFoundError):
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
 
-from pymanip.asyncsession.database_v4 import (
-    LogName,
-    Log,
-    DatasetName,
-    Dataset,
-    Parameter,
-    Metadata,
-    create_tables,
-    copy_table,
-)
+import pymanip.asyncsession.database_v3 as dbv3
+import pymanip.asyncsession.database_v4 as dbv4
+
+dblatest = dbv4
+
 
 __all__ = ["AsyncSession"]
+
+
+def get_db_module(Session):
+    """Reads version of database of given Session class, and returns appropriate database schema module."""
+    with Session() as sesn:
+        (version,) = (
+            sesn.query(dbv3.Parameter.value)
+            .filter_by(name="_database_version")
+            .one_or_none()
+        )
+        if version == 3 or version == 3.1:
+            db = dbv3
+        elif version == 4:
+            db = dbv4
+        else:
+            print(f"Unable to determine database version. Got <{version}>.")
+            db = dblatest
+    return db
 
 
 class AsyncSession:
@@ -79,8 +92,6 @@ class AsyncSession:
     :type delay_save: bool, optional
     """
 
-    database_version = 4.0
-
     def __init__(
         self,
         session_name=None,
@@ -88,6 +99,7 @@ class AsyncSession:
         delay_save=False,
         exist_ok=True,
         readonly=False,
+        database_version=-1,
     ):
         """Constructor method"""
 
@@ -111,8 +123,12 @@ class AsyncSession:
                 raise ValueError("Cannot delay_save if session_name is not specified")
 
         if self.session_path is not None and not delay_save:
-            if not exist_ok and self.session_path.exists():
-                raise RuntimeError("File exists !")
+            if self.session_path.exists():
+                if not exist_ok:
+                    raise RuntimeError("File exists !")
+                new_session = False
+            else:
+                new_session = True
             self.engine = create_engine(
                 "sqlite:///" + str(self.session_path.absolute()),
                 echo=False,
@@ -122,7 +138,17 @@ class AsyncSession:
                 "sqlite://",
                 echo=False,
             )
+            new_session = True
         self.Session = sessionmaker(bind=self.engine)
+        if new_session:
+            if database_version == -1:
+                self.db = dblatest
+            elif database_version == 3 or database_version == 3.1:
+                self.db = dbv3
+            elif database_version == 4:
+                self.db = dbv4
+        else:
+            self.db = get_db_module(self.Session)
 
         if delay_save:
             # Load existing database into in-memory database
@@ -132,17 +158,11 @@ class AsyncSession:
             )
             self.disk_Session = sessionmaker(bind=self.disk_engine)
             if self.session_path.exists():
-                create_tables(self.engine)
+                self.db = get_db_module(self.disk_Session)
+                self.db.create_tables(self.engine)
                 with self.disk_Session() as input_session, self.Session() as output_session:
-                    for table in (
-                        LogName,
-                        Log,
-                        DatasetName,
-                        Dataset,
-                        Parameter,
-                        Metadata,
-                    ):
-                        copy_table(input_session, output_session, table)
+                    for table in self.db.table_list:
+                        self.db.copy_table(input_session, output_session, table)
 
         self.verbose = verbose
         self.readonly = readonly
@@ -158,7 +178,7 @@ class AsyncSession:
     def __enter__(self):
         """Context manager enter method"""
         if not self.readonly:
-            new = create_tables(self.engine)
+            new = self.db.create_tables(self.engine)
         else:
             new = False
         if self.verbose and not new:
@@ -166,13 +186,13 @@ class AsyncSession:
         if new:
             with self.Session() as session:
                 session.add(
-                    Parameter(
+                    self.db.Parameter(
                         name="_database_version",
-                        value=AsyncSession.database_version,
+                        value=self.db.database_version,
                     )
                 )
                 session.add(
-                    Parameter(
+                    self.db.Parameter(
                         name="_session_creation_timestamp",
                         value=datetime.now().timestamp(),
                     )
@@ -194,17 +214,17 @@ class AsyncSession:
         This method is automatically called at the exit of the context manager.
         """
         if self.delay_save:
-            create_tables(self.disk_engine)
+            self.db.create_tables(self.disk_engine)
             with self.Session() as input_session, self.disk_Session() as output_session:
-                for table in (LogName, Log, DatasetName, Dataset, Parameter, Metadata):
+                for table in self.db.table_list:
                     output_session.query(table).delete()
-                    copy_table(input_session, output_session, table)
+                    self.db.copy_table(input_session, output_session, table)
 
     def get_version(self):
         """Returns current version of the database layout."""
         version = self.parameter("_database_version")
         if version is None:
-            version = 1
+            version = self.db.database_version
         return version
 
     @cached_property
@@ -285,6 +305,14 @@ class AsyncSession:
                 print(ds)
             print()
 
+        if version >= 4:
+            meta = self.metadatas()
+            if meta:
+                print("Metadata")
+                print("========")
+                for name, val in meta.items():
+                    print(name, ":", val)
+
     def add_entry(self, *args, **kwargs):
         """This methods adds scalar values into the database. Each entry value
         will hold a timestamp corresponding to the time at which this method has been called.
@@ -307,12 +335,12 @@ class AsyncSession:
             data.update(a)
         data.update(kwargs)
         with self.Session() as session:
-            names = {name for name, in session.query(LogName.name)}
+            names = {name for name, in session.query(self.db.LogName.name)}
             for key, val in data.items():
                 if key not in names:
-                    session.add(LogName(name=key))
+                    session.add(self.db.LogName(name=key))
                     names.add(key)
-                session.add(Log(timestamp=ts, name=key, value=val))
+                session.add(self.db.Log(timestamp=ts, name=key, value=val))
             session.commit()
 
     def add_dataset(self, *args, **kwargs):
@@ -333,13 +361,15 @@ class AsyncSession:
             data.update(a)
         data.update(kwargs)
         with self.Session() as session:
-            names = {name for name, in session.query(DatasetName.name)}
+            names = {name for name, in session.query(self.db.DatasetName.name)}
             for key, val in data.items():
                 if key not in names:
-                    session.add(DatasetName(name=key))
+                    session.add(self.db.DatasetName(name=key))
                     names.add(key)
                 session.add(
-                    Dataset(timestamp=ts, name=key, data=pickle.dumps(val, protocol=4))
+                    self.db.Dataset(
+                        timestamp=ts, name=key, data=pickle.dumps(val, protocol=4)
+                    )
                 )
             session.commit()
 
@@ -351,7 +381,7 @@ class AsyncSession:
         :rtype: set
         """
         with self.Session() as session:
-            names = {name for name, in session.query(LogName.name)}
+            names = {name for name, in session.query(self.db.LogName.name)}
         return names
 
     def logged_data(self):
@@ -363,13 +393,13 @@ class AsyncSession:
         """
         result = dict()
         with self.Session() as sesn:
-            names = {name for name, in sesn.query(LogName.name)}
+            names = {name for name, in sesn.query(self.db.LogName.name)}
             for name in names:
                 ts_val = np.array(
                     [
                         (timestamp, value)
                         for timestamp, value in sesn.query(
-                            Log.timestamp, Log.value
+                            self.db.Log.timestamp, self.db.Log.value
                         ).filter_by(name=name)
                     ]
                 )
@@ -395,7 +425,7 @@ class AsyncSession:
                 [
                     (timestamp, value)
                     for timestamp, value in session.query(
-                        Log.timestamp, Log.value
+                        self.db.Log.timestamp, self.db.Log.value
                     ).filter_by(name=varname)
                 ]
             )
@@ -410,12 +440,12 @@ class AsyncSession:
         """
         result = dict()
         with self.Session() as session:
-            names = {name for name, in session.query(LogName.name)}
+            names = {name for name, in session.query(self.db.LogName.name)}
             for name in names:
                 r = (
-                    session.query(Log)
+                    session.query(self.db.Log)
                     .filter_by(name=name)
-                    .order_by(Log.timestamp.asc())
+                    .order_by(self.db.Log.timestamp.asc())
                     .first()
                 )
                 if r is not None:
@@ -433,12 +463,12 @@ class AsyncSession:
         """
         result = dict()
         with self.Session() as session:
-            names = {name for name, in session.query(LogName.name)}
+            names = {name for name, in session.query(self.db.LogName.name)}
             for name in names:
                 r = (
-                    session.query(Log)
+                    session.query(self.db.Log)
                     .filter_by(name=name)
-                    .order_by(Log.timestamp.desc())
+                    .order_by(self.db.Log.timestamp.desc())
                     .first()
                 )
                 if r is not None:
@@ -462,10 +492,12 @@ class AsyncSession:
             ts_val = np.array(
                 [
                     (timestamp, value)
-                    for timestamp, value in session.query(Log.timestamp, Log.value)
+                    for timestamp, value in session.query(
+                        self.db.Log.timestamp, self.db.Log.value
+                    )
                     .filter_by(name=name)
-                    .filter(Log.timestamp >= timestamp)
-                    .order_by(Log.timestamp)
+                    .filter(self.db.Log.timestamp >= timestamp)
+                    .order_by(self.db.Log.timestamp)
                 ]
             )
             nrows = len(ts_val)
@@ -482,7 +514,7 @@ class AsyncSession:
         :rtype: set
         """
         with self.Session() as session:
-            names = {name for name, in session.query(DatasetName.name)}
+            names = {name for name, in session.query(self.db.DatasetName.name)}
         return names
 
     def datasets(self, name):
@@ -507,14 +539,14 @@ class AsyncSession:
 
         """
         with self.Session() as session:
-            names = {name for name, in session.query(DatasetName.name)}
+            names = {name for name, in session.query(self.db.DatasetName.name)}
             if name not in names:
                 print("Possible dataset names are", names)
                 raise ValueError(f'Bad dataset name "{name:}"')
             for timestamp, data in (
-                session.query(Dataset.timestamp, Dataset.data)
+                session.query(self.db.Dataset.timestamp, self.db.Dataset.data)
                 .filter_by(name=name)
-                .order_by(Dataset.timestamp)
+                .order_by(self.db.Dataset.timestamp)
             ):
                 yield timestamp, pickle.loads(data)
 
@@ -528,9 +560,9 @@ class AsyncSession:
         """
         with self.Session() as session:
             r = (
-                session.query(Dataset)
+                session.query(self.db.Dataset)
                 .filter_by(name=name)
-                .order_by(Dataset.timestamp.desc())
+                .order_by(self.db.Dataset.timestamp.desc())
                 .first()
             )
             if r is not None:
@@ -550,9 +582,9 @@ class AsyncSession:
             t = np.array(
                 [
                     timestamp
-                    for timestamp, in session.query(Dataset.timestamp)
+                    for timestamp, in session.query(self.db.Dataset.timestamp)
                     .filter_by(name=name)
-                    .order_by(Dataset.timestamp)
+                    .order_by(self.db.Dataset.timestamp)
                 ]
             )
         return t
@@ -572,10 +604,10 @@ class AsyncSession:
         """
 
         with self.Session() as session:
-            q = session.query(Dataset).filter_by(name=name)
+            q = session.query(self.db.Dataset).filter_by(name=name)
             if ts is not None:
                 q = q.filter_by(timestamp=ts)
-            q = q.order_by(Dataset.timestamp)
+            q = q.order_by(self.db.Dataset.timestamp)
             rows = q.all()
             if n is None:
                 data = pickle.loads(rows[-1].data)
@@ -587,18 +619,22 @@ class AsyncSession:
         """This method saves a text parameter into the database."""
         if self.readonly:
             raise RuntimeError("Cannot save metadata on readonly session")
+        if not hasattr(self.db, "Metadata"):
+            raise RuntimeError(
+                "Metadata not supported in currently opened database (version mismatch)."
+            )
         data = dict()
         for a in args:
             data.update(a)
         data.update(kwargs)
         with self.Session() as session:
             for key, val in data.items():
-                r = session.query(Metadata).filter_by(name=key).one_or_none()
+                r = session.query(self.db.Metadata).filter_by(name=key).one_or_none()
                 if r is not None:
                     r.value = val
                 else:
                     session.add(
-                        Metadata(
+                        self.db.Metadata(
                             name=key,
                             value=val,
                         )
@@ -624,12 +660,12 @@ class AsyncSession:
         data.update(kwargs)
         with self.Session() as session:
             for key, val in data.items():
-                r = session.query(Parameter).filter_by(name=key).one_or_none()
+                r = session.query(self.db.Parameter).filter_by(name=key).one_or_none()
                 if r is not None:
                     r.value = val
                 else:
                     session.add(
-                        Parameter(
+                        self.db.Parameter(
                             name=key,
                             value=val,
                         )
@@ -639,7 +675,7 @@ class AsyncSession:
     def metadata(self, name):
         """This method retrives the value of the specified metadata."""
         with self.Session() as session:
-            data = session.query(Metadata).filter_by(name=name).one_or_none()
+            data = session.query(self.db.Metadata).filter_by(name=name).one_or_none()
             if data is not None:
                 return data.value
         return None
@@ -653,7 +689,7 @@ class AsyncSession:
         :rtype: float
         """
         with self.Session() as session:
-            data = session.query(Parameter).filter_by(name=name).one_or_none()
+            data = session.query(self.db.Parameter).filter_by(name=name).one_or_none()
             if data is not None:
                 return data.value
         return None
@@ -677,7 +713,9 @@ class AsyncSession:
         with self.Session() as session:
             return {
                 name: value
-                for name, value in session.query(Metadata.name, Metadata.value)
+                for name, value in session.query(
+                    self.db.Metadata.name, self.db.Metadata.value
+                )
             }
 
     def parameters(self):
@@ -689,7 +727,9 @@ class AsyncSession:
         with self.Session() as session:
             return {
                 name: value
-                for name, value in session.query(Parameter.name, Parameter.value)
+                for name, value in session.query(
+                    self.db.Parameter.name, self.db.Parameter.value
+                )
             }
 
     def __getitem__(self, key):

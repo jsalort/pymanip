@@ -86,6 +86,14 @@ class _SavedAsyncSession:
                 print(ds)
             print()
 
+        if version >= 4:
+            meta = self.metadatas()
+            if meta:
+                print("Metadata")
+                print("========")
+                for name, val in meta.items():
+                    print(name, ":", val)
+
     # General attributes
 
     @lru_cache(maxsize=128)
@@ -210,6 +218,22 @@ class _SavedAsyncSession:
 
     def has_parameter(self, name):
         return name in self.parameters()
+
+    # Metadatas
+
+    @lru_cache(maxsize=128)
+    def metadatas(self):
+        if self.get_version() >= 4:
+            with self.session as sesn:
+                return sesn.metadatas()
+        else:
+            return dict()
+
+    def metadata(self, name):
+        return self.metadatas()[name]
+
+    def has_metadata(self, name):
+        return name in self.metadatas()
 
 
 @lru_cache(maxsize=128)

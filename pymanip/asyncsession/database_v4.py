@@ -26,6 +26,7 @@ from sqlalchemy import (
     inspect,
 )
 
+database_version = 4.0
 Base = declarative_base()
 
 
@@ -142,3 +143,13 @@ def copy_table(input_session, output_session, table):
     for r in input_session.query(table).yield_per(10000):
         output_session.add(table(**r.as_dict()))
     output_session.commit()
+
+
+table_list = [
+    LogName,
+    Log,
+    DatasetName,
+    Dataset,
+    Parameter,
+    Metadata,
+]

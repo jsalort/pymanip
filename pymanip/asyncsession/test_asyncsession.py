@@ -1,6 +1,5 @@
 import os
 import asyncio
-import pytest
 import numpy as np
 from pymanip.asyncsession import AsyncSession, SavedAsyncSession
 
@@ -90,6 +89,21 @@ def test_parameters(tmp_path):
         assert c == 3e8
         assert pi == 3.14
         assert d == 10
+
+
+def test_metadata(tmp_path):
+    async def dummy(sesn):
+        sesn.ask_exit()
+        await asyncio.sleep(0.001)
+
+    tmp_path.mkdir(exist_ok=True)
+
+    with AsyncSession(tmp_path / "test_asyncsession_meta.db") as sesn:
+        sesn.save_metadata(desc="toto")
+        sesn.run(dummy, server_port=None)
+
+    sesn = SavedAsyncSession(tmp_path / "test_asyncsession_meta.db")
+    assert sesn.metadata("desc") == "toto"
 
 
 def test_datasets():
