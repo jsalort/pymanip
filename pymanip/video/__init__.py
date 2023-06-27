@@ -30,11 +30,11 @@ import sys
 import signal
 import os
 import gzip
-import numpy as np 
+import numpy as np
 
 try:
     import pyqtgraph as pg
-    from pyqtgraph.Qt import QtCore, QtGui
+    from pyqtgraph.Qt import QtCore
     from PyQt5.QtWidgets import (
         QMainWindow,
         QWidget,
@@ -43,6 +43,8 @@ try:
         QHBoxLayout,
         QApplication,
         QLabel,
+        QCheckBox,
+        QDoubleSpinBox,
     )
 
     has_qtgraph = True
@@ -58,14 +60,21 @@ from pymanip.asynctools import synchronize_function, synchronize_generator
 
 
 class CameraTimeout(Exception):
-    """This class defines a CameraTimeout exception.
-    """
+    """This class defines a CameraTimeout exception."""
 
     pass
 
 
-def save_image(im, ii, basename, zerofill, file_format, compression, compression_level,
-               color_order=None):
+def save_image(
+    im,
+    ii,
+    basename,
+    zerofill,
+    file_format,
+    compression,
+    compression_level,
+    color_order=None,
+):
     """This function is a simple general function to save an input image from the camera
     to disk.
 
@@ -291,13 +300,11 @@ class Camera:
         raise NotImplementedError()
 
     def __enter__(self):
-        """Context manager enter method
-        """
+        """Context manager enter method"""
         return self
 
     def __exit__(self, type_, value, cb):
-        """Context manager exit method
-        """
+        """Context manager exit method"""
         if hasattr(self, "preview_generator"):
             self.preview_generator = None
 
@@ -353,7 +360,8 @@ class Camera:
                 if slice_:
                     if color:
                         img = (maxint // (maximum - minimum)) * (
-                            im[slice_[0] : slice_[1], slice_[2] : slice_[3], :] - minimum
+                            im[slice_[0] : slice_[1], slice_[2] : slice_[3], :]
+                            - minimum
                         )
                     else:
                         img = (maxint // (maximum - minimum)) * (
@@ -422,7 +430,7 @@ class Camera:
             self.app = app
             just_started = False
         elif not hasattr(self, "app"):
-            self.app = QtGui.QApplication([])
+            self.app = QApplication([])
             self.app.aboutToQuit.connect(self.preview_exitHandler)
             just_started = True
         else:
@@ -430,7 +438,7 @@ class Camera:
 
         # create window if it does not already exists
         if not hasattr(self, "window"):
-            self.window = QtGui.QMainWindow()
+            self.window = QMainWindow()
             # self.window.resize(*self.resolution)
             self.window.resize(800, 600)
             self.window.setWindowTitle(self.name)
@@ -445,26 +453,22 @@ class Camera:
             self.central_layout = QVBoxLayout(self.central_widget)
             self.tools_layout = QHBoxLayout(self.tools_widget)
 
-            self.crosshair_chkbox = QtGui.QCheckBox("Crosshair", self.tools_widget)
-            self.subtraction_chkbox = QtGui.QCheckBox(
+            self.crosshair_chkbox = QCheckBox("Crosshair", self.tools_widget)
+            self.subtraction_chkbox = QCheckBox(
                 "Background subtraction", self.tools_widget
             )
             self.learning_label = QLabel(
                 "Learning rate  [0, 1] :", parent=self.tools_widget
             )
-            self.spnbx_learning = QtGui.QDoubleSpinBox(
-                parent=self.tools_widget, value=0.05
-            )
+            self.spnbx_learning = QDoubleSpinBox(parent=self.tools_widget, value=0.05)
             self.spnbx_learning.setRange(0, 1)
             self.spnbx_learning.setSingleStep(0.01)
             self.spnbx_learning.setDecimals(3)
-            self.acq_btn = QtGui.QPushButton("Acquisition", self.tools_widget)
+            self.acq_btn = QPushButton("Acquisition", self.tools_widget)
             self.exposure_label = QLabel(
                 "Exposure time (s) :", parent=self.tools_widget
             )
-            self.spnbox_exposure = QtGui.QDoubleSpinBox(
-                parent=self.tools_widget, value=0.001
-            )
+            self.spnbox_exposure = QDoubleSpinBox(parent=self.tools_widget, value=0.001)
             self.spnbox_exposure.setRange(0.000033, 67.108895)
             self.spnbox_exposure.setSingleStep(0.0001)
             self.spnbox_exposure.setDecimals(4)
@@ -492,7 +496,9 @@ class Camera:
 
         # instantiate generator
         if not hasattr(self, "preview_generator"):
-            self.preview_generator = self.acquisition(timeout=1000, raise_on_timeout=False)
+            self.preview_generator = self.acquisition(
+                timeout=1000, raise_on_timeout=False
+            )
 
         if just_started:
             self.bkgrd = None
@@ -529,11 +535,11 @@ class Camera:
             if not color:
                 img = img.T
             else:
-                img = np.transpose(img, axes=(1,0,2))
+                img = np.transpose(img, axes=(1, 0, 2))
                 if self.color_order == "BGR":
                     # Qt comme Matplotlib travaille en RGB.
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
+
             self.image_view.setImage(
                 img, autoRange=False, autoLevels=False, autoHistogramRange=False
             )
@@ -548,7 +554,7 @@ class Camera:
         )
 
         if just_started:
-            QtGui.QApplication.instance().exec_()
+            self.app.exec_()
 
     def acquire_to_files(self, *args, **kwargs):
         """This method starts the camera, acquires images and saves them to the disk.
@@ -558,8 +564,7 @@ class Camera:
         return synchronize_function(self.acquire_to_files_async, *args, **kwargs)
 
     def acquire_signalHandler(self, *args, **kwargs):
-        """This method sends a stop signal to the :meth:`~pymanip.video.Camera.acquire_to_files_async` method.
-        """
+        """This method sends a stop signal to the :meth:`~pymanip.video.Camera.acquire_to_files_async` method."""
         self.acqinterrupted = True
 
     async def acquire_to_files_async(

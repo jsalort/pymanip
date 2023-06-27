@@ -142,7 +142,8 @@ class Photometrics_Camera(Camera):
                 )
                 try:
                     frame, fps, frame_count = await asyncio.wait_for(
-                        future, timeout=timeout, loop=loop
+                        future,
+                        timeout=timeout,  # loop=loop
                     )
                 except asyncio.TimeoutError:
                     print("Timeout while waiting for poll_frame")
