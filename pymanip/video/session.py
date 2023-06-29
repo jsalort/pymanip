@@ -161,7 +161,7 @@ class VideoSession(AsyncSession):
         self.output_format_params = output_format_params
         self.timeout = timeout
         self.burst_mode = burst_mode
-        
+
         if output_path is None:
             current_date = datetime.today().strftime("%Y-%m-%d")
             base_dir = Path(".") / current_date
@@ -209,7 +209,7 @@ class VideoSession(AsyncSession):
                 i = 1
                 while True:
                     self.output_folder = base_dir / f"{i:02d}"
-                    session_name = self.output_folder / "session"
+                    session_name = self.output_folder / "session.db"
                     if self.output_folder.exists():
                         i = i + 1
                     else:
@@ -294,13 +294,12 @@ class VideoSession(AsyncSession):
         print(f"{n:d} images acquired (cam {cam_no:}).")
 
     async def _save_images_finished(self):
-        """Awaits all images in queue have been saved.
-        """
+        """Awaits all images in queue have been saved."""
         while (not all([q.empty() for q in self.image_queues])) or self.saving:
             self.running = False
             await asyncio.sleep(1.0)
         print("Image saving complete.")
-        
+
     async def _start_clock(self):
         """Private instance method: clock starting task.
         This task waits for all the cameras to be ready for trigger, and then sends a software trig to
@@ -350,7 +349,9 @@ class VideoSession(AsyncSession):
                     )
                     if not no_save:
                         if hasattr(self, "process_image") and not unprocessed:
-                            img = await loop.run_in_executor(None, self.process_image, img)
+                            img = await loop.run_in_executor(
+                                None, self.process_image, img
+                            )
                         filepath = (
                             self.output_folder
                             / f"img-cam{cam_no:d}-{(i[cam_no]+1):05d}.{self.output_format:}"
@@ -561,7 +562,8 @@ class VideoSession(AsyncSession):
                     )
         else:
             acquisition_tasks = [
-                self._acquire_images(cam_no, live=live) for cam_no in range(len(self.camera_list))
+                self._acquire_images(cam_no, live=live)
+                for cam_no in range(len(self.camera_list))
             ]
             if live:
                 save_tasks = [self._live_preview(unprocessed)]
@@ -596,9 +598,11 @@ class VideoSession(AsyncSession):
         # Post-acquisition information
         _, camera_timestamps = self.logged_variable("ts")
         _, camera_counter = self.logged_variable("count")
-        
+
         if isinstance(camera_timestamps[0], str):
-            camera_timestamps = np.array([datetime.fromisoformat(ts).timestamp() for ts in camera_timestamps])
+            camera_timestamps = np.array(
+                [datetime.fromisoformat(ts).timestamp() for ts in camera_timestamps]
+            )
 
         if camera_timestamps.size > 2:
             dt = camera_timestamps[1:] - camera_timestamps[:-1]
@@ -621,7 +625,11 @@ class VideoSession(AsyncSession):
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
         ts, count = asyncio.run(
-            self.main(additionnal_trig=additionnal_trig, delay_save=delay_save, no_save=no_save)
+            self.main(
+                additionnal_trig=additionnal_trig,
+                delay_save=delay_save,
+                no_save=no_save,
+            )
         )
         return ts, count
 
@@ -757,12 +765,15 @@ class VideoSession(AsyncSession):
                         print(ndropped, "frames dropped.", end="\r")
                     if hasattr(self, "process_image") and not unprocessed:
                         img = self.process_image(img)
-                        
-                    if hasattr(self.camera_list[cam_no], "color_order") and self.camera_list[cam_no].color_order is not None:
+
+                    if (
+                        hasattr(self.camera_list[cam_no], "color_order")
+                        and self.camera_list[cam_no].color_order is not None
+                    ):
                         color = True
                         try:
                             l, c, ncomp = img.shape  # RGB or BGR mode
-                        except:
+                        except Exception:
                             l, c = img.shape  # Raw non-de-bayerized mode
                     else:
                         l, c = img.shape
@@ -770,7 +781,7 @@ class VideoSession(AsyncSession):
                         minimum = np.min(img)
                         maximum = np.max(img)
                         maxint = np.iinfo(img.dtype).max
-                        
+
                     if color:
                         if self.camera_list[cam_no].color_order == "RGB":
                             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
