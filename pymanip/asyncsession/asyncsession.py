@@ -39,6 +39,7 @@ from email.message import EmailMessage
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import sqlalchemy.exc
 
 try:
     import PyQt5.QtCore  # noqa: F401
@@ -60,18 +61,28 @@ __all__ = ["AsyncSession"]
 def get_db_module(Session):
     """Reads version of database of given Session class, and returns appropriate database schema module."""
     with Session() as sesn:
-        (version,) = (
-            sesn.query(dbv3.Parameter.value)
-            .filter_by(name="_database_version")
-            .one_or_none()
-        )
-        if version == 3 or version == 3.1:
-            db = dbv3
-        elif version == 4:
-            db = dbv4
+        try:
+            version = (
+                sesn.query(dbv3.Parameter.value)
+                .filter_by(name="_database_version")
+                .one_or_none()
+            )
+        except sqlalchemy.exc.MultipleResultsFound:
+            print("Multiple _database_version found. Fallback to dbv3.")
+            return dbv3
+        if version is None:
+            print("No _database_Version found. Fallback to dbv3.")
+            return dbv3
         else:
-            print(f"Unable to determine database version. Got <{version}>.")
-            db = dblatest
+            (version,) = version
+            if version == 3 or version == 3.1:
+                db = dbv3
+            elif version == 4:
+                db = dbv4
+            else:
+                print(f"Unable to determine database version. Got <{version}>.")
+                print("Fallback to dbv3")
+                return dbv3
     return db
 
 
