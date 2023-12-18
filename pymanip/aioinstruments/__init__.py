@@ -14,3 +14,4 @@ from .julabo import AsyncJulabo  # noqa: F401
 from .tti_cpx400dp import AsyncTtiCpx400dp  # noqa: F401
 from .lauda import AsyncLauda  # noqa: F401
 from .arduino_gbf import AsyncArduino  # noqa: F401
+from .lakeshore_224 import AsyncLakeshore224  # noqa: F401
