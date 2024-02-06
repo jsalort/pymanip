@@ -161,6 +161,7 @@ class VideoSession(AsyncSession):
         self.output_format_params = output_format_params
         self.timeout = timeout
         self.burst_mode = burst_mode
+        self.must_stop = False
 
         if output_path is None:
             current_date = datetime.today().strftime("%Y-%m-%d")
@@ -313,6 +314,14 @@ class VideoSession(AsyncSession):
             print("trigger sent")
         return datetime.now().timestamp()
 
+    def ask_exit(self, *args, **kwargs):
+        if self.running:
+            print(" Signal caught... stopping video acquisition...")
+            self.running = False
+        else:
+            print(" Signal caught... stopping all tasks...")
+            self.must_stop = True
+
     async def _save_images(self, keep_in_RAM=False, unprocessed=False, no_save=False):
         """Private instance method: image saving task.
         This task checks the image FIFO queue. If an image is available, it is taken out of the queue and
@@ -334,10 +343,14 @@ class VideoSession(AsyncSession):
             self.image_list = [list() for _ in range(len(self.camera_list))]
 
         while True:
+            if self.must_stop:
+                break
             if not self.running:
                 if all([q.empty() for q in self.image_queues]):
                     break
             for cam_no, q in enumerate(self.image_queues):
+                if self.must_stop:
+                    break
                 if q.empty():
                     self.saving = False
                     await asyncio.sleep(0.1)
@@ -354,7 +367,7 @@ class VideoSession(AsyncSession):
                             )
                         filepath = (
                             self.output_folder
-                            / f"img-cam{cam_no:d}-{(i[cam_no]+1):05d}.{self.output_format:}"
+                            / f"img-cam{cam_no:d}-{(i[cam_no] + 1):05d}.{self.output_format:}"
                         )
                     if keep_in_RAM:
                         self.image_list[cam_no].append(img)
