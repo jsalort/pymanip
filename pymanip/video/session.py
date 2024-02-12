@@ -113,6 +113,28 @@ import cv2
 from pymanip.asyncsession import AsyncSession
 from pymanip.video import MetadataArray
 
+from qasync import QEventLoop, QApplication, QThreadExecutor, asyncClose
+from PyQt5.QtWidgets import QWidget
+import pyqtgraph as pg
+
+
+class PreviewWindow(QWidget):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+        self.resize(800, 600)
+        self.setWindowTitle("Live preview")
+
+        self.image_view = pg.ImageView()
+        self.setCentralWidget(self.image_view)
+
+    @asyncClose
+    async def closeEvent(self, event):
+        self.session.ask_exit()
+        await asyncio.sleep(0.1)
+        while not all(self.session.acquisition_finished):
+            await asyncio.sleep(0.1)
+
 
 class VideoSession(AsyncSession):
     """This class represents a video acquisition session.
@@ -646,7 +668,7 @@ class VideoSession(AsyncSession):
         )
         return ts, count
 
-    def live(self):
+    def live_cv(self):
         """Starts live preview."""
         old_nframes = self.nframes
         old_output_format = self.output_format
@@ -658,6 +680,32 @@ class VideoSession(AsyncSession):
             self.nframes = old_nframes
             self.output_format = old_output_format
         return ts, count
+
+    def live_qt(self):
+        # Set up Qt application with qasync
+        app = QApplication()
+        event_loop = QEventLoop(app)
+        asyncio.set_event_loop(event_loop)
+
+        app_close_event = asyncio.Event()
+        app.aboutToQuit.connect(app_close_event.set)
+
+        # Create window
+        self.window = PreviewWindow()
+        self.image_view = self.window.image_view
+        self.range_set = False
+        self.window.show()
+
+        with event_loop:
+            with QThreadExecutor(1) as executor:
+                event_loop.set_default_executor(executor)
+                event_loop.run_until_complete(self.main(live=True))
+
+    def live(self, backend="cv"):
+        if backend == "cv":
+            self.live_cv()
+        elif backend == "qt":
+            self.live_qt()
 
     def get_one_image(
         self, additionnal_trig=0, unprocessed=False, unpack_solo_cam=True
@@ -811,10 +859,25 @@ class VideoSession(AsyncSession):
                     if zoom > 1:
                         img = cv2.resize(img, (int(c / zoom), int(l / zoom)))
 
-                    # Show image and run cv2 event loop
-                    cv2.imshow(f"cam{cam_no:}", img)
-            k = cv2.waitKey(1)
-            if k != -1:
-                self.ask_exit()
-            await asyncio.sleep(0.1)
-        cv2.destroyAllWindows()
+                    if hasattr(self, "app"):
+                        # Preview with pyqtgraph
+                        self.image_view.setImage(
+                            img,
+                            autoRange=False,
+                            autoLevels=False,
+                            autoHistogramRange=False,
+                        )
+                        if not self.range_set:
+                            self.image_view.autoRange()
+                            self.image_view.autoLevels()
+                            self.range_set = True
+                    else:
+                        # Show image and run cv2 event loop
+                        cv2.imshow(f"cam{cam_no:}", img)
+            if not hasattr(self, "app"):
+                k = cv2.waitKey(1)
+                if k != -1:
+                    self.ask_exit()
+                await asyncio.sleep(0.1)
+        if not hasattr(self, "app"):
+            cv2.destroyAllWindows()
