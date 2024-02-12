@@ -70,7 +70,9 @@ def PCO_get_binary_timestamp(image):
     microseconds = pf.bcd_to_int(image[11:], endianess="big")
     return (
         counter,
-        datetime.datetime(year, month, day, hour, minutes, seconds, microseconds),
+        datetime.datetime(
+            year, month, day, hour, minutes, seconds, microseconds
+        ).timestamp(),
     )
 
 
@@ -90,8 +92,7 @@ class PCO_Buffer:
     """
 
     def __init__(self, cam_handle, XResAct, YResAct):
-        """Constructor method
-        """
+        """Constructor method"""
         self.cam_handle = cam_handle
         self.XResAct = XResAct
         self.YResAct = YResAct
@@ -103,19 +104,16 @@ class PCO_Buffer:
         self.event_handle = event
 
     def free(self):
-        """This methods frees the buffer.
-        """
+        """This methods frees the buffer."""
         pf.PCO_FreeBuffer(self.cam_handle, self.bufNr)
         self.bufPtr = None
 
     def __enter__(self):
-        """Context manager enter method
-        """
+        """Context manager enter method"""
         return self
 
     def __exit__(self, type_, value, cb):
-        """Context manager exit method
-        """
+        """Context manager exit method"""
         self.free()
 
     def as_array(self):
@@ -197,15 +195,13 @@ class PCO_Camera(Camera):
             self.MetaDataVersion = MetaDataVersion
 
     def close(self):
-        """This method closes the connection to the camera.
-        """
+        """This method closes the connection to the camera."""
         pf.PCO_CloseCamera(self.handle)
         self.handle = None
         print("Connection to camera closed.")
 
     def __exit__(self, type_, value, cb):
-        """Context manager exit method
-        """
+        """Context manager exit method"""
         super(PCO_Camera, self).__exit__(type_, value, cb)
         self.close()
 
@@ -222,12 +218,12 @@ class PCO_Camera(Camera):
     def set_adc_operating_mode(self, mode):
         """This function selects single or dual ADC operating mode:
 
-           :param mode: "single" (or 0x0001) or "dual" (or 0x0002)
-           :type mode: int or str
+        :param mode: "single" (or 0x0001) or "dual" (or 0x0002)
+        :type mode: int or str
 
-           - Single mode increases linearity;
+        - Single mode increases linearity;
 
-           - Dual mode allows higher frame rates.
+        - Dual mode allows higher frame rates.
 
         """
         if mode not in (0x0001, 0x0002):
@@ -272,7 +268,9 @@ class PCO_Camera(Camera):
         if isinstance(mode, bool):
             if mode:
                 self.set_trigger_mode(0x0002)
-                print("Trigger mode set to 0x0002 (external expoure start & software trigger")
+                print(
+                    "Trigger mode set to 0x0002 (external expoure start & software trigger"
+                )
             else:
                 self.set_trigger_mode(0x0000)
                 print("Trigger mode set to 0x0000 (auto sequence)")
@@ -458,14 +456,12 @@ class PCO_Camera(Camera):
     # Properties
     @property
     def resolution(self):
-        """Camera maximum resolution
-        """
+        """Camera maximum resolution"""
         return self.camera_description.maximum_resolution_std
 
     @property
     def name(self):
-        """Camera name
-        """
+        """Camera name"""
         # if hasattr(self, '_name'):
         #    return self._name
         # PCO_GetCameraName is not supported by pco.1600
@@ -475,8 +471,7 @@ class PCO_Camera(Camera):
 
     @property
     def bitdepth(self):
-        """Camera sensor bit depth
-        """
+        """Camera sensor bit depth"""
         return 16
 
     def current_delay_exposure_time(self):
@@ -531,8 +526,7 @@ class PCO_Camera(Camera):
         return pf.PCO_GetFrameRate(self.handle)
 
     def acquisition_oneshot(self):
-        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_oneshot` for the PCO camera.
-        """
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_oneshot` for the PCO camera."""
         # Arm camera
         pf.PCO_ArmCamera(self.handle)
         XResAct, YResAct, XResMax, YResMax = pf.PCO_GetSizes(self.handle)
@@ -563,8 +557,7 @@ class PCO_Camera(Camera):
         initialising_cams=None,
         raise_on_timeout=True,
     ):
-        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the PCO camera.
-        """
+        """Concrete implementation of :meth:`pymanip.video.Camera.acquisition_async` for the PCO camera."""
 
         loop = asyncio.get_event_loop()
 
