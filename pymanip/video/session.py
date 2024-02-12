@@ -114,11 +114,11 @@ from pymanip.asyncsession import AsyncSession
 from pymanip.video import MetadataArray
 
 from qasync import QEventLoop, QApplication, QThreadExecutor, asyncClose
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QMainWindow
 import pyqtgraph as pg
 
 
-class PreviewWindow(QWidget):
+class PreviewWindow(QMainWindow):
     def __init__(self, session):
         super().__init__()
         self.session = session
@@ -131,9 +131,15 @@ class PreviewWindow(QWidget):
     @asyncClose
     async def closeEvent(self, event):
         self.session.ask_exit()
+        # make sure all tasks are finished before shutting down event loop
         await asyncio.sleep(0.1)
         while not all(self.session.acquisition_finished):
             await asyncio.sleep(0.1)
+        while self.session.live_preview_running:
+            await asyncio.sleep(0.1)
+        while self.session.main_running:
+            await asyncio.sleep(0.1)
+        print("closeEvent task finished")
 
 
 class VideoSession(AsyncSession):
@@ -267,6 +273,7 @@ class VideoSession(AsyncSession):
         :param live: if True, images are converted to numpy array even if self.output_format = 'dng'
         :type live: bool, optional
         """
+        print("_acquire_images task")
         with self.camera_list[cam_no] as cam:
             if hasattr(self, "prepare_camera"):
                 self.prepare_camera(cam)
@@ -548,6 +555,7 @@ class VideoSession(AsyncSession):
         :return: camera_timestamps, camera_counter
         :rtype: :class:`numpy.ndarray`, :class:`numpy.ndarray`
         """
+        self.main_running = True
         if self.trigger_gbf is not None:
             with self.trigger_gbf:
                 if live or self.nframes < 2 or not self.burst_mode:
@@ -621,6 +629,7 @@ class VideoSession(AsyncSession):
                     ]
 
             await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
+            print("monitor task finished")
 
         # Post-acquisition save if the save_tasks were not included (in fast mode, or in regular mode)
         if delay_save:
@@ -649,6 +658,8 @@ class VideoSession(AsyncSession):
             max_fps = 1.0 / min_dt
             print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3f})")
 
+        print("main task finished")
+        self.main_running = False
         return camera_timestamps, camera_counter
 
     def run(self, additionnal_trig=0, delay_save=False, no_save=False):
@@ -669,7 +680,7 @@ class VideoSession(AsyncSession):
         return ts, count
 
     def live_cv(self):
-        """Starts live preview."""
+        """Starts live preview using OpenCV."""
         old_nframes = self.nframes
         old_output_format = self.output_format
         try:
@@ -682,30 +693,44 @@ class VideoSession(AsyncSession):
         return ts, count
 
     def live_qt(self):
-        # Set up Qt application with qasync
-        app = QApplication()
-        event_loop = QEventLoop(app)
-        asyncio.set_event_loop(event_loop)
+        """Starts live preview using PyQtGraph."""
+        old_nframes = self.nframes
+        old_output_format = self.output_format
+        try:
+            self.nframes = float("inf")
+            self.output_format = "png"
 
-        app_close_event = asyncio.Event()
-        app.aboutToQuit.connect(app_close_event.set)
+            # Set up Qt application with qasync
+            self.app = QApplication(["LivePreview"])
+            event_loop = QEventLoop(self.app)
+            asyncio.set_event_loop(event_loop)
 
-        # Create window
-        self.window = PreviewWindow()
-        self.image_view = self.window.image_view
-        self.range_set = False
-        self.window.show()
+            app_close_event = asyncio.Event()
+            self.app.aboutToQuit.connect(app_close_event.set)
 
-        with event_loop:
-            with QThreadExecutor(1) as executor:
-                event_loop.set_default_executor(executor)
-                event_loop.run_until_complete(self.main(live=True))
+            # Create window
+            self.window = PreviewWindow(session=self)
+            self.image_view = self.window.image_view
+            self.range_set = False
+            self.window.show()
 
-    def live(self, backend="cv"):
+            with event_loop:
+                with QThreadExecutor(1) as executor:
+                    event_loop.set_default_executor(executor)
+                    ts, count = event_loop.run_until_complete(self.main(live=True))
+                event_loop.set_default_executor(None)
+        finally:
+            self.nframes = old_nframes
+            self.output_format = old_output_format
+        return ts, count
+
+    def live(self, backend="qt"):
+        """Starts live preview"""
         if backend == "cv":
-            self.live_cv()
+            ts, count = self.live_cv()
         elif backend == "qt":
-            self.live_qt()
+            ts, count = self.live_qt()
+        return ts, count
 
     def get_one_image(
         self, additionnal_trig=0, unprocessed=False, unpack_solo_cam=True
@@ -809,6 +834,7 @@ class VideoSession(AsyncSession):
         :param unprocessed: do not call :meth:`process_image` method.
         :type unprocessed: bool
         """
+        self.live_preview_running = True
         minimum = None
         maximum = None
         while self.running or any([not q.empty() for q in self.image_queues]):
@@ -826,7 +852,6 @@ class VideoSession(AsyncSession):
                         print(ndropped, "frames dropped.", end="\r")
                     if hasattr(self, "process_image") and not unprocessed:
                         img = self.process_image(img)
-
                     if (
                         hasattr(self.camera_list[cam_no], "color_order")
                         and self.camera_list[cam_no].color_order is not None
@@ -868,6 +893,8 @@ class VideoSession(AsyncSession):
                             autoHistogramRange=False,
                         )
                         if not self.range_set:
+                            print("auto range")
+                            print("auto level")
                             self.image_view.autoRange()
                             self.image_view.autoLevels()
                             self.range_set = True
@@ -878,6 +905,7 @@ class VideoSession(AsyncSession):
                 k = cv2.waitKey(1)
                 if k != -1:
                     self.ask_exit()
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
         if not hasattr(self, "app"):
             cv2.destroyAllWindows()
+        self.live_preview_running = False
