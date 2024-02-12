@@ -48,7 +48,6 @@ class Photometrics_Camera(Camera):
         global pvc_initialized
 
         if not pvc_initialized:
-            print("pvc.init_pvcam")
             pvc.init_pvcam()
             pvc_initialized = True
 
@@ -216,10 +215,10 @@ class Photometrics_Camera(Camera):
                         / 1e12,
                     },
                 )
-                if count == 0:
-                    for k, v in frame["meta_data"]["frame_header"].items():
-                        print(k, v)
-                    print("roi_headers", frame["meta_data"]["roi_headers"])
+                # if count == 0:
+                #    for k, v in frame["meta_data"]["frame_header"].items():
+                #        print(k, v)
+                #    print("roi_headers", frame["meta_data"]["roi_headers"])
                 count += 1
                 if stop_signal:
                     break

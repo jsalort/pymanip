@@ -139,7 +139,6 @@ class PreviewWindow(QMainWindow):
             await asyncio.sleep(0.1)
         while self.session.main_running:
             await asyncio.sleep(0.1)
-        print("closeEvent task finished")
 
 
 class VideoSession(AsyncSession):
@@ -273,7 +272,6 @@ class VideoSession(AsyncSession):
         :param live: if True, images are converted to numpy array even if self.output_format = 'dng'
         :type live: bool, optional
         """
-        print("_acquire_images task")
         with self.camera_list[cam_no] as cam:
             if hasattr(self, "prepare_camera"):
                 self.prepare_camera(cam)
@@ -335,7 +333,6 @@ class VideoSession(AsyncSession):
         This task waits for all the cameras to be ready for trigger, and then sends a software trig to
         the function generator.
         """
-        print("clock task")
         while len(self.initialising_cams) > 0:
             await asyncio.sleep(0.1)
         with self.trigger_gbf:
@@ -517,7 +514,6 @@ class VideoSession(AsyncSession):
         proc.stdin.close()
         await asyncio.wait_for(proc.stdin.wait_closed(), timeout=5.0)
         await asyncio.wait_for(proc.wait(), timeout=5.0)
-        print("ffmpeg has terminated.")
 
     async def _fast_acquisition_to_ram(self, cam_no, total_timeout_s):
         """Private instance method: fast acquisition to ram task"""
@@ -629,7 +625,6 @@ class VideoSession(AsyncSession):
                     ]
 
             await self.monitor(*acquisition_tasks, *save_tasks, server_port=None)
-            print("monitor task finished")
 
         # Post-acquisition save if the save_tasks were not included (in fast mode, or in regular mode)
         if delay_save:
@@ -658,7 +653,6 @@ class VideoSession(AsyncSession):
             max_fps = 1.0 / min_dt
             print(f"fps = {mean_fps:.3f} (between {min_fps:.3f} and {max_fps:.3f})")
 
-        print("main task finished")
         self.main_running = False
         return camera_timestamps, camera_counter
 
@@ -875,7 +869,8 @@ class VideoSession(AsyncSession):
                             img = cv2.cvtColor(img, cv2.COLOR_BayerGR2BGR)
                         else:
                             raise NotImplementedError
-                    else:
+                    elif not hasattr(self, "app"):
+                        # with OpenCV backend,
                         # if not in color, we rescale min max to first image (otherwise may appear black)
                         img = (maxint // (maximum - minimum)) * (img - minimum)
                     zoom_l = l / 900
@@ -886,6 +881,14 @@ class VideoSession(AsyncSession):
 
                     if hasattr(self, "app"):
                         # Preview with pyqtgraph
+                        if not color:
+                            img = img.T
+                        else:
+                            img = np.transpose(img, axes=(1, 0, 2))
+                            if self.color_order == "BGR":
+                                # Qt comme Matplotlib travaille en RGB.
+                                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
                         self.image_view.setImage(
                             img,
                             autoRange=False,
@@ -893,8 +896,6 @@ class VideoSession(AsyncSession):
                             autoHistogramRange=False,
                         )
                         if not self.range_set:
-                            print("auto range")
-                            print("auto level")
                             self.image_view.autoRange()
                             self.image_view.autoLevels()
                             self.range_set = True
