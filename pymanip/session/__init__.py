@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Module for experimental sessions.
 
@@ -85,7 +84,7 @@ def makeAcqName(comment=None):
     return next(defaultGenerator)
 
 
-class BaseSession(object):
+class BaseSession:
     def __init__(self, session_name=None):
         if session_name is None:
             session_name = makeAcqName()
@@ -310,47 +309,8 @@ class SavedSession(BaseSession):
         self, session_name, cache_override=False, cache_location=".", verbose=True
     ):
         super(SavedSession, self).__init__(session_name)
-        self.store = h5py.File(self.storename, "r")
-        try:
-            self.dset_time = self.store["time"]
-        except KeyError:
-            print("The file '" + self.storename + "' is not a pymanip session file.")
-            raise RuntimeError("Wrong hdf5 data")
-        self.grp_variables = self.store["variables"]
         self.verbose = verbose
-        try:
-            self.parameters = self.store.attrs
-            self.parameters_defined = True
-        except Exception:
-            self.parameters_defined = False
-            pass
-        try:
-            self.grp_datasets = self.store["datasets"]
-            self.grp_datasets_defined = True
-        except Exception:
-            self.grp_datasets_defined = False
-            pass
-        self.opened = True
-        if verbose:
-            print("Loading saved session from file", self.storename)
-        total_size = self.dset_time.len()
-        if total_size > 0:
-            start_t = self.dset_time[0]
-            end_t = self.dset_time[total_size - 1]
-            start_string = time.strftime(dateformat, time.localtime(start_t))
-            end_string = time.strftime(dateformat, time.localtime(end_t))
-            if verbose:
-                cprint.blue("*** Start date: " + start_string)
-                cprint.blue("***   End date: " + end_string)
-        elif not self.grp_datasets_defined:
-            if verbose:
-                cprint.red("No logged variables")
-        if self.grp_datasets_defined:
-            timestamp_string = time.strftime(
-                dateformat, time.localtime(self.grp_datasets.attrs["timestamp"])
-            )
-            if verbose:
-                cprint.blue("*** Acquisition timestamp " + timestamp_string)
+        self.opened = False
         self.cachestorename = os.path.join(
             os.path.realpath(cache_location), "cache", os.path.basename(self.storename)
         )
@@ -358,14 +318,6 @@ class SavedSession(BaseSession):
             self.cachemode = "w"
         else:
             self.cachemode = "r+"
-        try:
-            self.cachestore = h5py.File(self.cachestorename, self.cachemode)
-            if verbose:
-                cprint.yellow("*** Cache store found at " + self.cachestorename)
-            self.has_cachestore = True
-        except IOError:
-            self.has_cachestore = False
-            pass
 
     @property
     def cachedvars(self):
@@ -480,13 +432,65 @@ class SavedSession(BaseSession):
                         )
                         self.cachestore[name][:] = dict_caller[name]
 
+    def __enter__(self):
+        self.store = h5py.File(self.storename, "r")
+        try:
+            self.dset_time = self.store["time"]
+        except KeyError:
+            print("The file '" + self.storename + "' is not a pymanip session file.")
+            raise RuntimeError("Wrong hdf5 data")
+        self.grp_variables = self.store["variables"]
+        try:
+            self.parameters = self.store.attrs
+            self.parameters_defined = True
+        except Exception:
+            self.parameters_defined = False
+            pass
+        try:
+            self.grp_datasets = self.store["datasets"]
+            self.grp_datasets_defined = True
+        except Exception:
+            self.grp_datasets_defined = False
+            pass
+        self.opened = True
+        if self.verbose:
+            print("Loading saved session from file", self.storename)
+        total_size = self.dset_time.len()
+        if total_size > 0:
+            start_t = self.dset_time[0]
+            end_t = self.dset_time[total_size - 1]
+            start_string = time.strftime(dateformat, time.localtime(start_t))
+            end_string = time.strftime(dateformat, time.localtime(end_t))
+            if self.verbose:
+                cprint.blue("*** Start date: " + start_string)
+                cprint.blue("***   End date: " + end_string)
+        elif not self.grp_datasets_defined:
+            if self.verbose:
+                cprint.red("No logged variables")
+        if self.grp_datasets_defined:
+            timestamp_string = time.strftime(
+                dateformat, time.localtime(self.grp_datasets.attrs["timestamp"])
+            )
+            if self.verbose:
+                cprint.blue("*** Acquisition timestamp " + timestamp_string)
+
+        try:
+            self.cachestore = h5py.File(self.cachestorename, self.cachemode)
+            if self.verbose:
+                cprint.yellow("*** Cache store found at " + self.cachestorename)
+            self.has_cachestore = True
+        except IOError:
+            self.has_cachestore = False
+            pass
+        return super().__enter__()
+
     def __exit__(self, type, value, cb):
-        """ Previous versions used __del__ which is bad
-            practise because the gc triggering mechanism is
-            an implementation detail of CPython.
-            Therefore, one should either explicitly call
-            Stop() or close(), or use a context manager
-            (preferred way)
+        """Previous versions used __del__ which is bad
+        practise because the gc triggering mechanism is
+        an implementation detail of CPython.
+        Therefore, one should either explicitly call
+        Stop() or close(), or use a context manager
+        (preferred way)
         """
         self.store.close()
         self.store = None
@@ -495,7 +499,7 @@ class SavedSession(BaseSession):
             self.cachestore.close()
             self.has_cachestore = False
             self.cachestore = None
-        super(SavedSession, self).__exit__(type, value, cb)
+        super().__exit__(type, value, cb)
 
 
 class Session(BaseSession):

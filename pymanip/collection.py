@@ -23,10 +23,6 @@ class Manip(object):
             self.nickname = session_name
         self.directory = directory
         self.verbose = verbose
-        self.cachedvars = self.MI.cachedvars
-        self.cached = self.MI.cached
-        self.cachedvalue = self.MI.cachedvalue
-        self.cache = self.MI.cache
 
     def __str__(self):
         return self.nickname
@@ -66,26 +62,39 @@ class Manip(object):
     def describe(self):
         self.MI.describe()
 
-    @property
-    def MI(self):
-        if not hasattr(self, "_MI"):
-            if self.directory:
-                name = os.path.join(self.directory, self.session_name)
-            else:
-                name = self.session_name
+    def __enter__(self):
+        if self.directory:
+            name = os.path.join(self.directory, self.session_name)
+        else:
+            name = self.session_name
+        try:
+            self._MI = SavedSession(name, verbose=self.verbose)
+            self._MI.__enter__()
+        except IOError as a:
             try:
-                self._MI = SavedSession(name, verbose=self.verbose)
-            except IOError as a:
-                try:
-                    self._MI = OctSession(name, verbose=self.verbose)
-                except IOError as b:
-                    print("None of the possible files can be found:")
-                    print(" 1. {:}".format(a.filename))
-                    print(" 2. {:}".format(b.filename))
-                    raise IOError('Cannot open session "{:}" for reading'.format(name))
-                # print('OctMI legacy mode')
+                self._MI = OctSession(name, verbose=self.verbose)
+            except IOError as b:
+                print("None of the possible files can be found:")
+                print(" 1. {:}".format(a.filename))
+                print(" 2. {:}".format(b.filename))
+                raise IOError('Cannot open session "{:}" for reading'.format(name))
+            # print('OctMI legacy mode')
+
+        self.cachedvars = self._MI.cachedvars
+        self.cached = self._MI.cached
+        self.cachedvalue = self._MI.cachedvalue
+        self.cache = self._MI.cache
 
         return self._MI
+
+    def __exit__(self, type_, value, cb):
+        if hasattr(self._MI, "__exit__"):
+            self._MI.__exit__(type_, value, cb)
+        self.cachedvars = None
+        self.cached = None
+        self.cachedvalue = None
+        self.cache = None
+        del self._MI
 
 
 class ManipCollection(Manip):

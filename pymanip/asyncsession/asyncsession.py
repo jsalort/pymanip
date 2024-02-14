@@ -49,6 +49,7 @@ except (ModuleNotFoundError, FileNotFoundError):
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
 
+import pymanip.asyncsession.database_v1 as dbv1
 import pymanip.asyncsession.database_v3 as dbv3
 import pymanip.asyncsession.database_v4 as dbv4
 
@@ -71,18 +72,22 @@ def get_db_module(Session):
             print("Multiple _database_version found. Fallback to dbv3.")
             return dbv3
         if version is None:
-            print("No _database_Version found. Fallback to dbv3.")
-            return dbv3
+            return dbv1
         else:
             (version,) = version
-            if version == 3 or version == 3.1:
+            if version == 1:
+                """Identique au schéma v2, mais sans les tables `dataset` et `dataset_names`."""
+                db = dbv1
+            elif version == 2:
+                """Identique au schéma v3 mais il n'y a pas la property `_session_creation_timestamp`."""
+                db = dbv3
+            elif version == 3 or version == 3.1:
                 db = dbv3
             elif version == 4:
                 db = dbv4
             else:
                 print(f"Unable to determine database version. Got <{version}>.")
-                print("Fallback to dbv3")
-                return dbv3
+                return dbv4
     return db
 
 

@@ -42,45 +42,45 @@ def manip_info(sessionName, quiet, line_to_print, var_to_plot):
         N = len(sessionName)
         sessionName = sessionName[0 : (N - 5)]
 
-    MI = Manip(sessionName).MI
-    if line_to_print is not None:
-        if line_to_print >= len(MI.log("t")):
-            print("Specified line is out of bound.")
-            sys.exit(1)
-        format_str = "{:>15} | {:>20}"
-        print("Printing saved values on line", line_to_print)
-        print(format_str.format("Variable", "Value"))
-        varlist = ["Time"]
-        varlist += MI.log_variable_list()
-        print("-" * 38)
-        for varname in varlist:
-            valtab = MI.log(varname)
-            if isinstance(valtab, (float, int)):
-                # might occur if only one line
-                print(format_str.format(varname, MI.log(varname)))
+    with Manip(sessionName) as MI:
+        if line_to_print is not None:
+            if line_to_print >= len(MI.log("t")):
+                print("Specified line is out of bound.")
+                sys.exit(1)
+            format_str = "{:>15} | {:>20}"
+            print("Printing saved values on line", line_to_print)
+            print(format_str.format("Variable", "Value"))
+            varlist = ["Time"]
+            varlist += MI.log_variable_list()
+            print("-" * 38)
+            for varname in varlist:
+                valtab = MI.log(varname)
+                if isinstance(valtab, (float, int)):
+                    # might occur if only one line
+                    print(format_str.format(varname, MI.log(varname)))
+                else:
+                    print(format_str.format(varname, MI.log(varname)[line_to_print]))
+        elif not quiet:
+            MI.describe()
+        if var_to_plot is not None:
+            if var_to_plot in MI.log_variable_list():
+                t = date2num(datetime.fromtimestamp(MI.log("t")))
+                vardata = MI.log(var_to_plot)
+                fig = plt.figure()
+                xtick_locator = AutoDateLocator()
+                xtick_formatter = AutoDateFormatter(xtick_locator)
+                ax = plt.axes()
+                ax.xaxis.set_major_locator(xtick_locator)
+                ax.xaxis.set_major_formatter(xtick_formatter)
+                ax.plot(t, vardata, "o-")
+                plt.setp(ax.xaxis.get_majorticklabels(), rotation=70)
+                fig.subplots_adjust(bottom=0.2)
+                plt.ylabel(var_to_plot)
+                plt.title(sessionName)
+                plt.show()
             else:
-                print(format_str.format(varname, MI.log(varname)[line_to_print]))
-    elif not quiet:
-        MI.describe()
-    if var_to_plot is not None:
-        if var_to_plot in MI.log_variable_list():
-            t = date2num(datetime.fromtimestamp(MI.log("t")))
-            vardata = MI.log(var_to_plot)
-            fig = plt.figure()
-            xtick_locator = AutoDateLocator()
-            xtick_formatter = AutoDateFormatter(xtick_locator)
-            ax = plt.axes()
-            ax.xaxis.set_major_locator(xtick_locator)
-            ax.xaxis.set_major_formatter(xtick_formatter)
-            ax.plot(t, vardata, "o-")
-            plt.setp(ax.xaxis.get_majorticklabels(), rotation=70)
-            fig.subplots_adjust(bottom=0.2)
-            plt.ylabel(var_to_plot)
-            plt.title(sessionName)
-            plt.show()
-        else:
-            print("Variable", var_to_plot, "does not exist!")
-            sys.exit(1)
+                print("Variable", var_to_plot, "does not exist!")
+                sys.exit(1)
 
 
 def check_hdf(acqName, variable_to_plot):
