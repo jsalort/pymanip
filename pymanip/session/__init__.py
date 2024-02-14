@@ -6,22 +6,20 @@ Useful classes are Session and SavedSession.
 """
 
 import os
-import numpy as np
+from pathlib import Path
 import time
 import inspect
-import matplotlib.pyplot as plt
+from datetime import datetime
 import warnings
 
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    import h5py
+import numpy as np
+import matplotlib.pyplot as plt
+import h5py
+
 import smtplib
 import base64
 import quopri
 import tempfile
-
-from datetime import datetime
 
 from fluiddyn.util.terminal_colors import cprint
 
@@ -35,13 +33,6 @@ except ImportError:
 
 
 import pymanip.mytime as mytime
-
-try:
-    from pathlib import Path
-
-    has_pathlib = True
-except ImportError:
-    has_pathlib = False
 from pymanip.mytime import dateformat
 
 __all__ = ["makeAcqName", "SavedSession", "Session", "NameGenerator"]
@@ -89,8 +80,13 @@ class BaseSession:
         if session_name is None:
             session_name = makeAcqName()
 
-        self.session_name = session_name
-        self.storename = session_name + ".hdf5"
+        if isinstance(session_name, Path):
+            self.session_name = session_name.stem()
+            self.storename = str(session_name)
+        else:
+            self.session_name = session_name
+            self.storename = session_name + ".hdf5"
+
         self.session_opening_time = time.time()
         self.opened = False
         self.parameters_defined = False
@@ -504,12 +500,9 @@ class SavedSession(BaseSession):
 
 class Session(BaseSession):
     def __init__(self, session_name, variable_list=[], allow_override_datasets=False):
-        if has_pathlib:
-            if isinstance(session_name, Path):
-                session_name = session_name.as_posix()
         super(Session, self).__init__(session_name)
-        self.datname = session_name + ".dat"
-        self.logname = session_name + ".log"
+        self.datname = self.session_name + ".dat"
+        self.logname = self.session_name + ".log"
         self.datfile = open(self.datname, "a")
         self.logfile = open(self.logname, "a")
         self.allow_override_datasets = allow_override_datasets
