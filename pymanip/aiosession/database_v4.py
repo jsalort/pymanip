@@ -120,36 +120,32 @@ class Metadata(Base):
         }
 
 
-async def create_tables(engine):
+async def create_tables(conn):
     new = False
-    async with engine.begin() as conn:
-        if not inspect(engine).has_table("log_names"):
-            await conn.run_sync(LogName.metadata.create_all)
-            new = True
-        if not inspect(engine).has_table("log"):
-            await conn.run_sync(Log.metadata.create_all)
-            new = True
-        if not inspect(engine).has_table("dataset_names"):
-            await conn.run_sync(DatasetName.metadata.create_all)
-            new = True
-        if not inspect(engine).has_table("dataset"):
-            await conn.run_sync(Dataset.metadata.create_all)
-            new = True
-        if not inspect(engine).has_table("parameters"):
-            await conn.run_sync(Parameter.metadata.create_all)
-            new = True
-        if not inspect(engine).has_table("metadata"):
-            await conn.run_sync(Metadata.metadata.create_all)
-            new = True
-    await engine.dispose()
+    if not inspect(conn).has_table("log_names"):
+        await conn.run_sync(LogName.metadata.create_all)
+        new = True
+    if not inspect(conn).has_table("log"):
+        await conn.run_sync(Log.metadata.create_all)
+        new = True
+    if not inspect(conn).has_table("dataset_names"):
+        await conn.run_sync(DatasetName.metadata.create_all)
+        new = True
+    if not inspect(conn).has_table("dataset"):
+        await conn.run_sync(Dataset.metadata.create_all)
+        new = True
+    if not inspect(conn).has_table("parameters"):
+        await conn.run_sync(Parameter.metadata.create_all)
+        new = True
+    if not inspect(conn).has_table("metadata"):
+        await conn.run_sync(Metadata.metadata.create_all)
+        new = True
     return new
 
 
 async def copy_table(input_session, output_session, table):
-    async with input_session.begin(), output_session.begin():
-        async for r in input_session.query(table).yield_per(10000):
-            output_session.add(table(**r.as_dict()))
-    await output_session.commit()
+    async for r in input_session.query(table).yield_per(10000):
+        output_session.add(table(**r.as_dict()))
 
 
 table_list = [

@@ -18,13 +18,9 @@ import os.path
 import pickle
 import warnings
 import inspect
-
-try:
-    from functools import cached_property
-except ImportError:
-    from backports.cached_property import cached_property
 from datetime import datetime
 import asyncio
+from aiofile import async_open
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,7 +34,7 @@ import smtplib
 from email.message import EmailMessage
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-import sqlalchemy.exc
+from sqlalchemy import select
 
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
@@ -51,39 +47,6 @@ dblatest = dbv4
 
 
 __all__ = ["ExperimentalSession"]
-
-
-async def get_db_module(Session):
-    """Reads version of database of given Session class, and returns appropriate database schema module."""
-    async with Session() as session:
-        async with session.begin():
-            try:
-                version = (
-                    session.query(dbv3.Parameter.value)
-                    .filter_by(name="_database_version")
-                    .one_or_none()
-                )
-            except sqlalchemy.exc.MultipleResultsFound:
-                print("Multiple _database_version found. Fallback to dbv3.")
-                return dbv3
-            if version is None:
-                return dbv1
-            else:
-                (version,) = version
-                if version == 1:
-                    """Identique au schéma v2, mais sans les tables `dataset` et `dataset_names`."""
-                    db = dbv1
-                elif version == 2:
-                    """Identique au schéma v3 mais il n'y a pas la property `_session_creation_timestamp`."""
-                    db = dbv3
-                elif version == 3 or version == 3.1:
-                    db = dbv3
-                elif version == 4:
-                    db = dbv4
-                else:
-                    print(f"Unable to determine database version. Got <{version}>.")
-                    return dbv4
-    return db
 
 
 class ExperimentalSession:
@@ -110,7 +73,6 @@ class ExperimentalSession:
         delay_save=False,
         exist_ok=True,
         readonly=False,
-        database_version=-1,
     ):
         """Constructor method"""
 
@@ -137,9 +99,9 @@ class ExperimentalSession:
             if self.session_path.exists():
                 if not exist_ok:
                     raise RuntimeError("File exists !")
-                new_session = False
+                self.new_session = False
             else:
-                new_session = True
+                self.new_session = True
             self.engine = create_async_engine(
                 "sqlite:///" + str(self.session_path.absolute()),
                 echo=False,
@@ -149,31 +111,18 @@ class ExperimentalSession:
                 "sqlite://",
                 echo=False,
             )
-            new_session = True
-        self.Session = async_sessionmaker(bind=self.engine)
-        if new_session:
-            if database_version == -1:
-                self.db = dblatest
-            elif database_version == 3 or database_version == 3.1:
-                self.db = dbv3
-            elif database_version == 4:
-                self.db = dbv4
-        else:
-            self.db = get_db_module(self.Session)
+            self.new_session = True
 
+        self.async_session = async_sessionmaker(bind=self.engine)
         if delay_save:
-            # Load existing database into in-memory database
             self.disk_engine = create_async_engine(
                 "sqlite:///" + str(self.session_path.absolute()),
                 echo=False,
             )
-            self.disk_Session = async_sessionmaker(bind=self.disk_engine)
-            if self.session_path.exists():
-                self.db = get_db_module(self.disk_Session)
-                self.db.create_tables(self.engine)
-                with self.disk_Session() as input_session, self.Session() as output_session:
-                    for table in self.db.table_list:
-                        self.db.copy_table(input_session, output_session, table)
+            self.disk_async_session = async_sessionmaker(bind=self.disk_engine)
+        else:
+            self.disk_engine = self.engine
+            self.disk_async_session = self.async_session
 
         self.verbose = verbose
         self.readonly = readonly
@@ -188,35 +137,74 @@ class ExperimentalSession:
 
     def __aenter__(self):
         """Context manager enter method"""
-        if not self.readonly:
-            new = self.db.create_tables(self.engine)
+
+        # Database schema version
+        if self.new_session:
+            self.db = dbv4
         else:
-            new = False
-        if self.verbose and not new:
-            await self.print_welcome()
-        if new:
-            with self.Session() as session:
-                session.add(
+            async with self.disk_async_session() as session:
+                async with session.begin():
+                    version = await session.get(
+                        dbv3.Parameter, {"name": "_database_version"}
+                    )
+                    (version,) = version
+                    if version == 1:
+                        """Identique au schéma v2, mais sans les tables `dataset` et `dataset_names`."""
+                        self.db = dbv1
+                    elif version == 2:
+                        """Identique au schéma v3 mais il n'y a pas la property `_session_creation_timestamp`."""
+                        self.db = dbv3
+                    elif version == 3 or version == 3.1:
+                        self.db = dbv3
+                    elif version == 4:
+                        self.db = dbv4
+                    else:
+                        print(f"Unable to determine database version. Got <{version}>.")
+                        self.db = dbv4
+        # Create tables if necessary
+        async with self.engine.begin() as conn:
+            if not self.readonly:
+                new = await self.db.create_tables(conn)
+            else:
+                new = False
+        await self.engine.dispose()
+
+        # Load existing database into in-memory database
+        if self.delay_save:
+            async with self.disk_async_session() as input_session, self.async_session() as output_session:
+                async with input_session.begin(), output_session.begin():
+                    for table in self.db.table_list:
+                        self.db.copy_table(input_session, output_session, table)
+
+        # Enter session
+        self.session = await self.async_session.__aenter__()
+
+        async with self.session.begin():
+            # Print welcome
+            if self.verbose and not new:
+                await self.print_welcome()
+            if new:
+                self.session.add(
                     self.db.Parameter(
                         name="_database_version",
                         value=self.db.database_version,
                     )
                 )
-                session.add(
+                self.session.add(
                     self.db.Parameter(
                         name="_session_creation_timestamp",
                         value=datetime.now().timestamp(),
                     )
                 )
-                session.commit()
         return self
 
-    def __aexit__(self, type_, value, cb):
+    async def __aexit__(self, type_, value, cb):
         """Context manager exit method"""
         if self.delay_save:
-            self.save_database()
+            await self.save_database()
+        await self.session.__aexit__(type_, value, cb)
 
-    def save_database(self):
+    async def save_database(self):
         """This method is useful only if delay_save = True. Then, the database is kept in-memory for
         the duration of the session. This method saves the database on the disk.
         A new database file will be created with the content of the current
@@ -225,42 +213,45 @@ class ExperimentalSession:
         This method is automatically called at the exit of the context manager.
         """
         if self.delay_save:
-            self.db.create_tables(self.disk_engine)
-            with self.Session() as input_session, self.disk_Session() as output_session:
-                for table in self.db.table_list:
-                    output_session.query(table).delete()
-                    self.db.copy_table(input_session, output_session, table)
+            # Create table on disk
+            async with self.disk_engine.begin() as conn:
+                self.db.create_tables(conn)
+            await self.disk_engine.dispose()
 
-    def get_version(self):
+            async with self.disk_async_session() as output_session:
+                async with self.session.begin(), output_session.begin():
+                    for table in self.db.table_list:
+                        await output_session.execute(output_session.delete(table))
+                        await self.db.copy_table(self.session, output_session, table)
+
+    async def get_version(self):
         """Returns current version of the database layout."""
-        version = self.parameter("_database_version")
+        version = await self.parameter("_database_version")
         if version is None:
             version = self.db.database_version
         return version
 
-    @cached_property
-    def t0(self):
+    async def t0(self):
         """Session creation timestamp"""
-        t0 = self.parameter("_session_creation_timestamp")
+        t0 = await self.parameter("_session_creation_timestamp")
         if t0 is not None:
             return t0
-        logged_data = self.logged_first_values()
+        logged_data = await self.logged_first_values()
         if logged_data:
             t0 = min([v[0] for k, v in logged_data.items()])
-            self.save_parameter(_session_creation_timestamp=t0)
+            await self.save_parameter(_session_creation_timestamp=t0)
             return t0
         return 0
 
-    @property
-    def initial_timestamp(self):
+    async def initial_timestamp(self):
         """Session creation timestamp, identical to :attr:`pymanip.asyncsession.AsyncSession.t0`"""
-        return self.t0
+        t0 = await self.t0()
+        return t0
 
-    @property
-    def last_timestamp(self):
+    async def last_timestamp(self):
         """Timestamp of the last recorded value"""
         ts = list()
-        last_values = self.logged_last_values()
+        last_values = await self.logged_last_values()
         if last_values:
             ts.append(max([t_v[0] for name, t_v in last_values.items()]))
         for ds_name in self.dataset_names():
@@ -269,46 +260,47 @@ class ExperimentalSession:
             return max(ts)
         return None
 
-    def print_welcome(self):
+    async def print_welcome(self):
         """Prints informative start date/end date message. If verbose is True, this method
         is called by the constructor.
         """
-        start_string = time.strftime(dateformat, time.localtime(self.initial_timestamp))
+        t0 = await self.t0()
+        start_string = time.strftime(dateformat, time.localtime(t0))
         cprint.blue("*** Start date: " + start_string)
-        last = self.last_timestamp
+        last = await self.last_timestamp()
         if last:
             end_string = time.strftime(dateformat, time.localtime(last))
             cprint.blue("***   End date: " + end_string)
 
-    def print_description(self):
+    async def print_description(self):
         """Prints the list of parameters, logged variables and datasets."""
-        version = self.get_version()
+        version = await self.get_version()
         print(
             self.session_name,
             "is an asynchroneous session (version {:}).".format(version),
         )
         print()
-        last_values = self.logged_last_values()
+        last_values = await self.logged_last_values()
         params = {
             key: val
-            for key, val in self.parameters().items()
+            async for key, val in self.parameters().items()
             if not key.startswith("_")
         }
         if params:
             print("Parameters")
             print("==========")
-            for key, val in self.parameters().items():
+            for key, val in params.items():
                 print(key, ":", val)
             print()
 
         if last_values:
             print("Logged variables")
             print("================")
-            for name, t_v in last_values.items():
+            async for name, t_v in last_values.items():
                 print(name, "(", t_v[1], ")")
             print()
 
-        ds_names = self.dataset_names()
+        ds_names = await self.dataset_names()
         if ds_names:
             print("Datasets")
             print("========")
@@ -317,14 +309,14 @@ class ExperimentalSession:
             print()
 
         if version >= 4:
-            meta = self.metadatas()
+            meta = await self.metadatas()
             if meta:
                 print("Metadata")
                 print("========")
                 for name, val in meta.items():
                     print(name, ":", val)
 
-    def add_entry(self, *args, **kwargs):
+    async def add_entry(self, *args, **kwargs):
         """This methods adds scalar values into the database. Each entry value
         will hold a timestamp corresponding to the time at which this method has been called.
         Variables are passed in dictionnaries or as keyword-arguments. If several variables
@@ -345,16 +337,18 @@ class ExperimentalSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.LogName.name)}
+        async with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(select(self.db.LogName.name))
+            }
             for key, val in data.items():
                 if key not in names:
-                    session.add(self.db.LogName(name=key))
+                    self.session.add(self.db.LogName(name=key))
                     names.add(key)
-                session.add(self.db.Log(timestamp=ts, name=key, value=val))
-            session.commit()
+                self.session.add(self.db.Log(timestamp=ts, name=key, value=val))
 
-    def add_dataset(self, *args, **kwargs):
+    async def add_dataset(self, *args, **kwargs):
         """This method adds arrays, or other pickable objects, as “datasets” into the
         database. They will hold a timestamp corresponding to the time at which the method
         has been called.
@@ -371,31 +365,38 @@ class ExperimentalSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.DatasetName.name)}
+        async with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(
+                    select(self.db.DatasetName.name)
+                )
+            }
             for key, val in data.items():
                 if key not in names:
-                    session.add(self.db.DatasetName(name=key))
+                    self.session.add(self.db.DatasetName(name=key))
                     names.add(key)
-                session.add(
+                self.session.add(
                     self.db.Dataset(
                         timestamp=ts, name=key, data=pickle.dumps(val, protocol=4)
                     )
                 )
-            session.commit()
 
-    def logged_variables(self):
+    async def logged_variables(self):
         """This method returns a set of the names of the scalar variables currently stored
         in the session database.
 
         :return: names of scalar variables
         :rtype: set
         """
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.LogName.name)}
+        async with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(select(self.db.LogName.name))
+            }
         return names
 
-    def logged_data(self):
+    async def logged_data(self):
         """This method returns a name-value dictionnary containing all scalar variables
         currently stored in the session database.
 
@@ -403,21 +404,27 @@ class ExperimentalSession:
         :rtype: dict
         """
         result = dict()
-        with self.Session() as sesn:
-            names = {name for name, in sesn.query(self.db.LogName.name)}
+        async with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(select(self.db.LogName.name))
+            }
             for name in names:
                 ts_val = np.array(
                     [
                         (timestamp, value)
-                        for timestamp, value in sesn.query(
-                            self.db.Log.timestamp, self.db.Log.value
-                        ).filter_by(name=name)
+                        async for timestamp, value in self.session.execute(
+                            select(
+                                self.db.Log.timestamp,
+                                self.db.Log.value,
+                            ).filter_by(name=name)
+                        )
                     ]
                 )
                 result[name] = ts_val[:, 0].astype(float), ts_val[:, 1]
         return result
 
-    def logged_variable(self, varname):
+    async def logged_variable(self, varname):
         """This method retrieve the timestamps and values of a specified scalar variable.
         It is possible to use the sesn[varname] syntax as a shortcut.
 
@@ -428,21 +435,24 @@ class ExperimentalSession:
 
         :Exemple:
 
-        >>> ts, val = sesn.logged_variable('T_Pt_bas')
+        >>> ts, val = await sesn.logged_variable('T_Pt_bas')
 
         """
-        with self.Session() as session:
+        async with self.session.begin():
             ts_val = np.array(
                 [
                     (timestamp, value)
-                    for timestamp, value in session.query(
-                        self.db.Log.timestamp, self.db.Log.value
-                    ).filter_by(name=varname)
+                    async for timestamp, value in self.session.execute(
+                        select(
+                            self.db.Log.timestamp,
+                            self.db.Log.value,
+                        ).filter_by(name=varname)
+                    )
                 ]
             )
         return ts_val[:, 0], ts_val[:, 1]
 
-    def logged_first_values(self):
+    async def logged_first_values(self):
         """This method returns a dictionnary holding the first logged value of all scalar
         variables stored in the session database.
 
@@ -450,11 +460,14 @@ class ExperimentalSession:
         :rtype: dict
         """
         result = dict()
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.LogName.name)}
+        async with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(select(self.db.LogName.name))
+            }
             for name in names:
-                r = (
-                    session.query(self.db.Log)
+                r = await self.session.execute(
+                    select(self.db.Log)
                     .filter_by(name=name)
                     .order_by(self.db.Log.timestamp.asc())
                     .first()
@@ -465,7 +478,7 @@ class ExperimentalSession:
                     result[name] = None
         return result
 
-    def logged_last_values(self):
+    async def logged_last_values(self):
         """This method returns a dictionnary holding the last logged value of all scalar
         variables stored in the session database.
 
@@ -473,11 +486,14 @@ class ExperimentalSession:
         :rtype: dict
         """
         result = dict()
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.LogName.name)}
+        with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(select(self.db.LogName.name))
+            }
             for name in names:
-                r = (
-                    session.query(self.db.Log)
+                r = await self.session.execute(
+                    select(self.db.Log)
                     .filter_by(name=name)
                     .order_by(self.db.Log.timestamp.desc())
                     .first()
@@ -488,7 +504,7 @@ class ExperimentalSession:
                     result[name] = None
         return result
 
-    def logged_data_fromtimestamp(self, name, timestamp):
+    async def logged_data_fromtimestamp(self, name, timestamp):
         """This method returns the timestamps and values of a given scalar variable, recorded
         after the specified timestamp.
 
@@ -499,16 +515,19 @@ class ExperimentalSession:
         :return: the timestamps, and values of the specified variable
         :rtype: tuple of two numpy arrays
         """
-        with self.Session() as session:
+        async with self.session.begin():
             ts_val = np.array(
                 [
                     (timestamp, value)
-                    for timestamp, value in session.query(
-                        self.db.Log.timestamp, self.db.Log.value
+                    async for timestamp, value in self.session.execute(
+                        select(
+                            self.db.Log.timestamp,
+                            self.db.Log.value,
+                        )
+                        .filter_by(name=name)
+                        .filter(self.db.Log.timestamp >= timestamp)
+                        .order_by(self.db.Log.timestamp)
                     )
-                    .filter_by(name=name)
-                    .filter(self.db.Log.timestamp >= timestamp)
-                    .order_by(self.db.Log.timestamp)
                 ]
             )
             nrows = len(ts_val)
@@ -517,18 +536,23 @@ class ExperimentalSession:
         else:
             return np.array([]), np.array([])
 
-    def dataset_names(self):
+    async def dataset_names(self):
         """This method returns the names of the datasets currently stored in the session
         database.
 
         :return: names of datasets
         :rtype: set
         """
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.DatasetName.name)}
+        with self.session.connect():
+            names = {
+                name
+                async for name, in self.session.execute(
+                    select(self.db.DatasetName.name)
+                )
+            }
         return names
 
-    def datasets(self, name):
+    async def datasets(self, name):
         """This method returns a generator which will yield all timestamps and datasets
         recorded under the specified name.
         The rationale for returning a generator instead of a list, is that each individual
@@ -541,27 +565,35 @@ class ExperimentalSession:
 
         - To plot all the recorded datasets named 'toto'
 
-        >>> for timestamp, data in sesn.datasets('toto'):
+        >>> async for timestamp, data in sesn.datasets('toto'):
         >>>    plt.plot(data, label=f'ts = {timestamp-sesn.t0:.1f}')
 
         - To retrieve a list of all the recorded datasets named 'toto'
 
-        >>> datas = [d for ts, d in sesn.datasets('toto')]
+        >>> datas = [d async for ts, d in sesn.datasets('toto')]
 
         """
-        with self.Session() as session:
-            names = {name for name, in session.query(self.db.DatasetName.name)}
+        with self.session.begin():
+            names = {
+                name
+                async for name, in self.session.execute(
+                    select(self.db.DatasetName.name)
+                )
+            }
             if name not in names:
                 print("Possible dataset names are", names)
                 raise ValueError(f'Bad dataset name "{name:}"')
-            for timestamp, data in (
-                session.query(self.db.Dataset.timestamp, self.db.Dataset.data)
+            async for timestamp, data in self.session.execute(
+                select(
+                    self.db.Dataset.timestamp,
+                    self.db.Dataset.data,
+                )
                 .filter_by(name=name)
                 .order_by(self.db.Dataset.timestamp)
             ):
                 yield timestamp, pickle.loads(data)
 
-    def dataset_last_data(self, name):
+    async def dataset_last_data(self, name):
         """This method returns the last recorded dataset under the specified name.
 
         :param name: name of the dataset to retrieve
@@ -569,9 +601,9 @@ class ExperimentalSession:
         :return: dataset value
         :rtype: object
         """
-        with self.Session() as session:
-            r = (
-                session.query(self.db.Dataset)
+        async with self.session.begin():
+            r = self.session.execute(
+                select(self.db.Dataset)
                 .filter_by(name=name)
                 .order_by(self.db.Dataset.timestamp.desc())
                 .first()
@@ -580,7 +612,7 @@ class ExperimentalSession:
                 return r.timestamp, pickle.loads(r.data)
         return None, None
 
-    def dataset_times(self, name):
+    async def dataset_times(self, name):
         """This method returns the timestamp of the recorded dataset under the specified
         name.
 
@@ -589,18 +621,20 @@ class ExperimentalSession:
         :return: array of timestamps
         :rtype: :class:`numpy.ndarray`
         """
-        with self.Session() as session:
+        async with self.session.begin():
             t = np.array(
                 [
                     timestamp
-                    for timestamp, in session.query(self.db.Dataset.timestamp)
-                    .filter_by(name=name)
-                    .order_by(self.db.Dataset.timestamp)
+                    async for timestamp, in self.session.execute(
+                        select(self.db.Dataset.timestamp)
+                        .filter_by(name=name)
+                        .order_by(self.db.Dataset.timestamp)
+                    )
                 ]
             )
         return t
 
-    def dataset(self, name, ts=None, n=None):
+    async def dataset(self, name, ts=None, n=None):
         """This method returns the dataset recorded at the specified timestamp, and under
         the specified name.
 
@@ -614,19 +648,19 @@ class ExperimentalSession:
         :rtype: object
         """
 
-        with self.Session() as session:
-            q = session.query(self.db.Dataset).filter_by(name=name)
+        with self.session.begin():
+            q = select(self.db.Dataset).filter_by(name=name)
             if ts is not None:
                 q = q.filter_by(timestamp=ts)
             q = q.order_by(self.db.Dataset.timestamp)
-            rows = q.all()
+            rows = await self.session.execute(q.all())
             if n is None:
                 data = pickle.loads(rows[-1].data)
             else:
                 data = pickle.loads(rows[n].data)
         return data
 
-    def save_metadata(self, *args, **kwargs):
+    async def save_metadata(self, *args, **kwargs):
         """This method saves a text parameter into the database."""
         if self.readonly:
             raise RuntimeError("Cannot save metadata on readonly session")
@@ -638,21 +672,22 @@ class ExperimentalSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.Session() as session:
+        with self.session.begin():
             for key, val in data.items():
-                r = session.query(self.db.Metadata).filter_by(name=key).one_or_none()
+                r = await self.session.execute(
+                    select(self.db.Metadata).filter_by(name=key).one_or_none()
+                )
                 if r is not None:
                     r.value = val
                 else:
-                    session.add(
+                    self.session.add(
                         self.db.Metadata(
                             name=key,
                             value=val,
                         )
                     )
-            session.commit()
 
-    def save_parameter(self, *args, **kwargs):
+    async def save_parameter(self, *args, **kwargs):
         """This method saves a scalar parameter into the database. Unlike scalar values
         saved by the :meth:`pymanip.asyncsession.AsyncSession.add_entry` method, such parameter
         can only hold one value, and does not have an associated timestamp.
@@ -669,29 +704,32 @@ class ExperimentalSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.Session() as session:
+        async with self.session.begin():
             for key, val in data.items():
-                r = session.query(self.db.Parameter).filter_by(name=key).one_or_none()
+                r = await self.session.execute(
+                    select(self.db.Parameter).filter_by(name=key).one_or_none()
+                )
                 if r is not None:
                     r.value = val
                 else:
-                    session.add(
+                    self.session.add(
                         self.db.Parameter(
                             name=key,
                             value=val,
                         )
                     )
-            session.commit()
 
-    def metadata(self, name):
+    async def metadata(self, name):
         """This method retrives the value of the specified metadata."""
-        with self.Session() as session:
-            data = session.query(self.db.Metadata).filter_by(name=name).one_or_none()
+        async with self.session.begin():
+            data = await self.session.execute(
+                select(self.db.Metadata).filter_by(name=name).one_or_none()
+            )
             if data is not None:
                 return data.value
         return None
 
-    def parameter(self, name):
+    async def parameter(self, name):
         """This method retrieves the value of the specified parameter.
 
         :param name: name of the parameter to retrieve
@@ -699,17 +737,20 @@ class ExperimentalSession:
         :return: value of the parameter
         :rtype: float
         """
-        with self.Session() as session:
-            data = session.query(self.db.Parameter).filter_by(name=name).one_or_none()
+        async with self.session.begin():
+            data = await self.session.execute(
+                select(self.db.Parameter).filter_by(name=name).one_or_none()
+            )
             if data is not None:
                 return data.value
         return None
 
-    def has_metadata(self, name):
+    async def has_metadata(self, name):
         """This method returns True if the specified metadata exists in the session database."""
-        return self.metadata(name) is not None
+        n = await self.metadata(name)
+        return n is not None
 
-    def has_parameter(self, name):
+    async def has_parameter(self, name):
         """This method returns True if specified parameter exists in the session database.
 
         :param name: name of the parameter to retrieve
@@ -717,37 +758,38 @@ class ExperimentalSession:
         :return: True if parameter exists, False if it does not
         :rtype: bool
         """
-        return self.parameter(name) is not None
+        p = await self.parameter(name)
+        return p is not None
 
-    def metadatas(self):
+    async def metadatas(self):
         """This method returns all metadata."""
-        with self.Session() as session:
+        async with self.session.begin():
             return {
                 name: value
-                for name, value in session.query(
-                    self.db.Metadata.name, self.db.Metadata.value
+                async for name, value in self.session.execute(
+                    select(
+                        self.db.Metadata.name,
+                        self.db.Metadata.value,
+                    )
                 )
             }
 
-    def parameters(self):
+    async def parameters(self):
         """This method returns all parameter name and values.
 
         :return: parameters
         :rtype: dict
         """
-        with self.Session() as session:
+        async with self.session.begin():
             return {
                 name: value
-                for name, value in session.query(
-                    self.db.Parameter.name, self.db.Parameter.value
+                async for name, value in self.session.execute(
+                    select(
+                        self.db.Parameter.name,
+                        self.db.Parameter.value,
+                    )
                 )
             }
-
-    def __getitem__(self, key):
-        """Implement the evaluation of self[varname] as a shortcut to obtain timestamp and values for a given
-        variable name.
-        """
-        return self.logged_variable(key)
 
     async def send_email(
         self,
@@ -817,7 +859,7 @@ class ExperimentalSession:
                 dt_n.year, dt_n.month, dt_n.day, dt_n.hour, dt_n.minute, dt_n.second
             )
             # Generate HTML content
-            last_values = self.logged_last_values()
+            last_values = await self.logged_last_values()
             for name in last_values:
                 timestamp, value = last_values[name]
                 last_values[name] = (
@@ -848,8 +890,8 @@ class ExperimentalSession:
                 with os.fdopen(fd, "wb") as f_png:
                     fig.canvas.draw_idle()
                     fig.savefig(f_png)
-                with open(fname, "rb") as image_file:
-                    figure_data = image_file.read()
+                async with async_open(fname, "rb") as image_file:
+                    figure_data = await image_file.read()
                 os.remove(fname)
                 p = msg.get_payload()[1]
                 p.add_related(
@@ -971,7 +1013,8 @@ class ExperimentalSession:
         ts0 = self.initial_timestamp
         while self.running:
             data = {
-                k: self.logged_data_fromtimestamp(k, last_update[k]) for k in varnames
+                k: (await self.logged_data_fromtimestamp(k, last_update[k]))
+                for k in varnames
             }
             if xymode:
                 ts_x, vs_x = data[x]
@@ -1205,7 +1248,7 @@ class ExperimentalSession:
                 "value": str(v[1]) if isinstance(v[1], bytes) else v[1],
                 "datestr": time.strftime(dateformat, time.localtime(v[0])),
             }
-            for name, v in self.logged_last_values().items()
+            for name, v in (await self.logged_last_values()).items()
         ]
         return web.json_response(data)
 
@@ -1215,7 +1258,7 @@ class ExperimentalSession:
         """
         params = {
             k: (str(v) if isinstance(v, bytes) else v)
-            for k, v in self.parameters().items()
+            for k, v in (await self.parameters()).items()
             if not k.startswith("_")
         }
         return web.json_response(params)
@@ -1236,7 +1279,7 @@ class ExperimentalSession:
         data_in = await request.json()
         last_ts = data_in["last_ts"]
         name = data_in["name"]
-        timestamps, values = self.logged_data_fromtimestamp(name, last_ts)
+        timestamps, values = await self.logged_data_fromtimestamp(name, last_ts)
         data_out = list(zip(timestamps, values))
         # print('from', last_ts, data_out)
         return web.json_response(data_out)
@@ -1360,7 +1403,7 @@ class ExperimentalSession:
             )
         )
 
-    def save_remote_data(self, data):
+    async def save_remote_data(self, data):
         """This method saves the data returned by a :class:`pymanip.asyncsession.RemoteObserver` object into the current session database,
         as datasets and parameters.
 
@@ -1376,13 +1419,13 @@ class ExperimentalSession:
                 iterable = False
             if iterable:
                 # we are iterable
-                self.add_dataset(**{k: v})
+                await self.add_dataset(**{k: v})
             else:
                 # we are not iterable
                 if isinstance(v, dict):
                     # non reduced data, v is a dictionnary with two keys, 't' and 'value'
-                    self.add_dataset(**{k: v["value"]})
-                    self.add_dataset(**{k + "_time": v["t"]})
+                    await self.add_dataset(**{k: v["value"]})
+                    await self.add_dataset(**{k + "_time": v["t"]})
                 else:
                     try:
                         # data must be a scalar
@@ -1390,4 +1433,4 @@ class ExperimentalSession:
                     except TypeError:
                         print("skipping", k, type(v))
                         continue
-                    self.save_parameter(**{k: v})
+                    await self.save_parameter(**{k: v})
