@@ -1,7 +1,7 @@
 """Asynchronous session class (:mod:`pymanip.asyncsession.asyncsession`)
 ========================================================================
 
-This module defines the class for live acquisition, :class:`~pymanip.asyncsession.asyncsession.AsyncSession`.
+This module defines the class for live acquisition, :class:`~pymanip.aiosession.aiosession.AsyncSession`.
 It is used to manage an experimental session.
 
 .. autoclass:: AsyncSession
@@ -34,7 +34,7 @@ import smtplib
 from email.message import EmailMessage
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from fluiddyn.util.terminal_colors import cprint
 from pymanip.mytime import dateformat
@@ -46,10 +46,10 @@ import pymanip.aiosession.database_v4 as dbv4
 dblatest = dbv4
 
 
-__all__ = ["ExperimentalSession"]
+__all__ = ["AsyncSession"]
 
 
-class ExperimentalSession:
+class AsyncSession:
     """This class represents an asynchronous experiment session. It is the main tool that we
     use to set up monitoring of experimental systems. It will manage the storage for the data,
     as well as several asynchronous functions for use during the monitoring of the experimental
@@ -103,12 +103,12 @@ class ExperimentalSession:
             else:
                 self.new_session = True
             self.engine = create_async_engine(
-                "sqlite:///" + str(self.session_path.absolute()),
+                "sqlite+aiosqlite:///" + str(self.session_path.absolute()),
                 echo=False,
             )
         else:
             self.engine = create_async_engine(
-                "sqlite://",
+                "sqlite+aiosqlite://",
                 echo=False,
             )
             self.new_session = True
@@ -116,7 +116,7 @@ class ExperimentalSession:
         self.async_session = async_sessionmaker(bind=self.engine)
         if delay_save:
             self.disk_engine = create_async_engine(
-                "sqlite:///" + str(self.session_path.absolute()),
+                "sqlite+aiosqlite:///" + str(self.session_path.absolute()),
                 echo=False,
             )
             self.disk_async_session = async_sessionmaker(bind=self.disk_engine)
@@ -135,7 +135,7 @@ class ExperimentalSession:
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
         self.conn = None
 
-    def __aenter__(self):
+    async def __aenter__(self):
         """Context manager enter method"""
 
         # Database schema version
@@ -147,7 +147,7 @@ class ExperimentalSession:
                     version = await session.get(
                         dbv3.Parameter, {"name": "_database_version"}
                     )
-                    (version,) = version
+                    version = version.value
                     if version == 1:
                         """Identique au schéma v2, mais sans les tables `dataset` et `dataset_names`."""
                         self.db = dbv1
@@ -161,29 +161,31 @@ class ExperimentalSession:
                     else:
                         print(f"Unable to determine database version. Got <{version}>.")
                         self.db = dbv4
+
         # Create tables if necessary
         async with self.engine.begin() as conn:
             if not self.readonly:
-                new = await self.db.create_tables(conn)
+                new = await conn.run_sync(self.db.create_tables)
             else:
                 new = False
-        await self.engine.dispose()
+
+        # Enter session
+        self.session = await self.async_session().__aenter__()
 
         # Load existing database into in-memory database
         if self.delay_save:
-            async with self.disk_async_session() as input_session, self.async_session() as output_session:
-                async with input_session.begin(), output_session.begin():
+            # Create table on disk
+            async with self.disk_engine.begin() as conn:
+                new = await conn.run_sync(self.db.create_tables)
+            await self.disk_engine.dispose()
+
+            # print("Copy tables from disk to memory")
+            async with self.disk_async_session() as input_session:
+                async with input_session.begin(), self.session.begin():
                     for table in self.db.table_list:
-                        self.db.copy_table(input_session, output_session, table)
-
-        # Enter session
-        self.session = await self.async_session.__aenter__()
-
-        async with self.session.begin():
-            # Print welcome
-            if self.verbose and not new:
-                await self.print_welcome()
-            if new:
+                        await self.db.copy_table(input_session, self.session, table)
+        if new:
+            async with self.session.begin():
                 self.session.add(
                     self.db.Parameter(
                         name="_database_version",
@@ -196,6 +198,9 @@ class ExperimentalSession:
                         value=datetime.now().timestamp(),
                     )
                 )
+        elif self.verbose:
+            await self.print_welcome()
+
         return self
 
     async def __aexit__(self, type_, value, cb):
@@ -203,6 +208,7 @@ class ExperimentalSession:
         if self.delay_save:
             await self.save_database()
         await self.session.__aexit__(type_, value, cb)
+        await self.engine.dispose()
 
     async def save_database(self):
         """This method is useful only if delay_save = True. Then, the database is kept in-memory for
@@ -213,15 +219,11 @@ class ExperimentalSession:
         This method is automatically called at the exit of the context manager.
         """
         if self.delay_save:
-            # Create table on disk
-            async with self.disk_engine.begin() as conn:
-                self.db.create_tables(conn)
-            await self.disk_engine.dispose()
-
             async with self.disk_async_session() as output_session:
                 async with self.session.begin(), output_session.begin():
+                    # print("Copy tables from memory to disk")
                     for table in self.db.table_list:
-                        await output_session.execute(output_session.delete(table))
+                        await output_session.execute(delete(table))
                         await self.db.copy_table(self.session, output_session, table)
 
     async def get_version(self):
@@ -244,7 +246,7 @@ class ExperimentalSession:
         return 0
 
     async def initial_timestamp(self):
-        """Session creation timestamp, identical to :attr:`pymanip.asyncsession.AsyncSession.t0`"""
+        """Session creation timestamp, identical to :attr:`~pymanip.aiosession.aiosession.AsyncSession.t0`"""
         t0 = await self.t0()
         return t0
 
@@ -254,7 +256,7 @@ class ExperimentalSession:
         last_values = await self.logged_last_values()
         if last_values:
             ts.append(max([t_v[0] for name, t_v in last_values.items()]))
-        for ds_name in self.dataset_names():
+        for ds_name in await self.dataset_names():
             ts.append(max(self.dataset_times(ds_name)))
         if ts:
             return max(ts)
@@ -283,7 +285,7 @@ class ExperimentalSession:
         last_values = await self.logged_last_values()
         params = {
             key: val
-            async for key, val in self.parameters().items()
+            for key, val in (await self.parameters()).items()
             if not key.startswith("_")
         }
         if params:
@@ -296,7 +298,7 @@ class ExperimentalSession:
         if last_values:
             print("Logged variables")
             print("================")
-            async for name, t_v in last_values.items():
+            for name, t_v in last_values.items():
                 print(name, "(", t_v[1], ")")
             print()
 
@@ -323,7 +325,7 @@ class ExperimentalSession:
         are passed, then they all hold the same timestamps.
 
         For parameters which consists in only one scalar value, and for which timestamps are
-        not necessary, use :meth:`pymanip.asyncsession.AsyncSession.save_parameter` instead.
+        not necessary, use :meth:`~pymanip.aiosession.aiosession.AsyncSession.save_parameter` instead.
 
         :param \\*args: dictionnaries with name-value to be added in the database
         :type \\*args: dict, optional
@@ -340,7 +342,7 @@ class ExperimentalSession:
         async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(select(self.db.LogName.name))
+                for name, in (await self.session.execute(select(self.db.LogName.name)))
             }
             for key, val in data.items():
                 if key not in names:
@@ -368,8 +370,8 @@ class ExperimentalSession:
         async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(
-                    select(self.db.DatasetName.name)
+                for name, in (
+                    await self.session.execute(select(self.db.DatasetName.name))
                 )
             }
             for key, val in data.items():
@@ -392,7 +394,7 @@ class ExperimentalSession:
         async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(select(self.db.LogName.name))
+                for name, in (await self.session.execute(select(self.db.LogName.name)))
             }
         return names
 
@@ -407,17 +409,19 @@ class ExperimentalSession:
         async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(select(self.db.LogName.name))
+                for name, in (await self.session.execute(select(self.db.LogName.name)))
             }
             for name in names:
                 ts_val = np.array(
                     [
                         (timestamp, value)
-                        async for timestamp, value in self.session.execute(
-                            select(
-                                self.db.Log.timestamp,
-                                self.db.Log.value,
-                            ).filter_by(name=name)
+                        for timestamp, value in (
+                            await self.session.execute(
+                                select(
+                                    self.db.Log.timestamp,
+                                    self.db.Log.value,
+                                ).filter_by(name=name)
+                            )
                         )
                     ]
                 )
@@ -442,15 +446,19 @@ class ExperimentalSession:
             ts_val = np.array(
                 [
                     (timestamp, value)
-                    async for timestamp, value in self.session.execute(
-                        select(
-                            self.db.Log.timestamp,
-                            self.db.Log.value,
-                        ).filter_by(name=varname)
+                    for timestamp, value in (
+                        await self.session.execute(
+                            select(
+                                self.db.Log.timestamp,
+                                self.db.Log.value,
+                            ).filter_by(name=varname)
+                        )
                     )
                 ]
             )
-        return ts_val[:, 0], ts_val[:, 1]
+        if ts_val.size > 0:
+            return ts_val[:, 0], ts_val[:, 1]
+        return np.empty((0,)), np.empty((0,))
 
     async def logged_first_values(self):
         """This method returns a dictionnary holding the first logged value of all scalar
@@ -463,15 +471,16 @@ class ExperimentalSession:
         async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(select(self.db.LogName.name))
+                for name, in (await self.session.execute(select(self.db.LogName.name)))
             }
             for name in names:
-                r = await self.session.execute(
-                    select(self.db.Log)
-                    .filter_by(name=name)
-                    .order_by(self.db.Log.timestamp.asc())
-                    .first()
-                )
+                (r,) = (
+                    await self.session.execute(
+                        select(self.db.Log)
+                        .filter_by(name=name)
+                        .order_by(self.db.Log.timestamp.asc())
+                    )
+                ).first()
                 if r is not None:
                     result[name] = (r.timestamp, r.value)
                 else:
@@ -486,18 +495,19 @@ class ExperimentalSession:
         :rtype: dict
         """
         result = dict()
-        with self.session.begin():
+        async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(select(self.db.LogName.name))
+                for name, in (await self.session.execute(select(self.db.LogName.name)))
             }
             for name in names:
-                r = await self.session.execute(
-                    select(self.db.Log)
-                    .filter_by(name=name)
-                    .order_by(self.db.Log.timestamp.desc())
-                    .first()
-                )
+                (r,) = (
+                    await self.session.execute(
+                        select(self.db.Log)
+                        .filter_by(name=name)
+                        .order_by(self.db.Log.timestamp.desc())
+                    )
+                ).first()
                 if r is not None:
                     result[name] = (r.timestamp, r.value)
                 else:
@@ -519,14 +529,16 @@ class ExperimentalSession:
             ts_val = np.array(
                 [
                     (timestamp, value)
-                    async for timestamp, value in self.session.execute(
-                        select(
-                            self.db.Log.timestamp,
-                            self.db.Log.value,
+                    for timestamp, value in (
+                        await self.session.execute(
+                            select(
+                                self.db.Log.timestamp,
+                                self.db.Log.value,
+                            )
+                            .filter_by(name=name)
+                            .filter(self.db.Log.timestamp >= timestamp)
+                            .order_by(self.db.Log.timestamp)
                         )
-                        .filter_by(name=name)
-                        .filter(self.db.Log.timestamp >= timestamp)
-                        .order_by(self.db.Log.timestamp)
                     )
                 ]
             )
@@ -543,11 +555,11 @@ class ExperimentalSession:
         :return: names of datasets
         :rtype: set
         """
-        with self.session.connect():
+        async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(
-                    select(self.db.DatasetName.name)
+                for name, in (
+                    await self.session.execute(select(self.db.DatasetName.name))
                 )
             }
         return names
@@ -565,25 +577,25 @@ class ExperimentalSession:
 
         - To plot all the recorded datasets named 'toto'
 
-        >>> async for timestamp, data in sesn.datasets('toto'):
+        >>> for timestamp, data in (await sesn.datasets('toto')):
         >>>    plt.plot(data, label=f'ts = {timestamp-sesn.t0:.1f}')
 
         - To retrieve a list of all the recorded datasets named 'toto'
 
-        >>> datas = [d async for ts, d in sesn.datasets('toto')]
+        >>> datas = [d for ts, d in (await sesn.datasets('toto'))]
 
         """
-        with self.session.begin():
+        async with self.session.begin():
             names = {
                 name
-                async for name, in self.session.execute(
-                    select(self.db.DatasetName.name)
+                for name, in (
+                    await self.session.execute(select(self.db.DatasetName.name))
                 )
             }
             if name not in names:
                 print("Possible dataset names are", names)
                 raise ValueError(f'Bad dataset name "{name:}"')
-            async for timestamp, data in self.session.execute(
+            for timestamp, data in await self.session.execute(
                 select(
                     self.db.Dataset.timestamp,
                     self.db.Dataset.data,
@@ -602,13 +614,15 @@ class ExperimentalSession:
         :rtype: object
         """
         async with self.session.begin():
-            r = self.session.execute(
+            r = await self.session.execute(
                 select(self.db.Dataset)
                 .filter_by(name=name)
                 .order_by(self.db.Dataset.timestamp.desc())
-                .first()
+                .limit(1)
             )
+            r = r.one_or_none()
             if r is not None:
+                (r,) = r
                 return r.timestamp, pickle.loads(r.data)
         return None, None
 
@@ -625,10 +639,12 @@ class ExperimentalSession:
             t = np.array(
                 [
                     timestamp
-                    async for timestamp, in self.session.execute(
-                        select(self.db.Dataset.timestamp)
-                        .filter_by(name=name)
-                        .order_by(self.db.Dataset.timestamp)
+                    for timestamp, in (
+                        await self.session.execute(
+                            select(self.db.Dataset.timestamp)
+                            .filter_by(name=name)
+                            .order_by(self.db.Dataset.timestamp)
+                        )
                     )
                 ]
             )
@@ -648,16 +664,21 @@ class ExperimentalSession:
         :rtype: object
         """
 
-        with self.session.begin():
+        async with self.session.begin():
             q = select(self.db.Dataset).filter_by(name=name)
             if ts is not None:
                 q = q.filter_by(timestamp=ts)
-            q = q.order_by(self.db.Dataset.timestamp)
-            rows = await self.session.execute(q.all())
+
             if n is None:
-                data = pickle.loads(rows[-1].data)
+                q = q.order_by(self.db.Dataset.timestamp.desc())
+                rows = await self.session.execute(q)
+                (last_row,) = rows.first()
+                data = pickle.loads(last_row.data)
             else:
-                data = pickle.loads(rows[n].data)
+                q = q.order_by(self.db.Dataset.timestamp).offset(n).limit(1)
+                rows = await self.session.execute(q)
+                (nth_row,) = rows.first()
+                data = pickle.loads(nth_row.data)
         return data
 
     async def save_metadata(self, *args, **kwargs):
@@ -672,12 +693,15 @@ class ExperimentalSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        with self.session.begin():
+        async with self.session.begin():
             for key, val in data.items():
-                r = await self.session.execute(
-                    select(self.db.Metadata).filter_by(name=key).one_or_none()
-                )
+                r = (
+                    await self.session.execute(
+                        select(self.db.Metadata).filter_by(name=key)
+                    )
+                ).one_or_none()
                 if r is not None:
+                    (r,) = r
                     r.value = val
                 else:
                     self.session.add(
@@ -689,7 +713,7 @@ class ExperimentalSession:
 
     async def save_parameter(self, *args, **kwargs):
         """This method saves a scalar parameter into the database. Unlike scalar values
-        saved by the :meth:`pymanip.asyncsession.AsyncSession.add_entry` method, such parameter
+        saved by the :meth:`~pymanip.aiosession.aiosession.AsyncSession.add_entry` method, such parameter
         can only hold one value, and does not have an associated timestamp.
         Parameters can be passed as dictionnaries, or keyword arguments.
 
@@ -706,10 +730,13 @@ class ExperimentalSession:
         data.update(kwargs)
         async with self.session.begin():
             for key, val in data.items():
-                r = await self.session.execute(
-                    select(self.db.Parameter).filter_by(name=key).one_or_none()
-                )
+                r = (
+                    await self.session.execute(
+                        select(self.db.Parameter).filter_by(name=key)
+                    )
+                ).one_or_none()
                 if r is not None:
+                    (r,) = r
                     r.value = val
                 else:
                     self.session.add(
@@ -722,10 +749,13 @@ class ExperimentalSession:
     async def metadata(self, name):
         """This method retrives the value of the specified metadata."""
         async with self.session.begin():
-            data = await self.session.execute(
-                select(self.db.Metadata).filter_by(name=name).one_or_none()
-            )
+            data = (
+                await self.session.execute(
+                    select(self.db.Metadata).filter_by(name=name)
+                )
+            ).one_or_none()
             if data is not None:
+                (data,) = data
                 return data.value
         return None
 
@@ -738,10 +768,13 @@ class ExperimentalSession:
         :rtype: float
         """
         async with self.session.begin():
-            data = await self.session.execute(
-                select(self.db.Parameter).filter_by(name=name).one_or_none()
-            )
+            data = (
+                await self.session.execute(
+                    select(self.db.Parameter).filter_by(name=name)
+                )
+            ).one_or_none()
             if data is not None:
+                (data,) = data
                 return data.value
         return None
 
@@ -766,10 +799,12 @@ class ExperimentalSession:
         async with self.session.begin():
             return {
                 name: value
-                async for name, value in self.session.execute(
-                    select(
-                        self.db.Metadata.name,
-                        self.db.Metadata.value,
+                for name, value in (
+                    await self.session.execute(
+                        select(
+                            self.db.Metadata.name,
+                            self.db.Metadata.value,
+                        )
                     )
                 )
             }
@@ -783,10 +818,12 @@ class ExperimentalSession:
         async with self.session.begin():
             return {
                 name: value
-                async for name, value in self.session.execute(
-                    select(
-                        self.db.Parameter.name,
-                        self.db.Parameter.value,
+                for name, value in (
+                    await self.session.execute(
+                        select(
+                            self.db.Parameter.name,
+                            self.db.Parameter.value,
+                        )
                     )
                 )
             }
@@ -806,8 +843,8 @@ class ExperimentalSession:
         password=None,
     ):
         """This method returns an asynchronous task which sends an email at regular intervals.
-        Such a task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
-        :meth:`pymanip.asyncsession.AsyncSession.run`, and does not have to be awaited manually.
+        Such a task should be passed to :meth:`~pymanip.aiosession.aiosession.AsyncSession.monitor` or
+        :meth:`~pymanip.aiosession.aiosession.AsyncSession.run`, and does not have to be awaited manually.
 
         :param from_addr: email address of the sender
         :type from_addr: str
@@ -957,8 +994,8 @@ class ExperimentalSession:
         fixed_xlim=None,
     ):
         """This method returns an asynchronous task which creates and regularly updates a plot for
-        the specified scalar variables. Such a task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
-        :meth:`pymanip.asyncsession.AsyncSession.run`, and does not have to be awaited manually.
+        the specified scalar variables. Such a task should be passed to :meth:`~pymanip.aiosession.aiosession.AsyncSession.monitor` or
+        :meth:`~pymanip.aiosession.aiosession.AsyncSession.run`, and does not have to be awaited manually.
 
         If varnames is specified, the variables are plotted against time. If x and y are specified, then
         one is plotted against the other.
@@ -1123,7 +1160,7 @@ class ExperimentalSession:
             try:
                 geom = mngr.window.geometry()
                 figsize = tuple(fig.get_size_inches())
-                self.save_metadata(
+                await self.save_metadata(
                     **{param_key_window: str(geom), param_key_figsize: str(figsize)}
                 )
             except AttributeError:
@@ -1131,7 +1168,7 @@ class ExperimentalSession:
 
     async def figure_gui_update(self):
         """This method returns an asynchronous task which updates the figures created by the
-        :meth:`pymanip.asyncsession.AsyncSession.plot` tasks. This task is added automatically,
+        :meth:`~pymanip.aiosession.aiosession.AsyncSession.plot` tasks. This task is added automatically,
         and should not be used manually.
         """
         if not self.offscreen_figures:
@@ -1157,7 +1194,7 @@ class ExperimentalSession:
         is received.
         It essentially sets the :attr:`running` attribute to False.
         Long user-defined tasks should check the :attr:`running` attribute, and abort if set to False.
-        All other AsyncSession tasks check the attribute and will stop. The :meth:`~pymanip.asyncsession.AsyncSession.sleep`
+        All other AsyncSession tasks check the attribute and will stop. The :meth:`~pymanip.aiosession.aiosession.AsyncSession.sleep`
         method also aborts sleeping.
         """
         self.running = False
@@ -1165,8 +1202,8 @@ class ExperimentalSession:
 
     async def sweep(self, task, iterable):
         """This methods returns an asynchronous task which repeatedly awaits a given co-routine by iterating
-        the specified iterable. The returned asynchronous task should be passed to :meth:`pymanip.asyncsession.AsyncSession.monitor` or
-        :meth:`pymanip.asyncsession.AsyncSession.run`, and does not have to be awaited manually.
+        the specified iterable. The returned asynchronous task should be passed to :meth:`~pymanip.aiosession.aiosession.AsyncSession.monitor` or
+        :meth:`pymanip.aiosession.aiosession.AsyncSession.run`, and does not have to be awaited manually.
 
         This should be used when the main task of the asynchronous session is to sweep some value. The asynchronous session
         will exit when all values have been iterated.
@@ -1203,7 +1240,7 @@ class ExperimentalSession:
         prints a countdown. This should be called with verbose=True by only one of the tasks.
         The other tasks should call with verbose=False.
         This method should be preferred over asyncio.sleep because it checks that
-        :meth:`pymanip.asyncsession.AsyncSession.ask_exit` has not been called, and stops waiting
+        :meth:`~pymanip.aiosession.aiosession.AsyncSession.ask_exit` has not been called, and stops waiting
         if it has. This is useful to allow rapid abortion of the monitoring session.
 
         :param duration: time to wait
@@ -1292,7 +1329,7 @@ class ExperimentalSession:
 
     async def mytask(self, corofunc):
         """This method repeatedly awaits the given co-routine function, as long as
-        :meth:`pymanip.asyncsession.AsyncSession.ask_exit` has not been called.
+        :meth:`~pymanip.aiosession.aiosession.AsyncSession.ask_exit` has not been called.
         Should not be called manually.
         """
         print("Starting task", corofunc)
@@ -1318,10 +1355,12 @@ class ExperimentalSession:
         the signal handling and binding it to the ask_exit method.
 
         It defines a :attr:`running` attribute, which is finally set to False when the monitoring must stop. User can
-        use the :meth:`~pymanip.asyncsession.AsyncSession.ask_exit` method to stop the monitoring. Time consuming
+        use the :meth:`~pymanip.aiosession.aiosession.AsyncSession.ask_exit` method to stop the monitoring. Time consuming
         user-defined task should check the :attr:`running` and abort if set to False.
 
-        :param \\*tasks: asynchronous tasks to run: if the task is a co-routine function, it will be called repeatedly until ask_exit is called. If task is an awaitable it is called only once. Such an awaitable is responsible to check that ask_exit has not been called. Several such awaitables are provided: :meth:`pymanip.asyncsession.AsyncSession.send_email`, :meth:`pymanip.asyncsession.AsyncSession.plot` and :meth:`pymanip.asyncsession.AsyncSession.sweep`.
+        :param \\*tasks: asynchronous tasks to run: if the task is a co-routine function, it will be called repeatedly until ask_exit is called. If task is an awaitable it is called only once. Such an awaitable is responsible to check that ask_exit has not been called. Several such awaitables are
+        provided: :meth:`~pymanip.aiosession.aiosession.AsyncSession.send_email`, :meth:`~pymanip.aiosession.aiosession.AsyncSession.plot`
+        and :meth:`~pymanip.aiosession.aiosession.AsyncSession.sweep`.
         :type \\*tasks: co-routine function or awaitable
         :param server_port: the network port to open for remote HTTP connection, defaults to 6913. If None, no server is created.
         :type server_port: int, optional
@@ -1382,26 +1421,6 @@ class ExperimentalSession:
             await asyncio.gather(webserver, self.figure_gui_update(), *tasks_final)
         else:
             await asyncio.gather(self.figure_gui_update(), *tasks_final)
-
-    def run(
-        self,
-        *tasks,
-        server_port=6913,
-        custom_routes=None,
-        custom_figures=None,
-        offscreen_figures=False,
-    ):
-        """Synchronous call to :meth:`pymanip.asyncsession.AsyncSession.monitor`."""
-
-        asyncio.run(
-            self.monitor(
-                *tasks,
-                server_port=server_port,
-                custom_routes=custom_routes,
-                custom_figures=custom_figures,
-                offscreen_figures=offscreen_figures,
-            )
-        )
 
     async def save_remote_data(self, data):
         """This method saves the data returned by a :class:`pymanip.asyncsession.RemoteObserver` object into the current session database,

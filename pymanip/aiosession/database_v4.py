@@ -25,6 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
     ForeignKey,
     inspect,
+    select,
 )
 
 database_version = 4.0
@@ -120,32 +121,44 @@ class Metadata(Base):
         }
 
 
-async def create_tables(conn):
+def create_tables(conn):
+    """At this time, sqlalchemy does not support async inspection.
+    So, use:
+    ```python
+    conn.run_sync(create_tables)
+    ```
+    """
     new = False
     if not inspect(conn).has_table("log_names"):
-        await conn.run_sync(LogName.metadata.create_all)
+        LogName.metadata.create_all(conn)
         new = True
     if not inspect(conn).has_table("log"):
-        await conn.run_sync(Log.metadata.create_all)
+        Log.metadata.create_all(conn)
         new = True
     if not inspect(conn).has_table("dataset_names"):
-        await conn.run_sync(DatasetName.metadata.create_all)
+        DatasetName.metadata.create_all(conn)
         new = True
     if not inspect(conn).has_table("dataset"):
-        await conn.run_sync(Dataset.metadata.create_all)
+        Dataset.metadata.create_all(conn)
         new = True
     if not inspect(conn).has_table("parameters"):
-        await conn.run_sync(Parameter.metadata.create_all)
+        Parameter.metadata.create_all(conn)
         new = True
     if not inspect(conn).has_table("metadata"):
-        await conn.run_sync(Metadata.metadata.create_all)
+        Metadata.metadata.create_all(conn)
         new = True
     return new
 
 
 async def copy_table(input_session, output_session, table):
-    async for r in input_session.query(table).yield_per(10000):
-        output_session.add(table(**r.as_dict()))
+    rows = await input_session.execute(select(table))
+    # count = 0
+    for rr in rows.yield_per(10000):
+        (r,) = rr
+        new_row = table(**r.as_dict())
+        output_session.add(new_row)
+        # count = count + 1
+    # print(" -->", table.__tablename__, ":", count, "rows")
 
 
 table_list = [
