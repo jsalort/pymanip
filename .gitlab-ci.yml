@@ -1,0 +1,23 @@
+image: jsalort/py:latest
+
+stages:
+    - test
+    - docs
+
+tests:
+    stage: test
+    script:
+        - python -m pip install -e .
+        - python -m pytest -v
+
+pages:
+    stage: docs
+    script:
+        - python -m pip install -e .
+        - make -C doc html
+        - mv doc/_build/html/ public/ 
+    artifacts:
+        paths:
+            - public
+    only:
+        - master
