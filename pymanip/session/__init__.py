@@ -81,7 +81,7 @@ class BaseSession:
             session_name = makeAcqName()
 
         if isinstance(session_name, Path):
-            self.session_name = session_name.stem()
+            self.session_name = session_name.stem
             self.storename = str(session_name)
         else:
             self.session_name = session_name
