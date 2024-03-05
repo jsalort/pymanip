@@ -93,6 +93,15 @@ class _SavedAsyncSession:
                 print("========")
                 for name, val in meta.items():
                     print(name, ":", val)
+                print()
+
+        if version >= 4.1:
+            figures = self.figures()
+            if figures:
+                print("Figures")
+                print("=======")
+                for f in figures:
+                    print(f"Fig {f['fignum']}:", ",".join(f["variables"]))
 
     # General attributes
 
@@ -121,6 +130,13 @@ class _SavedAsyncSession:
         if ts:
             return max(ts)
         return None
+
+    # Figures
+
+    @lru_cache
+    def figures(self):
+        with self.session as sesn:
+            return list(sesn.figures())
 
     # Logged variables
 

@@ -26,7 +26,7 @@ from sqlalchemy import (
     inspect,
 )
 
-database_version = 4.0
+database_version = 4.1
 Base = declarative_base()
 
 
@@ -116,6 +116,40 @@ class Metadata(Base):
         }
 
 
+class Figure(Base):
+    __tablename__ = "figure"
+
+    fignum = Column(Integer, primary_key=True)
+    maxvalues = Column(Integer)
+    yscale = Column(Text)
+    ymin = Column(Double)
+    ymax = Column(Double)
+
+    def as_dict(self):
+        return {
+            "fignum": self.fignum,
+            "maxvalues": self.maxvalues,
+            "yscale": self.yscale,
+            "ymin": self.ymin,
+            "ymax": self.ymax,
+        }
+
+
+class FigureVariable(Base):
+    __tablename__ = "figure_variable"
+
+    varnum = Column(Integer, primary_key=True)
+    fignum = Column(Integer, ForeignKey(Figure.fignum), index=True)
+    name = Column(Text, ForeignKey(LogName.name))
+
+    def as_dict(self):
+        return {
+            "varnum": self.varnum,
+            "fignum": self.fignum,
+            "name": self.name,
+        }
+
+
 def create_tables(engine):
     new = False
     if not inspect(engine).has_table("log_names"):
@@ -136,6 +170,13 @@ def create_tables(engine):
     if not inspect(engine).has_table("metadata"):
         Metadata.metadata.create_all(engine)
         new = True
+    if not inspect(engine).has_table("figure"):
+        Figure.metadata.create_all(engine)
+        new = True
+    if not inspect(engine).has_table("figure_variable"):
+        FigureVariable.metadata.create_all(engine)
+        new = True
+
     return new
 
 
@@ -152,4 +193,6 @@ table_list = [
     Dataset,
     Parameter,
     Metadata,
+    Figure,
+    FigureVariable,
 ]

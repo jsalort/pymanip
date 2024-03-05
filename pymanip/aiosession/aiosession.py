@@ -46,6 +46,11 @@ import pymanip.aiosession.database_v4 as dbv4
 
 import pymanip.asyncsession as web_root
 
+try:
+    import PyQt5.QtCore  # noqa: F401
+except (ModuleNotFoundError, FileNotFoundError):
+    pass
+
 dblatest = dbv4
 
 
@@ -159,7 +164,7 @@ class AsyncSession:
                         self.db = dbv3
                     elif version == 3 or version == 3.1:
                         self.db = dbv3
-                    elif version == 4:
+                    elif version >= 4:
                         self.db = dbv4
                     else:
                         print(f"Unable to determine database version. Got <{version}>.")
@@ -172,9 +177,6 @@ class AsyncSession:
             else:
                 new = False
 
-        # Enter session
-        self.session = await self.async_session().__aenter__()
-
         # Load existing database into in-memory database
         if self.delay_save:
             # Create table on disk
@@ -183,19 +185,19 @@ class AsyncSession:
             await self.disk_engine.dispose()
 
             # print("Copy tables from disk to memory")
-            async with self.disk_async_session() as input_session:
-                async with input_session.begin(), self.session.begin():
+            async with self.disk_async_session() as input_session, self.async_session() as sesn:
+                async with input_session.begin(), sesn.begin():
                     for table in self.db.table_list:
                         await self.db.copy_table(input_session, self.session, table)
         if new:
-            async with self.session.begin():
-                self.session.add(
+            async with self.async_session() as sesn, sesn.begin():
+                sesn.add(
                     self.db.Parameter(
                         name="_database_version",
                         value=self.db.database_version,
                     )
                 )
-                self.session.add(
+                sesn.add(
                     self.db.Parameter(
                         name="_session_creation_timestamp",
                         value=datetime.now().timestamp(),
@@ -210,7 +212,6 @@ class AsyncSession:
         """Context manager exit method"""
         if self.delay_save:
             await self.save_database()
-        await self.session.__aexit__(type_, value, cb)
         await self.engine.dispose()
 
     async def save_database(self):
@@ -222,12 +223,12 @@ class AsyncSession:
         This method is automatically called at the exit of the context manager.
         """
         if self.delay_save:
-            async with self.disk_async_session() as output_session:
-                async with self.session.begin(), output_session.begin():
+            async with self.async_session() as sesn, self.disk_async_session() as output_session:
+                async with sesn.begin(), output_session.begin():
                     # print("Copy tables from memory to disk")
                     for table in self.db.table_list:
                         await output_session.execute(delete(table))
-                        await self.db.copy_table(self.session, output_session, table)
+                        await self.db.copy_table(sesn, output_session, table)
 
     async def get_version(self):
         """Returns current version of the database layout."""
@@ -321,6 +322,38 @@ class AsyncSession:
                 for name, val in meta.items():
                     print(name, ":", val)
 
+        if version >= 4.1:
+            figures = [f async for f in self.figures()]
+            if figures:
+                print("Figures")
+                print("=======")
+                for f in figures:
+                    print(f"Fig {f['fignum']}:", ",".join(f["variables"]))
+
+    async def figures(self):
+        async with self.async_session() as sesn, sesn.begin():
+            for fignum, maxvalues, yscale, ymin, ymax in await sesn.execute(
+                select(
+                    self.db.Figure.fignum,
+                    self.db.Figure.maxvalues,
+                    self.db.Figure.yscale,
+                    self.db.Figure.ymin,
+                    self.db.Figure.ymax,
+                )
+            ):
+                r = await sesn.execute(
+                    select(self.db.FigureVariable.name).filter_by(fignum=fignum)
+                )
+                varnames = r.all()
+                yield {
+                    "fignum": fignum,
+                    "maxvalues": maxvalues,
+                    "yscale": yscale,
+                    "ymin": ymin,
+                    "ymax": ymax,
+                    "variables": varnames,
+                }
+
     async def add_entry(self, *args, **kwargs):
         """This methods adds scalar values into the database. Each entry value
         will hold a timestamp corresponding to the time at which this method has been called.
@@ -342,16 +375,15 @@ class AsyncSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (await self.session.execute(select(self.db.LogName.name)))
+                name for name, in (await sesn.execute(select(self.db.LogName.name)))
             }
             for key, val in data.items():
                 if key not in names:
-                    self.session.add(self.db.LogName(name=key))
+                    sesn.add(self.db.LogName(name=key))
                     names.add(key)
-                self.session.add(self.db.Log(timestamp=ts, name=key, value=val))
+                sesn.add(self.db.Log(timestamp=ts, name=key, value=val))
 
     async def add_dataset(self, *args, **kwargs):
         """This method adds arrays, or other pickable objects, as “datasets” into the
@@ -370,18 +402,15 @@ class AsyncSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (
-                    await self.session.execute(select(self.db.DatasetName.name))
-                )
+                name for name, in (await sesn.execute(select(self.db.DatasetName.name)))
             }
             for key, val in data.items():
                 if key not in names:
-                    self.session.add(self.db.DatasetName(name=key))
+                    sesn.add(self.db.DatasetName(name=key))
                     names.add(key)
-                self.session.add(
+                sesn.add(
                     self.db.Dataset(
                         timestamp=ts, name=key, data=pickle.dumps(val, protocol=4)
                     )
@@ -394,10 +423,9 @@ class AsyncSession:
         :return: names of scalar variables
         :rtype: set
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (await self.session.execute(select(self.db.LogName.name)))
+                name for name, in (await sesn.execute(select(self.db.LogName.name)))
             }
         return names
 
@@ -409,17 +437,16 @@ class AsyncSession:
         :rtype: dict
         """
         result = dict()
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (await self.session.execute(select(self.db.LogName.name)))
+                name for name, in (await sesn.execute(select(self.db.LogName.name)))
             }
             for name in names:
                 ts_val = np.array(
                     [
                         (timestamp, value)
                         for timestamp, value in (
-                            await self.session.execute(
+                            await sesn.execute(
                                 select(
                                     self.db.Log.timestamp,
                                     self.db.Log.value,
@@ -445,12 +472,12 @@ class AsyncSession:
         >>> ts, val = await sesn.logged_variable('T_Pt_bas')
 
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             ts_val = np.array(
                 [
                     (timestamp, value)
                     for timestamp, value in (
-                        await self.session.execute(
+                        await sesn.execute(
                             select(
                                 self.db.Log.timestamp,
                                 self.db.Log.value,
@@ -471,14 +498,13 @@ class AsyncSession:
         :rtype: dict
         """
         result = dict()
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (await self.session.execute(select(self.db.LogName.name)))
+                name for name, in (await sesn.execute(select(self.db.LogName.name)))
             }
             for name in names:
                 (r,) = (
-                    await self.session.execute(
+                    await sesn.execute(
                         select(self.db.Log)
                         .filter_by(name=name)
                         .order_by(self.db.Log.timestamp.asc())
@@ -498,14 +524,13 @@ class AsyncSession:
         :rtype: dict
         """
         result = dict()
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (await self.session.execute(select(self.db.LogName.name)))
+                name for name, in (await sesn.execute(select(self.db.LogName.name)))
             }
             for name in names:
                 (r,) = (
-                    await self.session.execute(
+                    await sesn.execute(
                         select(self.db.Log)
                         .filter_by(name=name)
                         .order_by(self.db.Log.timestamp.desc())
@@ -528,12 +553,12 @@ class AsyncSession:
         :return: the timestamps, and values of the specified variable
         :rtype: tuple of two numpy arrays
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             ts_val = np.array(
                 [
                     (timestamp, value)
                     for timestamp, value in (
-                        await self.session.execute(
+                        await sesn.execute(
                             select(
                                 self.db.Log.timestamp,
                                 self.db.Log.value,
@@ -558,12 +583,9 @@ class AsyncSession:
         :return: names of datasets
         :rtype: set
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (
-                    await self.session.execute(select(self.db.DatasetName.name))
-                )
+                name for name, in (await sesn.execute(select(self.db.DatasetName.name)))
             }
         return names
 
@@ -588,17 +610,14 @@ class AsyncSession:
         >>> datas = [d for ts, d in (await sesn.datasets('toto'))]
 
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             names = {
-                name
-                for name, in (
-                    await self.session.execute(select(self.db.DatasetName.name))
-                )
+                name for name, in (await sesn.execute(select(self.db.DatasetName.name)))
             }
             if name not in names:
                 print("Possible dataset names are", names)
                 raise ValueError(f'Bad dataset name "{name:}"')
-            for timestamp, data in await self.session.execute(
+            for timestamp, data in await sesn.execute(
                 select(
                     self.db.Dataset.timestamp,
                     self.db.Dataset.data,
@@ -616,8 +635,8 @@ class AsyncSession:
         :return: dataset value
         :rtype: object
         """
-        async with self.session.begin():
-            r = await self.session.execute(
+        async with self.async_session() as sesn, sesn.begin():
+            r = await sesn.execute(
                 select(self.db.Dataset)
                 .filter_by(name=name)
                 .order_by(self.db.Dataset.timestamp.desc())
@@ -638,12 +657,12 @@ class AsyncSession:
         :return: array of timestamps
         :rtype: :class:`numpy.ndarray`
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             t = np.array(
                 [
                     timestamp
                     for timestamp, in (
-                        await self.session.execute(
+                        await sesn.execute(
                             select(self.db.Dataset.timestamp)
                             .filter_by(name=name)
                             .order_by(self.db.Dataset.timestamp)
@@ -667,19 +686,19 @@ class AsyncSession:
         :rtype: object
         """
 
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             q = select(self.db.Dataset).filter_by(name=name)
             if ts is not None:
                 q = q.filter_by(timestamp=ts)
 
             if n is None:
                 q = q.order_by(self.db.Dataset.timestamp.desc())
-                rows = await self.session.execute(q)
+                rows = await sesn.execute(q)
                 (last_row,) = rows.first()
                 data = pickle.loads(last_row.data)
             else:
                 q = q.order_by(self.db.Dataset.timestamp).offset(n).limit(1)
-                rows = await self.session.execute(q)
+                rows = await sesn.execute(q)
                 (nth_row,) = rows.first()
                 data = pickle.loads(nth_row.data)
         return data
@@ -696,18 +715,16 @@ class AsyncSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             for key, val in data.items():
                 r = (
-                    await self.session.execute(
-                        select(self.db.Metadata).filter_by(name=key)
-                    )
+                    await sesn.execute(select(self.db.Metadata).filter_by(name=key))
                 ).one_or_none()
                 if r is not None:
                     (r,) = r
                     r.value = val
                 else:
-                    self.session.add(
+                    sesn.add(
                         self.db.Metadata(
                             name=key,
                             value=val,
@@ -731,18 +748,16 @@ class AsyncSession:
         for a in args:
             data.update(a)
         data.update(kwargs)
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             for key, val in data.items():
                 r = (
-                    await self.session.execute(
-                        select(self.db.Parameter).filter_by(name=key)
-                    )
+                    await sesn.execute(select(self.db.Parameter).filter_by(name=key))
                 ).one_or_none()
                 if r is not None:
                     (r,) = r
                     r.value = val
                 else:
-                    self.session.add(
+                    sesn.add(
                         self.db.Parameter(
                             name=key,
                             value=val,
@@ -751,11 +766,9 @@ class AsyncSession:
 
     async def metadata(self, name):
         """This method retrives the value of the specified metadata."""
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             data = (
-                await self.session.execute(
-                    select(self.db.Metadata).filter_by(name=name)
-                )
+                await sesn.execute(select(self.db.Metadata).filter_by(name=name))
             ).one_or_none()
             if data is not None:
                 (data,) = data
@@ -770,11 +783,9 @@ class AsyncSession:
         :return: value of the parameter
         :rtype: float
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             data = (
-                await self.session.execute(
-                    select(self.db.Parameter).filter_by(name=name)
-                )
+                await sesn.execute(select(self.db.Parameter).filter_by(name=name))
             ).one_or_none()
             if data is not None:
                 (data,) = data
@@ -799,11 +810,11 @@ class AsyncSession:
 
     async def metadatas(self):
         """This method returns all metadata."""
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             return {
                 name: value
                 for name, value in (
-                    await self.session.execute(
+                    await sesn.execute(
                         select(
                             self.db.Metadata.name,
                             self.db.Metadata.value,
@@ -818,11 +829,11 @@ class AsyncSession:
         :return: parameters
         :rtype: dict
         """
-        async with self.session.begin():
+        async with self.async_session() as sesn, sesn.begin():
             return {
                 name: value
                 for name, value in (
-                    await self.session.execute(
+                    await sesn.execute(
                         select(
                             self.db.Parameter.name,
                             self.db.Parameter.value,
@@ -1034,15 +1045,19 @@ class AsyncSession:
             param_key_figsize = "_figsize_" + "_".join(varnames)
             xymode = False
         last_update = {k: 0 for k in varnames}
-        saved_geom = self.metadata(param_key_window)
+        saved_geom = await self.metadata(param_key_window)
         if saved_geom:
-            saved_geom = eval(saved_geom)
-        saved_figsize = self.metadata(param_key_figsize)
+            try:
+                saved_geom = eval(saved_geom)
+            except Exception:
+                saved_geom = None
+        saved_figsize = await self.metadata(param_key_figsize)
         if saved_figsize:
             saved_figsize = eval(saved_figsize)
         if not self.offscreen_figures:
             plt.ion()
         fig = plt.figure(figsize=saved_figsize)
+        assert hasattr(fig, "show")
         if not self.offscreen_figures:
             mngr = fig.canvas.manager
             if saved_geom:
@@ -1050,7 +1065,26 @@ class AsyncSession:
         ax = fig.add_subplot(111)
         line_objects = dict()
         self.figure_list.append(fig)
-        ts0 = self.initial_timestamp
+        ts0 = await self.initial_timestamp()
+        assert hasattr(fig, "show")
+
+        # Save figure in database
+        async with self.async_session() as sesn, sesn.begin():
+            ff = self.db.Figure(
+                maxvalues=maxvalues,
+                yscale=yscale,
+                ymin=fixed_ylim[0] if fixed_ylim else float("nan"),
+                ymax=fixed_ylim[1] if fixed_ylim else float("nan"),
+            )
+            sesn.add(ff)
+            await sesn.flush()
+            for var in varnames:
+                sesn.add(
+                    self.db.FigureVariable(
+                        fignum=ff.fignum,
+                        name=var,
+                    )
+                )
         while self.running:
             data = {
                 k: (await self.logged_data_fromtimestamp(k, last_update[k]))
@@ -1408,6 +1442,11 @@ class AsyncSession:
             webserver = loop.create_server(
                 app.make_handler(), host=None, port=server_port
             )
+
+        # Clear Figure description from database
+        async with self.async_session() as sesn, sesn.begin():
+            await sesn.execute(delete(self.db.FigureVariable))
+            await sesn.execute(delete(self.db.Figure))
 
         # if any of the tasks submitted are coroutinefunctions instead of
         # coroutines, then assume they take only one argument (self)

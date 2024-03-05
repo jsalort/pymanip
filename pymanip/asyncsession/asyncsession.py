@@ -83,7 +83,7 @@ def get_db_module(Session):
                 db = dbv3
             elif version == 3 or version == 3.1:
                 db = dbv3
-            elif version == 4:
+            elif version >= 4:
                 db = dbv4
             else:
                 print(f"Unable to determine database version. Got <{version}>.")
@@ -328,6 +328,31 @@ class AsyncSession:
                 print("========")
                 for name, val in meta.items():
                     print(name, ":", val)
+                print()
+
+        if version >= 4.1:
+            figures = list(self.figures())
+            if figures:
+                print("Figures")
+                print("=======")
+                for f in figures:
+                    print(f"Fig {f['fignum']}:", ",".join(f["variables"]))
+
+    def figures(self):
+        with self.Session() as session:
+            for fig in session.query(self.db.Figure).all():
+                q = session.query(self.db.FigureVariable.name).filter_by(
+                    fignum=fig.fignum
+                )
+                names = [r.name for r in q.all()]
+                yield {
+                    "fignum": fig.fignum,
+                    "maxvalues": fig.maxvalues,
+                    "yscale": fig.yscale,
+                    "ymin": fig.ymin,
+                    "ymax": fig.ymax,
+                    "variables": names,
+                }
 
     def add_entry(self, *args, **kwargs):
         """This methods adds scalar values into the database. Each entry value
