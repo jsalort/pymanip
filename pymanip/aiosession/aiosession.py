@@ -11,6 +11,7 @@ It is used to manage an experimental session.
 """
 
 from pathlib import Path
+from importlib.resources import files
 import signal
 import time
 import sys
@@ -42,6 +43,8 @@ from pymanip.mytime import dateformat
 import pymanip.aiosession.database_v1 as dbv1
 import pymanip.aiosession.database_v3 as dbv3
 import pymanip.aiosession.database_v4 as dbv4
+
+import pymanip.asyncsession as web_root
 
 dblatest = dbv4
 
@@ -130,8 +133,8 @@ class AsyncSession:
 
         self.custom_figures = None
         self.figure_list = []
-        self.template_dir = os.path.join(os.path.dirname(__file__), "web")
-        self.static_dir = os.path.join(os.path.dirname(__file__), "web_static")
+        self.template_dir = files(web_root) / "web"
+        self.static_dir = files(web_root) / "web_static"
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
         self.conn = None
 
