@@ -255,7 +255,8 @@ class VideoSession(AsyncSession):
                 cam.set_trigger_mode(True)
             else:
                 cam.set_trigger_mode(False)
-                cam.set_frame_rate(framerate)
+                if framerate is not None:
+                    cam.set_frame_rate(framerate)
         if self.trigger_gbf is True:
             self.trigger_gbf = None
         self.image_queues = [SimpleQueue() for _ in self.camera_list]
