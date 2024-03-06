@@ -19,6 +19,7 @@ import os.path
 import pickle
 import warnings
 import inspect
+import shutil
 from datetime import datetime
 import asyncio
 from aiofile import async_open
@@ -996,7 +997,7 @@ class AsyncSession:
 
             await self.sleep(delay_hours * 3600, verbose=False)
 
-    async def plot(
+    async def _plot_python(
         self,
         varnames=None,
         maxvalues=1000,
@@ -1007,28 +1008,6 @@ class AsyncSession:
         fixed_ylim=None,
         fixed_xlim=None,
     ):
-        """This method returns an asynchronous task which creates and regularly updates a plot for
-        the specified scalar variables. Such a task should be passed to :meth:`~pymanip.aiosession.aiosession.AsyncSession.monitor` or
-        :meth:`~pymanip.aiosession.aiosession.AsyncSession.run`, and does not have to be awaited manually.
-
-        If varnames is specified, the variables are plotted against time. If x and y are specified, then
-        one is plotted against the other.
-
-        :param varnames: names of the scalar variables to plot
-        :type varnames: list or str, optional
-        :param maxvalues: number of values to plot, defaults to 1000
-        :type maxvalues: int, optional
-        :param yscale: fixed yscale for temporal plot, defaults to automatic ylim
-        :type yscale: tuple or list, optional
-        :param x: name of the scalar variable to use on the x axis
-        :type x: str, optional
-        :param y: name of the scalar variable to use on the y axis
-        :type y: str, optional
-        :param fixed_xlim: fixed xscale for x-y plots, defaults to automatic xlim
-        :type fixed_xlim: tuple or list, optional
-        :param fixed_ylim: fixed yscale for x-y plots, defaults to automatic ylim
-        :type fixed_ylim: tuple or list, optional
-        """
         if varnames is None:
             if not isinstance(x, str) or not isinstance(y, str):
                 raise TypeError("x and y should be strings")
@@ -1066,25 +1045,7 @@ class AsyncSession:
         line_objects = dict()
         self.figure_list.append(fig)
         ts0 = await self.initial_timestamp()
-        assert hasattr(fig, "show")
 
-        # Save figure in database
-        async with self.async_session() as sesn, sesn.begin():
-            ff = self.db.Figure(
-                maxvalues=maxvalues,
-                yscale=yscale,
-                ymin=fixed_ylim[0] if fixed_ylim else float("nan"),
-                ymax=fixed_ylim[1] if fixed_ylim else float("nan"),
-            )
-            sesn.add(ff)
-            await sesn.flush()
-            for var in varnames:
-                sesn.add(
-                    self.db.FigureVariable(
-                        fignum=ff.fignum,
-                        name=var,
-                    )
-                )
         while self.running:
             data = {
                 k: (await self.logged_data_fromtimestamp(k, last_update[k]))
@@ -1202,6 +1163,85 @@ class AsyncSession:
                 )
             except AttributeError:
                 pass
+
+    async def plot(
+        self,
+        varnames=None,
+        maxvalues=1000,
+        yscale=None,
+        *,
+        x=None,
+        y=None,
+        fixed_ylim=None,
+        fixed_xlim=None,
+        backend=None,
+    ):
+        """This method returns an asynchronous task which creates and regularly updates a plot for
+        the specified scalar variables. Such a task should be passed to :meth:`~pymanip.aiosession.aiosession.AsyncSession.monitor` or
+        :meth:`~pymanip.aiosession.aiosession.AsyncSession.run`, and does not have to be awaited manually.
+
+        If varnames is specified, the variables are plotted against time. If x and y are specified, then
+        one is plotted against the other.
+
+        :param varnames: names of the scalar variables to plot
+        :type varnames: list or str, optional
+        :param maxvalues: number of values to plot, defaults to 1000
+        :type maxvalues: int, optional
+        :param yscale: fixed yscale for temporal plot, defaults to automatic ylim
+        :type yscale: tuple or list, optional
+        :param x: name of the scalar variable to use on the x axis
+        :type x: str, optional
+        :param y: name of the scalar variable to use on the y axis
+        :type y: str, optional
+        :param fixed_xlim: fixed xscale for x-y plots, defaults to automatic xlim
+        :type fixed_xlim: tuple or list, optional
+        :param fixed_ylim: fixed yscale for x-y plots, defaults to automatic ylim
+        :type fixed_ylim: tuple or list, optional
+        """
+        # Save figure in database
+        async with self.async_session() as sesn, sesn.begin():
+            ff = self.db.Figure(
+                maxvalues=maxvalues,
+                yscale=yscale,
+                ymin=fixed_ylim[0] if fixed_ylim else float("nan"),
+                ymax=fixed_ylim[1] if fixed_ylim else float("nan"),
+            )
+            sesn.add(ff)
+            await sesn.flush()
+            for var in varnames:
+                sesn.add(
+                    self.db.FigureVariable(
+                        fignum=(fignum := ff.fignum),
+                        name=var,
+                    )
+                )
+
+        # Start backend
+        manip_path = shutil.which("manip")
+        if backend is None:
+            if manip_path is None:
+                backend = "python"
+            else:
+                backend = "manip"
+        if backend == "python":
+            await self._plot_python(
+                varnames,
+                maxvalues,
+                yscale,
+                x=x,
+                y=y,
+                fixed_ylim=fixed_ylim,
+                fixed_xlim=fixed_xlim,
+            )
+        elif backend == "manip":
+            await asyncio.create_subprocess_exec(
+                manip_path,
+                "show",
+                "-f",
+                str(self.session_path),
+                "-n",
+                str(fignum),
+            )
 
     async def figure_gui_update(self):
         """This method returns an asynchronous task which updates the figures created by the
