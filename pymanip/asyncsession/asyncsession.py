@@ -1191,7 +1191,6 @@ class AsyncSession:
             await asyncio.create_subprocess_exec(
                 manip_path,
                 "show",
-                "-f",
                 str(self.session_path),
                 "-n",
                 str(fignum),
