@@ -6,6 +6,7 @@ This module auto-imports all the asynchronous instrument classes.
 """
 
 from .agilent_34970a import AsyncAgilent34970a  # noqa: F401
+from .agilent_6030a import AsyncAgilent6030a  # noqa: F401
 from .stanford_sr830 import AsyncStanfordSR830  # noqa: F401
 from .newport_xps_rl import AsyncNewportXpsRL  # noqa: F401
 from .tdk_lambda import AsyncTdkLambda  # noqa: F401
