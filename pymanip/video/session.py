@@ -886,9 +886,8 @@ class VideoSession(AsyncSession):
                             img = img.T
                         else:
                             img = np.transpose(img, axes=(1, 0, 2))
-                            if self.color_order == "BGR":
-                                # Qt comme Matplotlib travaille en RGB.
-                                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                            # Qt comme Matplotlib travaille en RGB.
+                            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
                         self.image_view.setImage(
                             img,
