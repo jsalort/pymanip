@@ -173,6 +173,7 @@ class VideoSession(AsyncSession):
         exist_ok=False,
         timeout=None,
         burst_mode=True,
+        white_balance=None,  # used by live preview only
     ):
         """Constructor method"""
         if isinstance(camera_or_camera_list, (list, tuple)):
@@ -189,6 +190,7 @@ class VideoSession(AsyncSession):
         self.timeout = timeout
         self.burst_mode = burst_mode
         self.must_stop = False
+        self.white_balance = white_balance
 
         if output_path is None:
             current_date = datetime.today().strftime("%Y-%m-%d")
@@ -870,6 +872,11 @@ class VideoSession(AsyncSession):
                             img = cv2.cvtColor(img, cv2.COLOR_BayerGR2BGR)
                         else:
                             raise NotImplementedError
+                        if self.white_balance is not None:
+                            dt = img.dtype
+                            b, g, r = cv2.split(img)
+                            kR, kG, kB = self.white_balance
+                            img = cv2.merge((kB * b, kG * g, kR * r)).astype(dt)
                     elif not hasattr(self, "app"):
                         # with OpenCV backend,
                         # if not in color, we rescale min max to first image (otherwise may appear black)
