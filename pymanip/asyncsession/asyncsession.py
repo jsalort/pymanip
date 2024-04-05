@@ -371,7 +371,7 @@ class AsyncSession:
         """
         if self.readonly:
             raise RuntimeError("Cannot add entry to readonly session")
-        ts = datetime.now().timestamp()
+        ts = time.time_ns() / 1e9
         data = dict()
         for a in args:
             data.update(a)
@@ -382,6 +382,15 @@ class AsyncSession:
                 if key not in names:
                     session.add(self.db.LogName(name=key))
                     names.add(key)
+                # On windows the clock is sometimes not precise enough, and there may be the same value for ts, which
+                # would cause a violation of the Unique constraint on (timestamp, name).
+                while (
+                    session.query(self.db.Log.timestamp)
+                    .filter_by(timestamp=ts, name=key)
+                    .one_or_none()
+                ) is not None:
+                    ts += 1e-6
+                    # print("add a microsecond to ts, new ts =", ts)
                 session.add(self.db.Log(timestamp=ts, name=key, value=val))
             session.commit()
 

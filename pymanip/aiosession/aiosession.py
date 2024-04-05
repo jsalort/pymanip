@@ -189,7 +189,7 @@ class AsyncSession:
             async with self.disk_async_session() as input_session, self.async_session() as sesn:
                 async with input_session.begin(), sesn.begin():
                     for table in self.db.table_list:
-                        await self.db.copy_table(input_session, self.session, table)
+                        await self.db.copy_table(input_session, sesn, table)
         if new:
             async with self.async_session() as sesn, sesn.begin():
                 sesn.add(
