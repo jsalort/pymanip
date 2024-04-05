@@ -52,7 +52,7 @@ class Log(Base):
     __table_args__ = (UniqueConstraint("name", "timestamp"),)
 
     rowid = Column(Integer, primary_key=True)
-    timestamp = Column(Integer, index=True)
+    timestamp = Column(Double, index=True)
     name = Column(Text, ForeignKey(LogName.name), index=True)
     value = Column(Double)
 

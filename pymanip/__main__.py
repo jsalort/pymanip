@@ -6,7 +6,12 @@ pymanip CLI interface
 
 from pathlib import Path
 from argparse import ArgumentParser
-from pymanip.util.session import manip_info, check_hdf, rebuild_from_dat
+from pymanip.util.session import (
+    manip_info,
+    check_hdf,
+    rebuild_from_dat,
+    convert_timestamp,
+)
 from pymanip.util.gpib import scanGpib
 from pymanip.util.video import (
     preview_pco,
@@ -59,6 +64,15 @@ parser_info.add_argument(
 )
 parser_info.add_argument(
     "-p", "--plot", help="plot the specified variable.", metavar="varname"
+)
+
+# Create parser for "convert_timestamp"
+parser_convert = subparsers.add_parser(
+    "convert_timestamp", help="convert timestamp to double"
+)
+
+parser_convert.add_argument(
+    "sessionName", help="name of the saved session to convert", metavar="session_name"
 )
 
 # Create parser for "list_instruments"
@@ -257,6 +271,8 @@ if __name__ == "__main__":
 
     if args.command == "info":
         manip_info(args.sessionName, args.quiet, args.line, args.plot)
+    if args.command == "convert_timestamp":
+        convert_timestamp(args.sessionName)
     elif args.command == "list_instruments":
         import pymanip
 

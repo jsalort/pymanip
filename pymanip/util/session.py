@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime
 import os
+from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,8 +23,11 @@ except ModuleNotFoundError:
     has_panda = False
 from pymanip.collection import Manip
 from pymanip import Session, SavedSession
-from pymanip.asyncsession import SavedAsyncSession
+from pymanip.asyncsession import AsyncSession, SavedAsyncSession
 from pymanip.mytime import dateformat
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 def manip_info(sessionName, quiet, line_to_print, var_to_plot):
@@ -181,3 +185,17 @@ def rebuild_from_dat(inputDatfile, outputSessionName):
             for line in data.iterrows():
                 MI.log_addline(timestamp=line[1].Time, dict_caller=dict(line[1]))
             MI.Stop()
+
+
+def convert_timestamp(sessionName):
+    if isinstance(sessionName, str):
+        sessionName = Path(sessionName)
+    if sessionName.suffix != ".db":
+        raise RuntimeError("This function must be called on db file")
+    output_path = sessionName.parent / (sessionName.stem + "-converted.db")
+    with AsyncSession(sessionName, delay_save=True) as sesn:
+        sesn.disk_engine = create_engine(
+            "sqlite:///" + str(output_path.absolute()),
+            echo=False,
+        )
+        sesn.disk_Session = sessionmaker(bind=sesn.disk_engine)
