@@ -971,8 +971,16 @@ class AsyncSession:
                         )
                         writer.write(filename.encode())
                         await writer.drain()
+                        timeout = 30
+                        start = time.monotonic()
 
-                        ok = await reader.read(100)
+                        while (
+                            (time.monotonic() - start < timeout)
+                            and self.running
+                            and (ok := await reader.read(100)) != b"OK"
+                        ):
+                            await asyncio.sleep(1)
+
                         if ok == b"OK":
                             # File has been generated
                             print(
