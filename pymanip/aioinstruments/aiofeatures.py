@@ -118,6 +118,10 @@ class AsyncFloatValue(AsyncNumberValue, flfeatures.FloatValue):
     pass
 
 
+class AsyncFloatScientificValue(AsyncNumberValue, flfeatures.FloatScientificValue):
+    pass
+
+
 class AsyncBoolValue(AsyncValue, flfeatures.BoolValue):
     pass
 
