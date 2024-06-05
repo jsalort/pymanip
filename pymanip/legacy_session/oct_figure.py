@@ -1,12 +1,21 @@
 """Read Octave Figure file (:mod:`pymanip.legacy_session.oct_figure`)
 =====================================================================
 
+.. autofunction:: openfig
+
 """
 import matplotlib.pyplot as plt
 from pymanip.legacy_session.octmi_binary import read_octave_binary
 
 
 def openfig(filename):
+    """Create a Matplotlib figure from a GNU Octave Figure file.
+
+    :param filename: path to input ofig file.
+    :type filename: str
+    :return: fig, axes
+    :rtype: :class:`~matplotlib.figure.Figure`, list
+    """
     fig_handle = read_octave_binary(filename)["s_oct40"]
     if fig_handle["type"] == "figure":
         # properties = fig_handle["properties"]

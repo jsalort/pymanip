@@ -40,10 +40,11 @@ extensions = [
 ]
 
 intersphinx_mapping = {
-    "fluidlab": ("https://fluidlab.readthedocs.io/en/latest/", None),
+    "fluidlab": ("https://fluiddyn.readthedocs.io/projects/fluidlab/en/latest/", None),
     "cv2": ("https://opencv-python.readthedocs.io/en/latest/", None),
     "numpy": ("https://numpy.readthedocs.io/en/latest/", None),
     "stdlib": ("https://docs.python.org/3/", None),
+    "matplotlib": ("https://matplotlib.org/stable/", None),
 }
 
 autodoc_mock_imports = [
