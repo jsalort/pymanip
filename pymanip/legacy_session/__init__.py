@@ -1,9 +1,12 @@
-"""
-Module for legacy OctMI sessions
+"""Compatibility module for Octave binaries (:mod:`pymanip.legacy_session`)
+===========================================================================
 
-The OctSession class is designed to be used
-in a similar fashion to SavedSession for
-use by the collection classes.
+This is primarily intented for reading legacy OctMI sessions, but it can be used
+to read other Octave binary files, as well as Octave figure files.
+
+.. autoclass:: OctSession
+   :members:
+   :show-inheritance:
 
 """
 
@@ -15,7 +18,12 @@ from fluiddyn.util.terminal_colors import cprint
 from .octmi_binary import read_OctMI_session
 
 
-class OctSession(object):
+class OctSession:
+    """The OctSession class is designed to be used
+    in a similar fashion to SavedSession for
+    use by the collection classes.
+    """
+
     def __init__(
         self, session_name, cache_override=False, cache_location=".", verbose=False
     ):

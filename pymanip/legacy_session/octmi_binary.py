@@ -1,5 +1,5 @@
-"""Read older Octave-based experiment session (:mod:`fluidlab.exp.octavesession`)
-=================================================================================
+"""Read older Octave-based experiment session (:mod:`pymanip.legacy_session.octmi_binary`)
+==========================================================================================
 
 Provides:
 
@@ -7,7 +7,7 @@ read_OctMI_session(sessionName, verbose=True)
 
 """
 
-from struct import pack, unpack, error
+from struct import unpack, error
 from time import strftime, localtime
 from functools import reduce
 
@@ -17,11 +17,11 @@ from fluiddyn.util.terminal_colors import cprint
 
 
 class OctaveReaderError(NameError):
-    """ OctaveReader error """
+    """OctaveReader error"""
 
 
 def read_header(f, verbose):
-    """ Reads Octave binary file header (one per file)
+    """Reads Octave binary file header (one per file)
 
     Format is described in libinterp/corefcn/ls-oct-binary.cc
     recalled below.
@@ -49,7 +49,7 @@ def read_header(f, verbose):
 
 
 def read_scalar_var(f, verbose):
-    """ Reads one variable of type 'scalar' from Octave binary file
+    """Reads one variable of type 'scalar' from Octave binary file
 
     See: octave_scalar::load_binary from libinterp/octave-value/ov-scalar.cc
     from GNU Octave source files
@@ -67,7 +67,7 @@ def read_scalar_var(f, verbose):
 
 
 def read_matrix_var(f, verbose):
-    """ Reads one variable of type 'matrix' from Octave binary file
+    """Reads one variable of type 'matrix' from Octave binary file
 
     See: octave_matrix::load_binary from libinterp/octave-value/ov-re-mat.cc
     from GNU Octave source files
@@ -115,7 +115,7 @@ def read_matrix_var(f, verbose):
 
 
 def read_complex_matrix_var(f, verbose):
-    """ Reads one variable of type 'complex matrix' from Octave binary file
+    """Reads one variable of type 'complex matrix' from Octave binary file
 
     See: octave_complex_matrix::load_binary from libinterp/octave-value/ov-cx-mat.cc
     from GNU Octave source files
@@ -169,7 +169,7 @@ def read_complex_matrix_var(f, verbose):
 
 
 def read_scalar_struct_var(f, verbose):
-    """ Reads one scalar structure variable from Octave binary file and returns
+    """Reads one scalar structure variable from Octave binary file and returns
     it as a dictionnary.
 
     See: octave_struct::load_binary from libinterp/octave-value/ov-struct.cc
@@ -201,7 +201,7 @@ def read_scalar_struct_var(f, verbose):
 
 
 def read_string_var(f, verbose):
-    """ Reads one sq_string variable from Octave binary file
+    """Reads one sq_string variable from Octave binary file
 
     See: octave_char_matrix_str::load_binary from octinterp/octave-value/ov-str-mat.cc
     from GNU Octave source files
@@ -238,7 +238,7 @@ def read_string_var(f, verbose):
 
 
 def read_cell_var(f, verbose):
-    """ Reads one Cell variable from Octave binary file and returns it as a list
+    """Reads one Cell variable from Octave binary file and returns it as a list
 
     See: octave_cell::load_binary from octinterp/octave-value/ov-cell.cc
     from GNU Octave source files
@@ -267,8 +267,53 @@ def read_cell_var(f, verbose):
     return var
 
 
+def read_fcn_handle_var(f, verbose):
+    """Reads fcn handle.
+
+    See: octave_fcn_handle::load_binary from octinterp/octave-value/ov-fcn-handle.cc
+    """
+
+    (tmp,) = unpack("i", f.read(4))
+    name = f.read(tmp).decode("ascii")
+    if name.startswith("anonymous"):
+        return f"Anonymous Fcn Handle ({name})"
+    else:
+        subtype = "simple"
+        if "\n" in name:
+            octaveroot, fpath, name = name.split("\n")
+        else:
+            octaveroot, fpath, name = "", "", name
+        if verbose:
+            print("octaveroot =", octaveroot)
+            print("fpath =", fpath)
+        name, subtype = octaveroot.split("@")
+        if subtype[0] != "<" or subtype[-1] != ">":
+            raise ValueError(f"Wrong subtype value {subtype}")
+        subtype = subtype[1:-1]
+        # dans octave_fcn_handle::load_binary, il appelle ensuite new_rep->load_binary,
+        # c'est-à-dire la fonction load_binary de la sous-classe correspondante,
+        # simple_fcn_handle::load_binary, scoped_fcn_handle::load_binary, base_nested_fcn_handle::load_binary,
+        # ou class_simple_fcn_handle::load_binary
+        # Parmi celles-ci, seule scoped_fcn_handle::load_binary continue à lire, avec
+        # octave_cell ov_cell;
+        # ov_cell.load_binary (is, swap, fmt);
+        # donc je suppose qu'il faut lire une variable de type cell.
+        if subtype == "simple":
+            return f"Simple Fcn Handle {name}"
+        elif subtype == "scopedfunction":
+            return read_cell_var(f, verbose)
+        elif subtype == "nested":
+            return f"Nested Fcn Handle {name}"
+        elif subtype == "classsimple":
+            return f"Class Simple Fcn Handle {name}"
+        else:
+            raise NotImplementedError(f"Unknown subtype {subtype}")
+
+    raise NotImplementedError
+
+
 def read_var(f, verbose):
-    """ Reads one variable from Octave binary file
+    """Reads one variable from Octave binary file
 
     Format is described in libinterp/corefcn/ls-oct-binary.cc
     recalled below.
@@ -360,7 +405,7 @@ def read_var(f, verbose):
         var = read_matrix_var(f, verbose)
     elif data_type == "complex matrix":
         var = read_complex_matrix_var(f, verbose)
-    elif data_type == "scalar struct":
+    elif data_type in ["scalar struct", "struct"]:
         var = read_scalar_struct_var(f, verbose)
     elif data_type == "string" or data_type == "sq_string" or data_type == "dq_string":
         # sq_string is single-quoted string
@@ -369,6 +414,8 @@ def read_var(f, verbose):
         var = read_string_var(f, verbose)
     elif data_type == "cell":
         var = read_cell_var(f, verbose)
+    elif data_type == "function handle":
+        var = read_fcn_handle_var(f, verbose)
     else:
         raise OctaveReaderError("NotImplemented: data_type =" + str(data_type))
 
@@ -376,7 +423,7 @@ def read_var(f, verbose):
 
 
 def read_octave_binary(path, verbose=False):
-    """ Reads an Octave binary file. Returns a dictionnary containing all the variables. """
+    """Reads an Octave binary file. Returns a dictionnary containing all the variables."""
     data = dict()
     with open(path, "rb") as f:
         _ = read_header(f, verbose)
