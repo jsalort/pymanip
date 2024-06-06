@@ -47,7 +47,7 @@ def openfig(filename):
                         marker = line_properties["marker"]
                         markeredgecolor = line_properties["markeredgecolor"]
                         markerfacecolor = line_properties["markerfacecolor"]
-                        # markersize = line_properties["markersize"]
+                        markersize = line_properties["markersize"]
                         linestyle = line_properties["linestyle"]
                         linewidth = line_properties["linewidth"]
                         color = line_properties["color"]
@@ -71,6 +71,9 @@ def openfig(filename):
                                 marker != "none"
                                 and markerfacecolor not in ["auto", "none"]
                             )
+                            else None,
+                            markersize=markersize
+                            if (marker != "none" and markersize)
                             else None,
                             linewidth=linewidth if linewidth != 0 else None,
                         )
