@@ -53,7 +53,7 @@ def openfig(filename):
                         color = line_properties["color"]
                         xdata = line_properties["xdata"]
                         ydata = line_properties["ydata"]
-                        if marker and markerfacecolor == "none":
+                        if marker and str(markerfacecolor) == "none":
                             markerfacecolor = "white"
                         ax.plot(
                             xdata,
@@ -63,13 +63,13 @@ def openfig(filename):
                             mec=markeredgecolor
                             if (
                                 marker != "none"
-                                and markeredgecolor not in ["auto", "none"]
+                                and str(markeredgecolor) not in ["auto", "none"]
                             )
                             else None,
                             mfc=markerfacecolor
                             if (
                                 marker != "none"
-                                and markerfacecolor not in ["auto", "none"]
+                                and str(markerfacecolor) not in ["auto", "none"]
                             )
                             else None,
                             markersize=markersize
