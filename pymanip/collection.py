@@ -42,14 +42,15 @@ class Manip(object):
         elif name in self.properties:
             value = self.properties[name]
         else:
-            if self.MI.has_log(name):
-                value = self.MI.log(name)
-            elif self.MI.has_dataset(name):
-                value = self.MI.dataset(name)
-            elif self.MI.has_parameter(name):
-                value = self.MI.parameter(name)
-            else:
-                raise KeyError("Key not found {:s}".format(name))
+            with self as MI:
+                if MI.has_log(name):
+                    value = MI.log(name)
+                elif MI.has_dataset(name):
+                    value = MI.dataset(name)
+                elif MI.has_parameter(name):
+                    value = MI.parameter(name)
+                else:
+                    raise KeyError("Key not found {:s}".format(name))
 
         return value
 
