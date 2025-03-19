@@ -902,9 +902,9 @@ class AsyncSession:
 
             try:
                 if use_ssl_submission:
-                    smtp_server = smtplib.SMTP_SSL(host, port)
+                    smtp_server = smtplib.SMTP_SSL(host, port, timeout=5)
                 else:
-                    smtp_server = smtplib.SMTP(host, port)
+                    smtp_server = smtplib.SMTP(host, port, timeout=5)
             except Exception as e:
                 print("Unable to connect to SMTP server")
                 print(e)
