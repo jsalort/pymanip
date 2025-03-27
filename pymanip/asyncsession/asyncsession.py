@@ -33,6 +33,7 @@ from matplotlib import MatplotlibDeprecationWarning
 
 from aiohttp import web
 import aiohttp_jinja2
+from aiofile import async_open
 import jinja2
 import tempfile
 import smtplib
@@ -187,6 +188,8 @@ class AsyncSession:
 
         self.custom_figures = None
         self.figure_list = []
+        self.egui_process = set()
+        self.egui_process_obj = set()
         self.template_dir = os.path.join(os.path.dirname(__file__), "web")
         self.static_dir = os.path.join(os.path.dirname(__file__), "web_static")
         self.jinja2_loader = jinja2.FileSystemLoader(self.template_dir)
@@ -882,14 +885,14 @@ class AsyncSession:
             msg.set_content("This is a MIME message")
             msg.add_alternative(message_html, subtype="html")
 
-            # Add figure images
+            # Add MPL figure images
             for fignum, fig in enumerate(self.figure_list):
                 fd, fname = tempfile.mkstemp(suffix=".png")
                 with os.fdopen(fd, "wb") as f_png:
                     fig.canvas.draw_idle()
                     fig.savefig(f_png)
-                with open(fname, "rb") as image_file:
-                    figure_data = image_file.read()
+                async with async_open(fname, "rb") as image_file:
+                    figure_data = await image_file.read()
                 os.remove(fname)
                 p = msg.get_payload()[1]
                 p.add_related(
@@ -899,6 +902,55 @@ class AsyncSession:
                     cid="{:d}{:}".format(fignum, datestr),
                     filename="fig{:d}-{:}.png".format(fignum, datestr),
                 )
+
+            # Add egui figures images
+            if self.egui_process:
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    for fignum in self.egui_process:
+                        reader, writer = await asyncio.open_connection(
+                            "127.0.0.1", 6913 + fignum
+                        )
+                        filename = str(
+                            (Path(temp_dir) / f"figure-{fignum}.png").absolute()
+                        )
+                        writer.write(filename.encode())
+                        await writer.drain()
+                        timeout = 30
+                        start = time.monotonic()
+
+                        while (
+                            (time.monotonic() - start < timeout)
+                            and self.running
+                            and (ok := await reader.read(100)) != b"OK"
+                        ):
+                            await asyncio.sleep(1)
+
+                        if ok == b"OK":
+                            # File has been generated
+                            print(
+                                "File has been generated as",
+                                filename,
+                                "for figure",
+                                fignum,
+                            )
+                            async with async_open(filename, "rb") as image_file:
+                                figure_data = await image_file.read()
+                            os.remove(filename)
+                            p = msg.get_payload()[1]
+                            p.add_related(
+                                figure_data,
+                                maintype="image",
+                                subtype="png",
+                                cid="{:d}{:}".format(fignum, datestr),
+                                filename="fig{:d}-{:}.png".format(fignum, datestr),
+                            )
+                        else:
+                            print("Error. Got", ok)
+
+                        writer.close()
+                        await writer.wait_closed()
+            else:
+                print("No figures to add to email")
 
             try:
                 if use_ssl_submission:
@@ -1197,13 +1249,27 @@ class AsyncSession:
                 fixed_xlim=fixed_xlim,
             )
         elif backend == "manip":
-            await asyncio.create_subprocess_exec(
+            self.egui_process.add(fignum)
+            proc = await asyncio.create_subprocess_exec(
                 manip_path,
                 "show",
                 str(self.session_path),
                 "-n",
                 str(fignum),
+                "-p",
+                str(6913 + fignum),
             )
+            self.egui_process_obj.add(proc)
+            # Wait until process is closed, or we have to stop running
+            while self.running:
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=1.0)
+                    break
+                except TimeoutError:
+                    continue
+            self.egui_process.remove(fignum)
+            self.egui_process_obj.remove(proc)
+            print(fignum, "removed from egui_process")
 
     async def figure_gui_update(self):
         """This method returns an asynchronous task which updates the figures created by the
