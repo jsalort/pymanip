@@ -1222,13 +1222,16 @@ class AsyncSession:
             )
             sesn.add(ff)
             sesn.flush()
-            for var in varnames:
-                sesn.add(
-                    self.db.FigureVariable(
-                        fignum=(fignum := ff.fignum),
-                        name=var,
+            if varnames is not None:
+                for var in varnames:
+                    sesn.add(
+                        self.db.FigureVariable(
+                            fignum=(fignum := ff.fignum),
+                            name=var,
+                        )
                     )
-                )
+            else:
+                fignum = ff.fignum
             sesn.commit()
 
         # Start backend
