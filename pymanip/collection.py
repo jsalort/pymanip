@@ -1,9 +1,9 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
+"""Collection (:mod:`pymanim.collection`)
+=========================================
 
-from __future__ import print_function
+"""
 
-from pymanip import SavedSession
+from pymanip.session import SavedSession
 from pymanip.legacy_session import OctSession
 import os
 import six

@@ -1,6 +1,5 @@
-"""
-
-pymanip CLI interface
+"""pymanip CLI interface
+========================
 
 """
 
@@ -25,7 +24,8 @@ from pymanip.util.video import (
 try:
     from pymanip.util.oscillo import Oscillo
     from pymanip.util.channel_selector import ChannelSelector
-except ModuleNotFoundError:
+except ModuleNotFoundError as e:
+    print(e)
     has_oscillo = False
 has_video = True
 

@@ -1,8 +1,15 @@
-#! /usr/bin/env python
-"""
-Module for experimental sessions.
+"""Module for experimental sessions (:mod:`pymanip.session`)
+============================================================
 
-Useful classes are Session and SavedSession.
+.. autoclass:: Session
+   :members:
+   :private-members:
+
+.. autoclass:: SavedSession
+   :members:
+   :private-members:
+   :show-inheritance:
+
 """
 
 import os
