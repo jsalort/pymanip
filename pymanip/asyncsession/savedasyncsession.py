@@ -191,9 +191,9 @@ class _SavedAsyncSession:
         with self.session as sesn:
             return sesn.dataset_names()
 
-    def datasets(self, name):
+    def datasets(self, name, raw=False):
         with self.session as sesn:
-            return sesn.datasets()
+            return sesn.datasets(name, raw)
 
     def dataset_last_data(self, name):
         """This method returns the last recorded dataset under the specified name.

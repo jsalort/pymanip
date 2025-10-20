@@ -571,7 +571,7 @@ class AsyncSession:
             names = {name for name, in session.query(self.db.DatasetName.name)}
         return names
 
-    def datasets(self, name):
+    def datasets(self, name, raw=False):
         """This method returns a generator which will yield all timestamps and datasets
         recorded under the specified name.
         The rationale for returning a generator instead of a list, is that each individual
@@ -602,7 +602,7 @@ class AsyncSession:
                 .filter_by(name=name)
                 .order_by(self.db.Dataset.timestamp)
             ):
-                yield timestamp, pickle.loads(data)
+                yield timestamp, pickle.loads(data) if not raw else data
 
     def dataset_last_data(self, name):
         """This method returns the last recorded dataset under the specified name.
