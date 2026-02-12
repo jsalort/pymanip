@@ -69,6 +69,10 @@ def NISysCfgGetResourceIndexedProperty(resourceHandle):
                 raise RuntimeError(
                     f"NISysCfgGetResourceIndexedProperty returned {str(NISysCfgStatus(status)):}"
                 )
-            indexed_data[attr.name] = val.value.decode("ascii")
+            try:
+                indexed_data[attr.name] = val.value.decode("ascii")
+            except UnicodeDecodeError:
+                indexed_data[attr.name] = val.value
+            
         data.append(indexed_data)
     return data

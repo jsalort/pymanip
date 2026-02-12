@@ -8,7 +8,7 @@ from pprint import pprint
 from ._lib.constants import *
 from .resource import NISysCfgHardwareEnumerator, NISysCfgResourceAttributeError
 
-preferred_experts = ["daqmx", "scope", "ni-visa", "ni-488.2"]
+preferred_experts = ["scope", "niscopescx", "daqmx", "ni-visa", "ni-488.2"]
 
 
 def find_resources():
@@ -71,4 +71,6 @@ def daqmx_devices():
 def scope_devices():
     return [
         info["scope"]["ExpertUserAlias"] for info in find_resources() if "scope" in info
+    ] + [
+        info["niscopescx"]["ExpertUserAlias"] for info in find_resources() if "niscopescx" in info
     ]

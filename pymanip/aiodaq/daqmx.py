@@ -34,8 +34,8 @@ from pymanip.aiodaq import (
 ConcreteTerminalConfig = {
     TerminalConfig.RSE: TerminalConfiguration.RSE,
     TerminalConfig.NRSE: TerminalConfiguration.NRSE,
-    TerminalConfig.Diff: TerminalConfiguration.DIFFERENTIAL,
-    TerminalConfig.PseudoDiff: TerminalConfiguration.PSEUDODIFFERENTIAL,
+    TerminalConfig.Diff: TerminalConfiguration.DIFF,
+    TerminalConfig.PseudoDiff: TerminalConfiguration.PSEUDO_DIFF,
 }
 
 
