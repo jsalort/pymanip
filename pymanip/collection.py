@@ -2,7 +2,6 @@
 =========================================
 
 """
-
 from pymanip.session import SavedSession
 from pymanip.legacy_session import OctSession
 import os
